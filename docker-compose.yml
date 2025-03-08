@@ -19,6 +19,8 @@ services:
       INFLUX_TOKEN: ${INFLUX_TOKEN}
       INFLUX_ORG: ${INFLUX_ORGANIZATION}
       INFLUX_BUCKET: ${INFLUX_BUCKET}
+      GOOGLE_OAUTH2_CLIENT_ID: 939239491866-unqfnuoqc0loboqoq9l4shji2i1atpei.apps.googleusercontent.com
+      GOOGLE_OAUTH2_CLIENT_SECRET: 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
     depends_on:
       rabbitmq:
         condition: service_healthy
