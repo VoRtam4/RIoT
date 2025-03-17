@@ -51,7 +51,12 @@ type RelationalDatabaseClient interface {
 	DeleteSDInstanceGroup(id uint32) error
 	PersistUser(user dllModel.User) sharedUtils.Result[uint]
 	LoadUserBasedOnOAuth2ProviderIssuedID(oauth2ProviderIssuedID string) sharedUtils.Result[sharedUtils.Optional[dllModel.User]]
-	// LoadUser(id uint) sharedUtils.Result[dllModel.User] TODO: Implement
+	LoadUser(id uint) sharedUtils.Result[dllModel.User]
+	LoadUserSessionBasedOnRefreshTokenHash(refreshTokenHash string) sharedUtils.Result[sharedUtils.Optional[dllModel.UserSession]]
+	PersistUserSession(userSession dllModel.UserSession) sharedUtils.Result[uint]
+	PersistUserConfig(userConfig dllModel.UserConfig) sharedUtils.Result[uint32]
+	LoadUserConfig(userId uint32) sharedUtils.Result[dllModel.UserConfig]
+	DeleteUserConfig(userId uint32) error
 }
 
 var ErrOperationWouldLeadToForeignKeyIntegrityBreach = errors.New("operation would lead to foreign key integrity breach")
@@ -99,6 +104,7 @@ func (r *relationalDatabaseClientImpl) setup() {
 		new(dbModel.SDInstanceGroupMembershipEntity),
 		new(dbModel.SDInstanceKPIDefinitionRelationshipEntity),
 		new(dbModel.UserEntity),
+		new(dbModel.UserSessionEntity),
 		new(dbModel.UserConfigEntity),
 	), "[RDB client (GORM)]: auto-migration failed")
 }
@@ -553,4 +559,69 @@ func (r *relationalDatabaseClientImpl) LoadUserBasedOnOAuth2ProviderIssuedID(oau
 		}
 	}
 	return sharedUtils.NewSuccessResult[sharedUtils.Optional[dllModel.User]](sharedUtils.NewOptionalOf(db2dll.ToDLLModelUser(userEntityLoadResult.GetPayload())))
+}
+
+func (r *relationalDatabaseClientImpl) LoadUser(id uint) sharedUtils.Result[dllModel.User] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	// TODO: Implement
+	return sharedUtils.NewFailureResult[dllModel.User](errors.New("[RDB client (GORM)]: not implemented"))
+}
+
+func (r *relationalDatabaseClientImpl) LoadUserSessionBasedOnRefreshTokenHash(refreshTokenHash string) sharedUtils.Result[sharedUtils.Optional[dllModel.UserSession]] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	userSessionEntityLoadResult := dbUtil.LoadEntityFromDB[dbModel.UserSessionEntity](r.db, dbUtil.Where("refresh_token_hash = ?", refreshTokenHash))
+	if userSessionEntityLoadResult.IsFailure() {
+		userSessionEntityLoadError := userSessionEntityLoadResult.GetError()
+		if errors.Is(userSessionEntityLoadError, gorm.ErrRecordNotFound) {
+			return sharedUtils.NewSuccessResult[sharedUtils.Optional[dllModel.UserSession]](sharedUtils.NewEmptyOptional[dllModel.UserSession]())
+		} else {
+			return sharedUtils.NewFailureResult[sharedUtils.Optional[dllModel.UserSession]](userSessionEntityLoadError)
+		}
+	}
+	return sharedUtils.NewSuccessResult[sharedUtils.Optional[dllModel.UserSession]](sharedUtils.NewOptionalOf(db2dll.ToDLLModelUserSession(userSessionEntityLoadResult.GetPayload())))
+}
+
+func (r *relationalDatabaseClientImpl) PersistUserSession(userSession dllModel.UserSession) sharedUtils.Result[uint] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	userSessionEntity := dll2db.ToDBModelEntityUserSession(userSession)
+	if err := dbUtil.PersistEntityIntoDB(r.db, &userSessionEntity); err != nil {
+		return sharedUtils.NewFailureResult[uint](err)
+	}
+	return sharedUtils.NewSuccessResult[uint](userSessionEntity.ID)
+}
+
+func (r *relationalDatabaseClientImpl) PersistUserConfig(userConfig dllModel.UserConfig) sharedUtils.Result[uint32] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	userConfigEntity := dll2db.ToDBModelEntityUserConfig(userConfig)
+
+	if err := dbUtil.PersistEntityIntoDB(r.db, &userConfigEntity); err != nil {
+		return sharedUtils.NewFailureResult[uint32](err)
+	}
+
+	return sharedUtils.NewSuccessResult[uint32](userConfigEntity.UserID)
+}
+
+func (r *relationalDatabaseClientImpl) LoadUserConfig(userId uint32) sharedUtils.Result[dllModel.UserConfig] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	userConfigEntityLoadResult := dbUtil.LoadEntityFromDB[dbModel.UserConfigEntity](r.db, dbUtil.Where("user_id = ?", userId))
+
+	if userConfigEntityLoadResult.IsFailure() {
+		return sharedUtils.NewFailureResult[dllModel.UserConfig](userConfigEntityLoadResult.GetError())
+	}
+
+	return sharedUtils.NewSuccessResult(db2dll.ToDLLModelUserConfig(userConfigEntityLoadResult.GetPayload()))
+}
+
+func (r *relationalDatabaseClientImpl) DeleteUserConfig(userId uint32) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return dbUtil.DeleteCertainEntityBasedOnId[dbModel.UserConfigEntity](r.db, userId)
 }
