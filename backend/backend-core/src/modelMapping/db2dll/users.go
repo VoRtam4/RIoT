@@ -17,6 +17,26 @@ func ToDLLModelUser(userEntity dbModel.UserEntity) dllModel.User {
 		OAuth2Provider:         sharedUtils.NewOptionalFromPointer[string](userEntity.OAuth2Provider),
 		OAuth2ProviderIssuedID: sharedUtils.NewOptionalFromPointer[string](userEntity.OAuth2ProviderIssuedID),
 		LastLoginAt:            sharedUtils.NewOptionalFromPointer[time.Time](userEntity.LastLoginAt),
-		// TODO: Implement 'Invocations' as needed
+		Sessions:               sharedUtils.Map(userEntity.Sessions, ToDLLModelUserSession),
+		// TODO: Implement 'Invocations', 'UserConfig' and other possibly missing fields as needed
+	}
+}
+
+func ToDLLModelUserSession(userSessionEntity dbModel.UserSessionEntity) dllModel.UserSession {
+	return dllModel.UserSession{
+		ID:               sharedUtils.NewOptionalOf(userSessionEntity.ID),
+		UserID:           userSessionEntity.UserID,
+		RefreshTokenHash: userSessionEntity.RefreshTokenHash,
+		ExpiresAt:        userSessionEntity.ExpiresAt,
+		Revoked:          userSessionEntity.Revoked,
+		IPAddress:        userSessionEntity.IPAddress,
+		UserAgent:        userSessionEntity.UserAgent,
+	}
+}
+
+func ToDLLModelUserConfig(userConfig dbModel.UserConfigEntity) dllModel.UserConfig {
+	return dllModel.UserConfig{
+		UserID: userConfig.UserID,
+		Config: userConfig.Config,
 	}
 }
