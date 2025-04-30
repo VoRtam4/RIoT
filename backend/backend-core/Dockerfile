@@ -15,5 +15,13 @@ RUN go mod tidy
 RUN go mod download
 # Build the Go app
 RUN CGO_ENABLED=0 GOOS=linux go build -o RIoT-backend-core src/main.go
-# Run the executable
+
+# Move to production alpine image
+FROM alpine AS prod
+
+COPY --from=build /app/backend-core/RIoT-backend-core /app/backend-core/RIoT-backend-core
+
+# Copy the GraphQL schema file
+COPY --from=build /app/backend-core/src/api/graphql/schema.graphqls /app/backend-core/schema.graphqls
+
 CMD ["/app/backend-core/RIoT-backend-core"]

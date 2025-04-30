@@ -3,6 +3,7 @@ package dbClient
 import (
 	"errors"
 	"fmt"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/db/misc"
 	"log"
 	"strings"
 	"sync"
@@ -27,6 +28,7 @@ var (
 
 type RelationalDatabaseClient interface {
 	setup()
+	PerformOnStartupOperations() error
 	PersistKPIDefinition(kpiDefinition sharedModel.KPIDefinition) sharedUtils.Result[uint32]
 	LoadKPIDefinition(id uint32) sharedUtils.Result[sharedModel.KPIDefinition]
 	LoadKPIDefinitions() sharedUtils.Result[[]sharedModel.KPIDefinition]
@@ -107,6 +109,17 @@ func (r *relationalDatabaseClientImpl) setup() {
 		new(dbModel.UserSessionEntity),
 		new(dbModel.UserConfigEntity),
 	), "[RDB client (GORM)]: auto-migration failed")
+}
+
+func (r *relationalDatabaseClientImpl) PerformOnStartupOperations() error {
+	createGraphQLAPISnapshotResult := misc.CreateGraphQLAPISnapshot()
+	if createGraphQLAPISnapshotResult.IsFailure() {
+		return createGraphQLAPISnapshotResult.GetError()
+	}
+	graphQLAPISnapshot := createGraphQLAPISnapshotResult.GetPayload()
+	sharedUtils.Dump(graphQLAPISnapshot)
+	// TODO: Proceed with database operations, using the API snapshot as a reference
+	return nil
 }
 
 func (r *relationalDatabaseClientImpl) PersistKPIDefinition(kpiDefinition sharedModel.KPIDefinition) sharedUtils.Result[uint32] {
