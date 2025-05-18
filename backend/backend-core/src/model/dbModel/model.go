@@ -144,31 +144,31 @@ type UserEntity struct {
 	Sessions               []UserSessionEntity         `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
 	Invocations            []SDCommandInvocationEntity `gorm:"foreignKey:UserId;constraint:OnDelete:CASCADE"`
 	UserConfig             UserConfigEntity            `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
-/*
-	ID        uint           `gorm:"primaryKey"` // Primary key for the user
-	CreatedAt time.Time      // Timestamp of creation
-	UpdatedAt time.Time      // Timestamp of the last update
-	DeletedAt gorm.DeletedAt `gorm:"index"` // Soft delete field
+	/*
+	   ID        uint           `gorm:"primaryKey"` // Primary key for the user
+	   CreatedAt time.Time      // Timestamp of creation
+	   UpdatedAt time.Time      // Timestamp of the last update
+	   DeletedAt gorm.DeletedAt `gorm:"index"` // Soft delete field
 
-	// Basic User Information
-	Username     string `gorm:"uniqueIndex;size:100"` // Unique username for the user
-	Email        string `gorm:"uniqueIndex;size:255"` // User's email address (unique)
-	Name         string `gorm:"size:255"`             // Full name of the user
-	ProfileImage string `gorm:"size:500"`             // URL to the user's profile image
+	   // Basic User Information
+	   Username     string `gorm:"uniqueIndex;size:100"` // Unique username for the user
+	   Email        string `gorm:"uniqueIndex;size:255"` // User's email address (unique)
+	   Name         string `gorm:"size:255"`             // Full name of the user
+	   ProfileImage string `gorm:"size:500"`             // URL to the user's profile image
 
-	// OAuth Information
-	Provider     string    `gorm:"size:50"`        // OAuth provider name (e.g., google, github)
-	ProviderID   string    `gorm:"size:255;index"` // Unique ID provided by the OAuth provider
-	OAuthToken   string    `gorm:"size:500"`       // OAuth access token
-	RefreshToken string    `gorm:"size:500"`       // OAuth refresh token, if available
-	TokenExpiry  time.Time // Expiration time of the OAuth token
+	   // OAuth Information
+	   Provider     string    `gorm:"size:50"`        // OAuth provider name (e.g., google, github)
+	   ProviderID   string    `gorm:"size:255;index"` // Unique ID provided by the OAuth provider
+	   OAuthToken   string    `gorm:"size:500"`       // OAuth access token
+	   RefreshToken string    `gorm:"size:500"`       // OAuth refresh token, if available
+	   TokenExpiry  time.Time // Expiration time of the OAuth token
 
-	// Additional Metadata
-	LastLoginAt time.Time                   // Timestamp of the last login
-	IsActive    bool                        `gorm:"default:true"` // Whether the user's account is active
-	Invocations []SDCommandInvocationEntity `gorm:"foreignKey:UserId;constraint:OnDelete:CASCADE"`
-	UserConfig  UserConfigEntity            `gorm:"foreignKey:UserId;constraint:OnDelete:CASCADE"`
-*/
+	   // Additional Metadata
+	   LastLoginAt time.Time                   // Timestamp of the last login
+	   IsActive    bool                        `gorm:"default:true"` // Whether the user's account is active
+	   Invocations []SDCommandInvocationEntity `gorm:"foreignKey:UserId;constraint:OnDelete:CASCADE"`
+	   UserConfig  UserConfigEntity            `gorm:"foreignKey:UserId;constraint:OnDelete:CASCADE"`
+	*/
 }
 
 func (UserEntity) TableName() string { // TODO: Standardize table names, e.g. 'user' × 'users'
@@ -220,4 +220,14 @@ type SDCommandInvocationEntity struct {
 
 func (SDCommandInvocationEntity) TableName() string {
 	return "command_invocation"
+}
+
+type GraphQLOperationEntity struct {
+	ID            uint32 `gorm:"column:id;primaryKey;not null"`
+	Identifier    string `gorm:"column:identifier;not null;uniqueIndex"`
+	OperationType string `gorm:"column:operation_type;not null;check:operation_type IN ('query', 'mutation', 'subscription')"`
+}
+
+func (GraphQLOperationEntity) TableName() string {
+	return "graphql_operations"
 }
