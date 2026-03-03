@@ -1,28 +1,28 @@
-version: '2'
+##/
+ # @File: docker-compose.yml
+ # @Author: Dominik Vondruška
+ # @Project: Bakalářská práce — Systém pro monitorování otevřených dat v reálném čase
+ # @Description: Soubor byl převzat z původního systému RIOT a doplněn o nové služby a upraven. 
+##/
+
+version: '3'
 
 services:
-
-  riot-frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    environment:
-      BACKEND_CORE_URL: ${BACKEND_CORE_URL}
-    depends_on:
-        - riot-backend-core
-    ports:
-        - "8080:80"
-
   riot-backend-core:
     build:
       context: ./backend
       dockerfile: backend-core/Dockerfile
     environment:
       POSTGRES_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB_NAME}
+      INFLUXDB_URL: http://influxdb:8086
       RABBITMQ_URL: ${RABBITMQ_URL}
+      INFLUX_TOKEN: ${INFLUX_TOKEN}
+      INFLUX_ORG: ${INFLUX_ORG}
+      INFLUX_BUCKET: ${INFLUX_BUCKET}
     depends_on:
       - rabbitmq
       - postgres
+      - influxdb
     ports:
       - "9090:9090"
     #cpu_quota: 1000 # 1% of a single CPU core
@@ -41,37 +41,18 @@ services:
     #cpu_quota: 1000 # 1% of a single CPU core
     #mem_limit: 32m # 32 MB of RAM
 
-  riot-mqtt-preprocessor:
-    build:
-      context: ./backend
-      dockerfile: mqtt-preprocessor/Dockerfile
-    environment:
-      MQTT_BROKER_URL: mqtt://mosquitto:1883
-      MQTT_BROKER_USERNAME: admin
-      MQTT_BROKER_PASSWORD: password
-      MQTT_TOPIC: topic
-      BACKEND_CORE_URL: ${BACKEND_CORE_URL}
-      RABBITMQ_URL: ${RABBITMQ_URL}
-    depends_on:
-      - rabbitmq
-      - mosquitto # TODO: Consider getting rid of this 'dependency' (by adding a full-fledged MQTT configuration)
-      - riot-backend-core # 'Backend-core' has to set up the 'RabbitMQ infrastructure'
-    #cpu_quota: 1000 # 1% of a single CPU core
-    #mem_limit: 32m # 32 MB of RAM
-
   mosquitto:
     image: eclipse-mosquitto:latest
     ports:
       - "9001:9001"
       - "1883:1883"
     volumes:
-      - ./docker/mosquitto-config/mosquitto.conf:/mosquitto/config/mosquitto.conf
-      - ./docker/mosquitto-config/password.txt:/mosquitto/config/password.txt
-      - ./docker/mosquitto-data:/mosquitto/data
-      - ./docker/mosquitto-log:/mosquitto/log
+        - ./docker/mosquitto-config:/mosquitto/config
+        - ./docker/mosquitto-data:/mosquitto/data
+        - ./docker/mosquitto-log:/mosquitto/log
 
   postgres:
-    image: postgres:latest
+    image: postgres:16
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -80,6 +61,7 @@ services:
       - "5432:5432"
     volumes:
       - ./docker/postgres-data:/var/lib/postgresql/data
+      - ./pg_backup:/backup
 
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -91,10 +73,23 @@ services:
 
   rabbitmq:
     image: rabbitmq:3-management
+    container_name: riot-rabbitmq
     ports:
-      - "5672:5672" # Main (amqp)
-      - "15672:15672" # Management
-      - "15692:15692" # Prometheus
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # Management UI
+      - "15692:15692"  # Prometheus (nepovinné)
+    environment:
+      RABBITMQ_DEFAULT_USER: riot
+      RABBITMQ_DEFAULT_PASS: secret
+      RABBITMQ_ERLANG_COOKIE: "my_shared_cookie"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   grafana:
     image: grafana/grafana-enterprise
@@ -124,3 +119,28 @@ services:
       MQTT_TOPIC: topic
       MQTT_USERNAME: admin
       MQTT_PASSWORD: password
+
+  influxdb:
+    image: influxdb:2.7
+    container_name: riot-influxdb
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_USER}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_PASSWORD}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8086/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+volumes:
+  rabbitmq_data:
+  influxdb_data:
