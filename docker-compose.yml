@@ -14,10 +14,10 @@ services:
       dockerfile: backend-core/Dockerfile
     environment:
       POSTGRES_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB_NAME}
-      INFLUXDB_URL: http://influxdb:8086
+      INFLUX_URL: ${INFLUX_URL}
       RABBITMQ_URL: ${RABBITMQ_URL}
       INFLUX_TOKEN: ${INFLUX_TOKEN}
-      INFLUX_ORG: ${INFLUX_ORG}
+      INFLUX_ORG: ${INFLUX_ORGANIZATION}
       INFLUX_BUCKET: ${INFLUX_BUCKET}
     depends_on:
       - rabbitmq
@@ -60,7 +60,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./docker/postgres-data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
       - ./pg_backup:/backup
 
   pgadmin:
@@ -78,10 +78,10 @@ services:
       - "8086:8086"
     environment:
       - DOCKER_INFLUXDB_INIT_MODE=setup
-      - DOCKER_INFLUXDB_INIT_USERNAME=user
-      - DOCKER_INFLUXDB_INIT_PASSWORD=password
-      - DOCKER_INFLUXDB_INIT_ORG=jiap
-      - DOCKER_INFLUXDB_INIT_BUCKET=jiap-time-series
+      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUX_USER}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUX_PASSWORD}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUX_ORGANIZATION}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUX_BUCKET}
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=Fgp2ozMxmkYnUBkzwLpkx6ydOVXyQqF4-ZPctGjv8-xkirYPYRvoBtrpAHMCr_joYoJMOqZjl8djjuyOx-MR_A==
     healthcheck:
       test: [ "CMD", "influx", "ping" ]
@@ -96,10 +96,10 @@ services:
     environment:
       BACKEND_CORE_URL: ${BACKEND_CORE_URL}
       RABBITMQ_URL: ${RABBITMQ_URL}
-      INFLUX_ORGANIZATION: jiap
-      INFLUX_BUCKET: jiap-time-series
-      INFLUX_URL: http://influxdb:8086
-      INFLUX_TOKEN: Fgp2ozMxmkYnUBkzwLpkx6ydOVXyQqF4-ZPctGjv8-xkirYPYRvoBtrpAHMCr_joYoJMOqZjl8djjuyOx-MR_A==
+      INFLUX_ORGANIZATION: ${INFLUX_ORGANIZATION}
+      INFLUX_BUCKET: ${INFLUX_BUCKET}
+      INFLUX_URL: ${INFLUX_URL}
+      INFLUX_TOKEN: ${INFLUX_TOKEN}
     depends_on:
       - rabbitmq
       - riot-backend-core # 'Backend-core' has to set up the 'RabbitMQ infrastructure'
@@ -112,8 +112,8 @@ services:
       - "15672:15672"  # Management UI
       - "15692:15692"  # Prometheus (nepovinné)
     environment:
-      RABBITMQ_DEFAULT_USER: riot
-      RABBITMQ_DEFAULT_PASS: secret
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
       RABBITMQ_ERLANG_COOKIE: "my_shared_cookie"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
@@ -156,27 +156,6 @@ services:
       MQTT_USERNAME: admin
       MQTT_PASSWORD: password
 
-  influxdb:
-    image: influxdb:2.7
-    container_name: riot-influxdb
-    ports:
-      - "8086:8086"
-    volumes:
-      - influxdb_data:/var/lib/influxdb2
-    environment:
-      DOCKER_INFLUXDB_INIT_MODE: setup
-      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_USER}
-      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_PASSWORD}
-      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG}
-      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET}
-      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN}
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8086/health"]
-      interval: 5s
-      timeout: 3s
-      retries: 30
-    restart: unless-stopped
-
 volumes:
   rabbitmq_data:
-  influxdb_data:
+  postgres_data:

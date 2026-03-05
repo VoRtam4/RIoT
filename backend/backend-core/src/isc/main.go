@@ -3,6 +3,9 @@ package isc
 import (
 	"errors"
 	"fmt"
+	"log"
+	"time"
+
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/db/dbClient"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dllModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
@@ -11,7 +14,6 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedConstants"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
-	"log"
 )
 
 func ProcessIncomingMessageProcessingUnitConnectionNotifications() {
@@ -34,6 +36,26 @@ func ProcessIncomingSDInstanceRegistrationRequests(sdInstanceGraphQLSubscription
 			select {
 			case *sdInstanceGraphQLSubscriptionChannel <- dll2gql.ToGraphQLModelSDInstance(newSDInstancePersistResult.GetPayload()):
 			default:
+			}
+			eventTime := sdInstanceRegistrationRequestISCMessage.EventTime
+			if eventTime.IsZero() {
+				eventTime = time.Now().UTC()
+			}
+
+			rawRecord := sharedModel.TimeSeriesRawRecord{
+				EventTime:           eventTime,
+				SDInstanceUID:       newSDInstanceUID,
+				SDTypeSpecification: newSDInstanceSDTypeSpecification,
+				Parameters:          map[string]interface{}{},
+			}
+
+			jsonResult := sharedUtils.SerializeToJSON(rawRecord)
+			if jsonResult.IsSuccess() {
+				_ = rabbitMQClient.PublishJSONMessage(
+					sharedUtils.NewEmptyOptional[string](),
+					sharedUtils.NewOptionalOf(sharedConstants.TimeSeriesRawDataQueueName),
+					jsonResult.GetPayload(),
+				)
 			}
 		} else if newSDInstancePersistError := newSDInstancePersistResult.GetError(); !errors.Is(newSDInstancePersistError, dbClient.ErrOperationWouldLeadToForeignKeyIntegrityBreach) {
 			return fmt.Errorf("failed to persist a new SD instance with UID = %s and SD type specification = %s: %w", newSDInstanceUID, newSDInstanceSDTypeSpecification, newSDInstancePersistError)
@@ -65,6 +87,28 @@ func ProcessIncomingKPIFulfillmentCheckResults(kpiFulfillmentCheckResultGraphQLS
 			select {
 			case *kpiFulfillmentCheckResultGraphQLSubscriptionChannel <- gqlKPIFulfillmentCheckResultTuple:
 			default:
+			}
+			for _, kpiFulfillmentCheckResult := range kpiFulfillmentCheckResultTuple {
+				eventTime := kpiFulfillmentCheckResult.EventTime
+				if eventTime.IsZero() {
+					eventTime = time.Now().UTC()
+				}
+
+				record := sharedModel.TimeSeriesKPIResultRecord{
+					EventTime:       eventTime,
+					SDInstanceUID:   kpiFulfillmentCheckResult.SDInstanceUID,
+					KPIDefinitionID: kpiFulfillmentCheckResult.KPIDefinitionID,
+					Fulfilled:       kpiFulfillmentCheckResult.Fulfilled,
+				}
+
+				jsonResult := sharedUtils.SerializeToJSON(record)
+				if jsonResult.IsSuccess() {
+					_ = rabbitMQClient.PublishJSONMessage(
+						sharedUtils.NewEmptyOptional[string](),
+						sharedUtils.NewOptionalOf(sharedConstants.TimeSeriesKPIResultQueueName),
+						jsonResult.GetPayload(),
+					)
+				}
 			}
 		} else if kpiFulfillmentCheckResultTuplePersistError := kpiFulfillmentCheckResultTuplePersistResult.GetError(); !errors.Is(kpiFulfillmentCheckResultTuplePersistError, dbClient.ErrOperationWouldLeadToForeignKeyIntegrityBreach) {
 			return fmt.Errorf("failed to persist KPI fulfillment check result tuple: %w", kpiFulfillmentCheckResultTuplePersistError)

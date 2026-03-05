@@ -3,16 +3,17 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"net/url"
+	"os"
+	"time"
+
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/rabbitmq"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedConstants"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/xjohnp00/jiap/backend/shared/time-series-store/src/internal"
-	"log"
-	"net/url"
-	"os"
-	"time"
 )
 
 func main() {
@@ -52,60 +53,68 @@ func main() {
 
 	sharedUtils.WaitForAll(
 		func() {
-			err := consumeInputMessages(rabbitMQClient, influx)
-
-			if err != nil {
+			if err := consumeRawRecords(rabbitMQClient, influx); err != nil {
 				log.Println(err.Error())
 			}
 		},
 		func() {
-			err := consumeReadRequests(rabbitMQClient, influx)
-
-			if err != nil {
+			if err := consumeKPIRecords(rabbitMQClient, influx); err != nil {
+				log.Println(err.Error())
+			}
+		},
+		func() {
+			if err := consumeReadRequests(rabbitMQClient, influx); err != nil {
 				log.Println(err.Error())
 			}
 		},
 	)
 }
 
-func consumeInputMessages(rabbitMQClient rabbitmq.Client, influx internal.Influx2Client) error {
-	err := rabbitmq.ConsumeJSONMessages[sharedModel.InputData](rabbitMQClient, sharedConstants.TimeSeriesStoreDataQueueName, func(messagePayload sharedModel.InputData) error {
-		log.Printf("Writing: %s \n", messagePayload.SDInstanceUID)
-		influx.Write(messagePayload)
-		return nil
-	})
-	return err
+func consumeRawRecords(rabbitMQClient rabbitmq.Client, influx internal.Influx2Client) error {
+	return rabbitmq.ConsumeJSONMessages[sharedModel.TimeSeriesRawRecord](
+		rabbitMQClient,
+		sharedConstants.TimeSeriesRawDataQueueName,
+		func(record sharedModel.TimeSeriesRawRecord) error {
+			influx.WriteRaw(record)
+			return nil
+		},
+	)
+}
+
+func consumeKPIRecords(rabbitMQClient rabbitmq.Client, influx internal.Influx2Client) error {
+	return rabbitmq.ConsumeJSONMessages[sharedModel.TimeSeriesKPIResultRecord](
+		rabbitMQClient,
+		sharedConstants.TimeSeriesKPIResultQueueName,
+		func(record sharedModel.TimeSeriesKPIResultRecord) error {
+			influx.WriteKPI(record)
+			return nil
+		},
+	)
 }
 
 func consumeReadRequests(rabbitMQClient rabbitmq.Client, influx internal.Influx2Client) error {
-	err := rabbitmq.ConsumeJSONMessagesWithAccessToDelivery[sharedModel.ReadRequestBody](
+	return rabbitmq.ConsumeJSONMessagesWithAccessToDelivery[sharedModel.TimeSeriesReadRequest](
 		rabbitMQClient,
 		sharedConstants.TimeSeriesReadRequestQueueName,
 		"",
-		func(readRequestBody sharedModel.ReadRequestBody, delivery amqp.Delivery) error {
-			result := influx.Query(readRequestBody)
+		func(req sharedModel.TimeSeriesReadRequest, delivery amqp.Delivery) error {
+			result := influx.Query(req)
 
-			if result.IsFailure() {
-				log.Println(result.GetError())
-			}
-
-			responseWithData := sharedModel.ReadRequestResponseOrError{
+			resp := sharedModel.TimeSeriesReadResponse{
 				Data:  nil,
 				Error: "",
 			}
 
 			if result.IsSuccess() {
-				responseWithData.Data = result.GetPayload()
+				resp.Data = result.GetPayload()
+			} else {
+				resp.Error = result.GetError().Error()
 			}
 
-			if result.IsFailure() {
-				responseWithData.Error = result.GetError().Error()
-			}
-
-			jsonData, err := json.Marshal(responseWithData)
-
+			jsonData, err := json.Marshal(resp)
 			if err != nil {
-				log.Printf("Error During Marshall: %s", err)
+				log.Printf("Error during marshal: %s", err)
+				return nil
 			}
 
 			err = rabbitMQClient.PublishJSONMessageRPC(
@@ -117,13 +126,12 @@ func consumeReadRequests(rabbitMQClient rabbitmq.Client, influx internal.Influx2
 			)
 
 			if err != nil {
-				log.Fatalf("Error: %s", err)
+				log.Printf("Error publishing RPC response: %s", err)
 				return err
 			}
 			return nil
 		},
 	)
-	return err
 }
 
 func parseParameters() (bool, internal.TimeSeriesStoreEnvironment) {

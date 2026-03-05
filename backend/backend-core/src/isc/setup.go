@@ -2,6 +2,7 @@ package isc
 
 import (
 	"fmt"
+
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/rabbitmq"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedConstants"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
@@ -19,9 +20,10 @@ func SetupRabbitMQInfrastructureForISC(rabbitMQClient rabbitmq.Client) {
 		sharedConstants.SetOfSDTypesUpdatesQueueName,
 		sharedConstants.SetOfSDInstancesUpdatesQueueName,
 		sharedConstants.MessageProcessingUnitConnectionNotificationsQueueName,
-		sharedConstants.TimeSeriesStoreDataQueueName,
+		sharedConstants.TimeSeriesRawDataQueueName,
+		sharedConstants.TimeSeriesKPIResultQueueName,
 		sharedConstants.TimeSeriesReadRequestQueueName,
-		sharedConstants.TimeSeriesReadRequestBackendCoreResponseQueueName,
+		sharedConstants.TimeSeriesReadResponseQueueName,
 	)
 	sharedUtils.ForEach(namesOfQueuesToDeclare, func(nameOfQueuesToDeclare string) {
 		sharedUtils.TerminateOnError(rabbitMQClient.DeclareQueue(nameOfQueuesToDeclare), getQueueDeclarationErrorMessage(nameOfQueuesToDeclare))

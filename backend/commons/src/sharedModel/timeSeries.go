@@ -1,5 +1,56 @@
 package sharedModel
 
+import "time"
+
+type TimeSeriesRawRecord struct {
+	EventTime           time.Time              `json:"eventTime"`
+	SDInstanceUID       string                 `json:"sdInstanceUID"`
+	SDTypeSpecification string                 `json:"sdTypeSpecification"`
+	Source              string                 `json:"source,omitempty"`
+	Parameters          map[string]interface{} `json:"parameters"`
+}
+
+type TimeSeriesKPIResultRecord struct {
+	EventTime           time.Time `json:"eventTime"`
+	SDInstanceUID       string    `json:"sdInstanceUID"`
+	SDTypeSpecification string    `json:"sdTypeSpecification"`
+	KPIDefinitionID     uint32    `json:"kpiDefinitionID"`
+	Source              string    `json:"source,omitempty"`
+	Fulfilled           bool      `json:"fulfilled"`
+}
+
+type TimeSeriesType string
+
+const (
+	TimeSeriesTypeRaw       TimeSeriesType = "RAW"
+	TimeSeriesTypeKPIResult TimeSeriesType = "KPI"
+)
+
+type TimeSeriesReadRequest struct {
+	Type                TimeSeriesType `json:"type"`
+	SDInstanceUID       *string        `json:"sdInstanceUID,omitempty"`
+	SDTypeSpecification *string        `json:"sdTypeSpecification,omitempty"`
+	KPIDefinitionID     *uint32        `json:"kpiDefinitionID,omitempty"`
+	Source              *string        `json:"source,omitempty"`
+	From                *time.Time     `json:"from,omitempty"`
+	To                  *time.Time     `json:"to,omitempty"`
+	AggregateMinutes    *int           `json:"aggregateMinutes,omitempty"`
+}
+
+type TimeSeriesDataPoint struct {
+	Time time.Time              `json:"time"`
+	Tags map[string]string      `json:"tags,omitempty"`
+	Data map[string]interface{} `json:"data"`
+}
+
+type TimeSeriesReadResponse struct {
+	Data  []TimeSeriesDataPoint `json:"data,omitempty"`
+	Error string                `json:"error,omitempty"`
+}
+
+/*
+package sharedModel
+
 import (
 	"encoding/json"
 	"fmt"
@@ -134,3 +185,4 @@ func (simpleSensors SimpleSensors) MarshalJSON() ([]byte, error) {
 func (sensorsWithFields SensorsWithFields) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string][]string(sensorsWithFields))
 }
+*/

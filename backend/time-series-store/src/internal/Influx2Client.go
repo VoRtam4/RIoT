@@ -3,13 +3,19 @@ package internal
 import (
 	"context"
 	"fmt"
+	"log"
+	"strings"
+	"time"
+
 	sharedModel "github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/influxdata/influxdb-client-go/v2/api"
-	"log"
-	"strings"
-	"time"
+)
+
+const (
+	measurementRaw = "raw_data"
+	measurementKPI = "kpi_results"
 )
 
 type Influx2Client struct {
@@ -24,7 +30,7 @@ type Influx2Client struct {
 func NewInflux2Client(endpoint string, token string, organization string, bucket string) Influx2Client {
 	client := influxdb2.NewClientWithOptions(endpoint, token, influxdb2.DefaultOptions().SetBatchSize(20))
 
-	influx2Client := Influx2Client{
+	return Influx2Client{
 		endpoint:     endpoint,
 		organization: organization,
 		bucket:       bucket,
@@ -32,201 +38,245 @@ func NewInflux2Client(endpoint string, token string, organization string, bucket
 		writeApi:     client.WriteAPIBlocking(organization, bucket),
 		queryApi:     client.QueryAPI(organization),
 	}
-	return influx2Client
 }
 
-func (influx2Client Influx2Client) Query(body sharedModel.ReadRequestBody) sharedUtils.Result[[]sharedModel.OutputData] {
-	aggregation := createAggregation(body)
-	timeRange := convertTimeToQueryTimePart(body)
-	filter := createFilter(body)
-	imports := ""
-
-	if body.Timezone != "" {
-		imports = "import \"timezone\""
+func (c Influx2Client) WriteRaw(record sharedModel.TimeSeriesRawRecord) {
+	if record.EventTime.IsZero() {
+		record.EventTime = time.Now().UTC()
 	}
 
-	query := fmt.Sprintf("%s\n\n"+ // imports
-		"from(bucket: \"%s\")\n"+
-		"  %s\n"+ // time range
-		"  %s\n"+ // filter
-		"  %s\n"+ // aggregation
-		"  |> drop(columns: [\"_start\", \"_stop\", \"host\", \"deviceType\"])\n"+
-		"  |> pivot(columnKey: [\"_field\"], rowKey: [\"_measurement\", \"_time\"], valueColumn: \"_value\")\n"+
-		"  |> rename(columns: {_time: \"time\", _measurement: \"deviceId\"})\n"+
-		"  |> group(columns: [\"measurement\"], mode: \"by\")", imports, influx2Client.bucket, timeRange, filter, aggregation)
+	tags := map[string]string{
+		"sdInstanceUID": record.SDInstanceUID,
+		"sdType":        record.SDTypeSpecification,
+	}
 
-	log.Println(query)
+	if record.Source != "" {
+		tags["source"] = record.Source
+	}
 
-	result, err := influx2Client.queryApi.Query(context.Background(), query)
+	fields := make(map[string]interface{})
 
+	if record.Parameters != nil {
+		if raw, ok := record.Parameters["uuid"]; ok && raw != nil {
+			tags["uuid"] = fmt.Sprint(raw)
+		}
+
+		for k, v := range record.Parameters {
+			if v == nil {
+				continue
+			}
+			if k == "uuid" {
+				continue
+			}
+			fields[k] = v
+		}
+	}
+
+	if len(fields) == 0 {
+		return
+	}
+
+	point := influxdb2.NewPoint(
+		measurementRaw,
+		tags,
+		fields,
+		record.EventTime.UTC(),
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := c.writeApi.WritePoint(ctx, point); err != nil {
+		log.Printf("WriteRaw failed: %v", err)
+	}
+}
+
+func (c Influx2Client) WriteKPI(record sharedModel.TimeSeriesKPIResultRecord) {
+	if record.EventTime.IsZero() {
+		record.EventTime = time.Now().UTC()
+	}
+
+	fields := map[string]interface{}{
+		"fulfilled": record.Fulfilled,
+	}
+
+	tags := map[string]string{
+		"sdInstanceUID":   record.SDInstanceUID,
+		"kpiDefinitionID": fmt.Sprintf("%d", record.KPIDefinitionID),
+	}
+
+	if record.SDTypeSpecification != "" {
+		tags["sdType"] = record.SDTypeSpecification
+	}
+
+	if record.Source != "" {
+		tags["source"] = record.Source
+	}
+
+	point := influxdb2.NewPoint(
+		measurementKPI,
+		tags,
+		fields,
+		record.EventTime.UTC(),
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := c.writeApi.WritePoint(ctx, point); err != nil {
+		log.Printf("WriteKPI failed: %v", err)
+	}
+}
+
+func (c Influx2Client) Query(req sharedModel.TimeSeriesReadRequest) sharedUtils.Result[[]sharedModel.TimeSeriesDataPoint] {
+
+	measurement := measurementRaw
+	if req.Type == sharedModel.TimeSeriesTypeKPIResult {
+		measurement = measurementKPI
+	}
+
+	rangePart := buildRange(req)
+	filterPart := buildFilters(req, measurement)
+	aggregationPart := buildAggregation(req)
+
+	query := fmt.Sprintf(`
+from(bucket: "%s")
+%s
+%s
+%s
+|> pivot(rowKey:["_time"], columnKey:["_field"], valueColumn:"_value")
+`, c.bucket, rangePart, filterPart, aggregationPart)
+
+	result, err := c.queryApi.Query(context.Background(), query)
 	if err != nil {
-		return sharedUtils.NewFailureResult[[]sharedModel.OutputData](err)
+		return sharedUtils.NewFailureResult[[]sharedModel.TimeSeriesDataPoint](err)
 	}
-
-	outputData := []sharedModel.OutputData{}
 
 	if result.Err() != nil {
-		return sharedUtils.NewFailureResult[[]sharedModel.OutputData](result.Err())
+		return sharedUtils.NewFailureResult[[]sharedModel.TimeSeriesDataPoint](result.Err())
 	}
+
+	points := make([]sharedModel.TimeSeriesDataPoint, 0)
 
 	for result.Next() {
-		outputData = append(outputData, mapToOutputData(result.Record().Values()))
-	}
 
-	return sharedUtils.NewSuccessResult[[]sharedModel.OutputData](outputData)
-}
+		values := result.Record().Values()
 
-func (influx2Client Influx2Client) Write(data sharedModel.InputData) {
-	log.Printf("Writing %s with ts %s received ts %f\n", data.SDInstanceUID, time.Unix(int64(data.Timestamp), 0), data.Timestamp)
-	if parameters, ok := data.Parameters.(map[string]interface{}); ok {
-		// Drop nil / null values
-		for key, value := range parameters {
-			if value == nil {
-				log.Printf("Dropping %s because it was nil / null", key)
-				delete(parameters, key)
+		t, ok := values["_time"].(time.Time)
+		if !ok {
+			continue
+		}
+
+		point := sharedModel.TimeSeriesDataPoint{
+			Time: t,
+			Tags: map[string]string{},
+			Data: map[string]interface{}{},
+		}
+
+		copyTagIfPresent(values, point.Tags, "sdInstanceUID")
+		copyTagIfPresent(values, point.Tags, "sdType")
+		copyTagIfPresent(values, point.Tags, "source")
+		copyTagIfPresent(values, point.Tags, "kpiDefinitionID")
+
+		for k, v := range values {
+
+			if k == "_time" || k == "_measurement" || k == "result" || k == "table" {
+				continue
 			}
-		}
 
-		point := influxdb2.NewPoint(data.SDInstanceUID, map[string]string{"deviceType": data.SDTypeSpecification}, parameters, time.Unix(int64(data.Timestamp), 0))
-
-		ctx, cancelFunction := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancelFunction()
-
-		err := influx2Client.writeApi.WritePoint(ctx, point)
-		if err != nil {
-			log.Printf("Writing %s failed with %s\n", data.SDInstanceUID, err)
-		}
-
-		err = influx2Client.writeApi.Flush(ctx)
-		if err != nil {
-			log.Printf("Writing %s failed with %s\n", data.SDInstanceUID, err)
-		}
-
-	} else {
-		log.Println("parameterAsAny is not a map[string]interface{}")
-	}
-}
-
-func (influx2Client Influx2Client) Close() {
-	influx2Client.client.Close()
-}
-
-func convertTimeToQueryTimePart(body sharedModel.ReadRequestBody) string {
-	if body.From != nil && body.To == nil {
-		currentDate := time.Now()
-
-		currentDateString := currentDate.Format(time.RFC3339)
-
-		return fmt.Sprintf("|> range(start: %s, stop: %s)", body.From.Format(time.RFC3339), currentDateString)
-	}
-
-	if body.From == nil && body.To != nil {
-		thirtyDaysAgo := body.To.AddDate(0, 0, -30)
-
-		thirtyDaysAgoString := thirtyDaysAgo.Format(time.RFC3339)
-
-		return fmt.Sprintf("|> range(start: %s, stop: %s)", thirtyDaysAgoString, body.To.Format(time.RFC3339))
-	}
-
-	if body.From == nil && body.To == nil {
-		currentDate := time.Now()
-		thirtyDaysAgo := currentDate.AddDate(0, 0, -30)
-
-		currentDateString := currentDate.Format(time.RFC3339)
-		thirtyDaysAgoString := thirtyDaysAgo.Format(time.RFC3339)
-
-		return fmt.Sprintf("|> range(start: %s, stop: %s)", thirtyDaysAgoString, currentDateString)
-	}
-
-	return fmt.Sprintf("|> range(start: %s, stop: %s)", body.From.Format(time.RFC3339), body.To.Format(time.RFC3339))
-}
-
-func createFilter(body sharedModel.ReadRequestBody) string {
-	var filterStrings []string
-
-	log.Printf("Getting sensors: %s\n", body.Sensors)
-	if sharedModel.AreSimpleSensors(body.Sensors) {
-		simpleSensors := body.Sensors.(sharedModel.SimpleSensors)
-		for _, sensor := range simpleSensors {
-			filterStrings = append(filterStrings, fmt.Sprintf(`r["_measurement"] == "%s"`, sensor))
-		}
-	} else {
-		sensorsWithFields := body.Sensors.(sharedModel.SensorsWithFields)
-		for sensor, fields := range sensorsWithFields {
-			var fieldConditions []string
-			for _, field := range fields {
-				fieldConditions = append(fieldConditions, fmt.Sprintf(`r["_field"] == "%s"`, field))
+			if k == "sdInstanceUID" || k == "sdType" || k == "source" || k == "kpiDefinitionID" {
+				continue
 			}
-			fieldCondition := strings.Join(fieldConditions, " or ")
-			if fieldCondition != "" {
-				fieldCondition = " and (" + fieldCondition + ")"
+
+			if v == nil {
+				continue
 			}
-			filterStrings = append(filterStrings, fmt.Sprintf(`(r["_measurement"] == "%s"%s)`, sensor, fieldCondition))
+
+			point.Data[k] = v
 		}
+
+		points = append(points, point)
 	}
 
-	filter := strings.Join(filterStrings, " or ")
-
-	return fmt.Sprintf("|> filter(fn: (r) => %s)", filter)
+	return sharedUtils.NewSuccessResult(points)
 }
 
-func createAggregation(body sharedModel.ReadRequestBody) string {
-	aggregation := ""
-
-	if body.Operation != "" {
-		zone := ""
-
-		if body.AggregateMinutes == 0 {
-			body.AggregateMinutes = 10
-		}
-
-		if body.Timezone != "" {
-			zone = fmt.Sprintf(", location: timezone.location(name: \"%s\")", body.Timezone)
-		}
-
-		aggregation = fmt.Sprintf("|> aggregateWindow(every: %dm, fn: %s, createEmpty: false%s)", body.AggregateMinutes, body.Operation, zone)
-	}
-
-	return aggregation
+func (c Influx2Client) Close() {
+	c.client.Close()
 }
 
-// mapToOutputData converts a map[string]interface{} to an OutputData struct.
-func mapToOutputData(influxOutput map[string]interface{}) sharedModel.OutputData {
-	outputData := sharedModel.OutputData{
-		Result:     "",
-		Table:      influxOutput["table"].(int64),
-		Time:       influxOutput["time"].(time.Time),
-		DeviceID:   influxOutput["deviceId"].(string),
-		DeviceType: "",
+func buildRange(req sharedModel.TimeSeriesReadRequest) string {
+
+	if req.From == nil && req.To == nil {
+		return `|> range(start: -30d)`
 	}
 
-	if value, exists := influxOutput["deviceType"]; exists {
-		outputData.DeviceType = value.(string)
-		delete(influxOutput, "deviceType")
-	} else {
-		outputData.DeviceType = ""
+	if req.From != nil && req.To == nil {
+		return fmt.Sprintf(`|> range(start: %s)`, req.From.UTC().Format(time.RFC3339))
 	}
 
-	if value, exists := influxOutput["result"]; exists {
-		outputData.DeviceType = value.(string)
-		delete(influxOutput, "result")
-	} else {
-		outputData.DeviceType = ""
+	if req.From == nil && req.To != nil {
+		start := req.To.UTC().AddDate(0, 0, -30)
+		return fmt.Sprintf(`|> range(start: %s, stop: %s)`,
+			start.Format(time.RFC3339),
+			req.To.UTC().Format(time.RFC3339))
 	}
 
-	for key, value := range influxOutput {
-		if value == nil {
-			delete(influxOutput, key)
+	return fmt.Sprintf(`|> range(start: %s, stop: %s)`,
+		req.From.UTC().Format(time.RFC3339),
+		req.To.UTC().Format(time.RFC3339))
+}
+
+func buildFilters(req sharedModel.TimeSeriesReadRequest, measurement string) string {
+
+	filter := fmt.Sprintf(`|> filter(fn: (r) => r["_measurement"] == "%s")`, measurement)
+
+	if req.SDInstanceUID != nil && *req.SDInstanceUID != "" {
+		filter += fmt.Sprintf(` |> filter(fn: (r) => r["sdInstanceUID"] == "%s")`,
+			escapeFluxString(*req.SDInstanceUID))
+	}
+
+	if req.SDTypeSpecification != nil && *req.SDTypeSpecification != "" {
+		filter += fmt.Sprintf(` |> filter(fn: (r) => r["sdType"] == "%s")`,
+			escapeFluxString(*req.SDTypeSpecification))
+	}
+
+	if req.Source != nil && *req.Source != "" {
+		filter += fmt.Sprintf(` |> filter(fn: (r) => r["source"] == "%s")`,
+			escapeFluxString(*req.Source))
+	}
+
+	if req.KPIDefinitionID != nil {
+		filter += fmt.Sprintf(` |> filter(fn: (r) => r["kpiDefinitionID"] == "%d")`,
+			*req.KPIDefinitionID)
+	}
+
+	return filter
+}
+
+func buildAggregation(req sharedModel.TimeSeriesReadRequest) string {
+
+	if req.AggregateMinutes == nil || *req.AggregateMinutes <= 0 {
+		return ""
+	}
+
+	return fmt.Sprintf(`|> aggregateWindow(every: %dm, fn: mean, createEmpty: false)`,
+		*req.AggregateMinutes)
+}
+
+func copyTagIfPresent(values map[string]interface{}, tags map[string]string, key string) {
+
+	if v, ok := values[key]; ok && v != nil {
+		if s, ok := v.(string); ok && s != "" {
+			tags[key] = s
 		}
 	}
+}
 
-	delete(influxOutput, "result")
-	delete(influxOutput, "table")
-	delete(influxOutput, "time")
-	delete(influxOutput, "deviceId")
-	delete(influxOutput, "host")
+func escapeFluxString(s string) string {
 
-	outputData.Data = influxOutput
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `"`, `\"`)
 
-	return outputData
+	return s
 }

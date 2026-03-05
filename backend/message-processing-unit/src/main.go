@@ -2,17 +2,18 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"net/url"
+	"os"
+	"sync"
+	"time"
+
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/rabbitmq"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedConstants"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 	"github.com/MichalBures-OG/bp-bures-RIoT-message-processing-unit/src/processing"
 	"github.com/google/uuid"
-	"log"
-	"net/url"
-	"os"
-	"sync"
-	"time"
 )
 
 var (
@@ -25,6 +26,31 @@ func checkForKPIFulfilmentCheckRequests() {
 	rabbitMQClient := rabbitmq.NewClient()
 	defer rabbitMQClient.Dispose()
 	err := rabbitmq.ConsumeJSONMessages[sharedModel.KPIFulfillmentCheckRequestISCMessage](rabbitMQClient, sharedConstants.KPIFulfillmentCheckRequestsQueueName, func(messagePayload sharedModel.KPIFulfillmentCheckRequestISCMessage) error {
+		eventTime := messagePayload.EventTime
+		if eventTime.IsZero() {
+			eventTime = time.Now().UTC()
+		}
+		params := map[string]interface{}{}
+		switch p := messagePayload.Parameters.(type) {
+		case map[string]interface{}:
+			params = p
+		default:
+			log.Printf("Unsupported parameters type")
+		}
+		rawRecord := sharedModel.TimeSeriesRawRecord{
+			EventTime:           eventTime,
+			SDInstanceUID:       messagePayload.SDInstanceUID,
+			SDTypeSpecification: messagePayload.SDTypeSpecification,
+			Parameters:          params,
+		}
+		jsonResult := sharedUtils.SerializeToJSON(rawRecord)
+		if jsonResult.IsSuccess() {
+			_ = rabbitMQClient.PublishJSONMessage(
+				sharedUtils.NewEmptyOptional[string](),
+				sharedUtils.NewOptionalOf(sharedConstants.TimeSeriesRawDataQueueName),
+				jsonResult.GetPayload(),
+			)
+		}
 		kpiDefinitionsBySDTypeDenotationMapMutex.Lock()
 		kpiDefinitions := kpiDefinitionsBySDTypeDenotationMap[messagePayload.SDTypeSpecification]
 		kpiDefinitionsBySDTypeDenotationMapMutex.Unlock()
@@ -43,10 +69,12 @@ func checkForKPIFulfilmentCheckRequests() {
 				log.Printf("Failed to check KPI fulfillment: %s\n", kpiFulfillmentCheckResult.GetError().Error())
 				continue
 			}
-			kpiFulfillmentCheckResults = append(kpiFulfillmentCheckResults, sharedModel.KPIFulfillmentCheckResultISCMessage{ // TODO: Consider employing the timestamp...
+			kpiFulfillmentCheckResults = append(kpiFulfillmentCheckResults, sharedModel.KPIFulfillmentCheckResultISCMessage{
+				EventTime:       eventTime,
 				SDInstanceUID:   sdInstanceUID,
 				KPIDefinitionID: sharedUtils.NewOptionalFromPointer(kpiDefinition.ID).GetPayload(),
 				Fulfilled:       kpiFulfillmentCheckResult.GetPayload(),
+				// SDTypeSpecification: messagePayload.SDTypeSpecification,
 			})
 		}
 		jsonSerializationResult := sharedUtils.SerializeToJSON(kpiFulfillmentCheckResults)
