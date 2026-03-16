@@ -1,5 +1,7 @@
 package sharedModel
 
+import "time"
+
 type LogicalOperationNodeType string
 
 const (
@@ -119,4 +121,24 @@ type LogicalOperationKPINode struct {
 
 func (*LogicalOperationKPINode) GetType() KPINodeType {
 	return LogicalOperation
+}
+
+type RawKey struct {
+	SDInstanceUID string
+	Parameter     string
+}
+
+type KPIKey struct {
+	SDInstanceUID   string
+	KPIDefinitionID uint32
+}
+
+type RawState struct {
+	Value     interface{}
+	EventTime time.Time
+}
+
+type KPIState struct {
+	Value     bool
+	EventTime time.Time
 }

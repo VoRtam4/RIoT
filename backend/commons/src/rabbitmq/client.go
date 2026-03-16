@@ -3,12 +3,13 @@ package rabbitmq
 import (
 	"context"
 	"fmt"
-	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"log"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type connectionManager struct {

@@ -2,6 +2,7 @@ package db2dll
 
 import (
 	"fmt"
+
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dbModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dllModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
@@ -22,7 +23,7 @@ func ToDLLModelSDType(sdTypeEntity dbModel.SDTypeEntity) dllModel.SDType {
 					case "number":
 						return dllModel.SDParameterTypeNumber
 					case "boolean":
-						return dllModel.SDParameterTypeTypeBoolean
+						return dllModel.SDParameterTypeBoolean
 					}
 					panic(fmt.Errorf("unpexted model mapping failure – shouldn't happen"))
 				}(sdParameterEntity.Type),

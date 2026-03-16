@@ -1,6 +1,8 @@
 package sharedUtils
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 func DeserializeFromJSON[T any](data []byte) Result[T] {
 	var object T
@@ -17,4 +19,13 @@ func SerializeToJSON(object any) Result[[]byte] {
 		return NewFailureResult[[]byte](err)
 	}
 	return NewSuccessResult[[]byte](data)
+}
+
+func CompareJSONs(a interface{}, b interface{}) bool {
+	aj := SerializeToJSON(a)
+	bj := SerializeToJSON(b)
+	if aj.IsFailure() || bj.IsFailure() {
+		return false
+	}
+	return string(aj.GetPayload()) == string(bj.GetPayload())
 }

@@ -20,9 +20,12 @@ services:
       INFLUX_ORG: ${INFLUX_ORGANIZATION}
       INFLUX_BUCKET: ${INFLUX_BUCKET}
     depends_on:
-      - rabbitmq
-      - postgres
-      - influxdb
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_started
+      influxdb:
+        condition: service_started
     ports:
       - "9090:9090"
     #cpu_quota: 1000 # 1% of a single CPU core
@@ -36,8 +39,10 @@ services:
       BACKEND_CORE_URL: ${BACKEND_CORE_URL}
       RABBITMQ_URL: ${RABBITMQ_URL}
     depends_on:
-      - rabbitmq
-      - riot-backend-core # 'Backend-core' has to set up the 'RabbitMQ infrastructure'
+      rabbitmq:
+        condition: service_healthy
+      riot-backend-core:
+        condition: service_started # 'Backend-core' has to set up the 'RabbitMQ infrastructure'
     #cpu_quota: 1000 # 1% of a single CPU core
     #mem_limit: 32m # 32 MB of RAM
 
@@ -101,8 +106,10 @@ services:
       INFLUX_URL: ${INFLUX_URL}
       INFLUX_TOKEN: ${INFLUX_TOKEN}
     depends_on:
-      - rabbitmq
-      - riot-backend-core # 'Backend-core' has to set up the 'RabbitMQ infrastructure'
+      rabbitmq:
+        condition: service_healthy
+      riot-backend-core:
+        condition: service_started # 'Backend-core' has to set up the 'RabbitMQ infrastructure'
 
   rabbitmq:
     image: rabbitmq:3-management

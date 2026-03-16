@@ -14,3 +14,8 @@ frontend/node_modules
 
 # Ignore backend executables
 backend/bin
+
+debug.sh
+
+pg
+pg_backup

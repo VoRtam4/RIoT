@@ -2,6 +2,7 @@ package gql2dll
 
 import (
 	"fmt"
+
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dllModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
@@ -22,7 +23,7 @@ func ToDLLModelSDType(sdTypeInput graphQLModel.SDTypeInput) dllModel.SDType {
 					case graphQLModel.SDParameterTypeNumber:
 						return dllModel.SDParameterTypeNumber
 					case graphQLModel.SDParameterTypeBoolean:
-						return dllModel.SDParameterTypeTypeBoolean
+						return dllModel.SDParameterTypeBoolean
 					}
 					panic(fmt.Errorf("unpexted model mapping failure – shouldn't happen"))
 				}(sdParameterInput.Type),

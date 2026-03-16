@@ -5,9 +5,9 @@ import "github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 type SDParameterType string
 
 const (
-	SDParameterTypeString      SDParameterType = "string"
-	SDParameterTypeNumber      SDParameterType = "number"
-	SDParameterTypeTypeBoolean SDParameterType = "boolean"
+	SDParameterTypeString  SDParameterType = "string"
+	SDParameterTypeNumber  SDParameterType = "number"
+	SDParameterTypeBoolean SDParameterType = "boolean"
 )
 
 type SDParameter struct {

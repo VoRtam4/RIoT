@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/db/dbClient"
@@ -41,14 +42,12 @@ func ProcessIncomingSDInstanceRegistrationRequests(sdInstanceGraphQLSubscription
 			if eventTime.IsZero() {
 				eventTime = time.Now().UTC()
 			}
-
 			rawRecord := sharedModel.TimeSeriesRawRecord{
 				EventTime:           eventTime,
 				SDInstanceUID:       newSDInstanceUID,
 				SDTypeSpecification: newSDInstanceSDTypeSpecification,
 				Parameters:          map[string]interface{}{},
 			}
-
 			jsonResult := sharedUtils.SerializeToJSON(rawRecord)
 			if jsonResult.IsSuccess() {
 				_ = rabbitMQClient.PublishJSONMessage(
@@ -72,14 +71,20 @@ func ProcessIncomingKPIFulfillmentCheckResults(kpiFulfillmentCheckResultGraphQLS
 			log.Printf("Warning: Got an enpty tuple of KPI fulfillment check results... that shouldn't happen...")
 			return nil
 		}
+		eventTimes := make([]time.Time, 0)
 		sdInstanceUID := kpiFulfillmentCheckResultTuple[0].SDInstanceUID
 		kpiDefinitionIDs := make([]uint32, 0)
 		fulfillmentStatuses := make([]bool, 0)
 		for _, kpiFulfillmentCheckResult := range kpiFulfillmentCheckResultTuple {
 			kpiDefinitionIDs = append(kpiDefinitionIDs, kpiFulfillmentCheckResult.KPIDefinitionID)
 			fulfillmentStatuses = append(fulfillmentStatuses, kpiFulfillmentCheckResult.Fulfilled)
+			eventTime := kpiFulfillmentCheckResult.EventTime
+			if eventTime.IsZero() {
+				eventTime = time.Now().UTC()
+			}
+			eventTimes = append(eventTimes, eventTime)
 		}
-		kpiFulfillmentCheckResultTuplePersistResult := dbClient.GetRelationalDatabaseClientInstance().PersistKPIFulFulfillmentCheckResultTuple(sdInstanceUID, kpiDefinitionIDs, fulfillmentStatuses)
+		kpiFulfillmentCheckResultTuplePersistResult := dbClient.GetRelationalDatabaseClientInstance().PersistKPIFulFulfillmentCheckResultTuple(sdInstanceUID, kpiDefinitionIDs, fulfillmentStatuses, eventTimes)
 		if kpiFulfillmentCheckResultTuplePersistResult.IsSuccess() {
 			gqlKPIFulfillmentCheckResultTuple := graphQLModel.KPIFulfillmentCheckResultTuple{
 				KpiFulfillmentCheckResults: sharedUtils.Map(kpiFulfillmentCheckResultTuplePersistResult.GetPayload(), dll2gql.ToGraphQLModelKPIFulfillmentCheckResult),
@@ -88,33 +93,50 @@ func ProcessIncomingKPIFulfillmentCheckResults(kpiFulfillmentCheckResultGraphQLS
 			case *kpiFulfillmentCheckResultGraphQLSubscriptionChannel <- gqlKPIFulfillmentCheckResultTuple:
 			default:
 			}
-			for _, kpiFulfillmentCheckResult := range kpiFulfillmentCheckResultTuple {
-				eventTime := kpiFulfillmentCheckResult.EventTime
-				if eventTime.IsZero() {
-					eventTime = time.Now().UTC()
-				}
-
-				record := sharedModel.TimeSeriesKPIResultRecord{
-					EventTime:       eventTime,
-					SDInstanceUID:   kpiFulfillmentCheckResult.SDInstanceUID,
-					KPIDefinitionID: kpiFulfillmentCheckResult.KPIDefinitionID,
-					Fulfilled:       kpiFulfillmentCheckResult.Fulfilled,
-				}
-
-				jsonResult := sharedUtils.SerializeToJSON(record)
-				if jsonResult.IsSuccess() {
-					_ = rabbitMQClient.PublishJSONMessage(
-						sharedUtils.NewEmptyOptional[string](),
-						sharedUtils.NewOptionalOf(sharedConstants.TimeSeriesKPIResultQueueName),
-						jsonResult.GetPayload(),
-					)
-				}
-			}
 		} else if kpiFulfillmentCheckResultTuplePersistError := kpiFulfillmentCheckResultTuplePersistResult.GetError(); !errors.Is(kpiFulfillmentCheckResultTuplePersistError, dbClient.ErrOperationWouldLeadToForeignKeyIntegrityBreach) {
 			return fmt.Errorf("failed to persist KPI fulfillment check result tuple: %w", kpiFulfillmentCheckResultTuplePersistError)
 		}
 		return nil
 	}, rabbitMQClient)
+}
+
+func ProcessIncomingSDTypeRegistrationRequests() {
+	rabbitMQClient := rabbitmq.NewClient()
+	defer rabbitMQClient.Dispose()
+	rabbitmq.ConsumeJSONMessages[sharedModel.SDTypeRegistrationRequestISCMessage](
+		rabbitMQClient,
+		sharedConstants.SDTypeRegistrationRequestsQueueName,
+		func(message sharedModel.SDTypeRegistrationRequestISCMessage) error {
+			params := make([]dllModel.SDParameter, 0)
+			for _, p := range message.Parameters {
+				var paramType dllModel.SDParameterType
+				switch strings.ToUpper(p.Type) {
+				case "STRING":
+					paramType = dllModel.SDParameterTypeString
+				case "NUMBER":
+					paramType = dllModel.SDParameterTypeNumber
+				case "BOOLEAN":
+					paramType = dllModel.SDParameterTypeBoolean
+				default:
+					return fmt.Errorf("unknown parameter type: %s", p.Type)
+				}
+				params = append(params, dllModel.SDParameter{
+					Denotation: p.Denotation,
+					Type:       paramType,
+				})
+			}
+			sdType := dllModel.SDType{
+				Denotation: message.SDTypeSpecification,
+				Parameters: params,
+			}
+			result := dbClient.GetRelationalDatabaseClientInstance().UpsertSDType(sdType)
+			if result.IsFailure() {
+				return result.GetError()
+			}
+			log.Printf("SDType %s registrován.", message.SDTypeSpecification)
+			return nil
+		},
+	)
 }
 
 func EnqueueMessageRepresentingCurrentSDTypeConfiguration(rabbitMQClient rabbitmq.Client) {
@@ -181,4 +203,26 @@ func EnqueueMessagesRepresentingCurrentSystemConfiguration(rabbitMQClient rabbit
 	EnqueueMessageRepresentingCurrentSDTypeConfiguration(rabbitMQClient)
 	EnqueueMessageRepresentingCurrentSDInstanceConfiguration(rabbitMQClient)
 	EnqueueMessageRepresentingCurrentKPIDefinitionConfiguration(rabbitMQClient)
+}
+
+func EnqueueKPIReprocessRequest(rabbitMQClient rabbitmq.Client, kpiDefinition sharedModel.KPIDefinition, fromTime time.Time) error {
+	jsonResult := sharedUtils.SerializeToJSON(sharedModel.KPIReprocessRequestISCMessage{
+		KPIDefinitionID:     sharedUtils.NewOptionalFromPointer(kpiDefinition.ID).GetPayload(),
+		SDTypeSpecification: kpiDefinition.SDTypeSpecification,
+		From:                fromTime,
+	})
+	if jsonResult.IsFailure() {
+		return jsonResult.GetError()
+	}
+	return rabbitMQClient.PublishJSONMessage(sharedUtils.NewEmptyOptional[string](), sharedUtils.NewOptionalOf(sharedConstants.KPIReprocessRequestQueueName), jsonResult.GetPayload())
+}
+
+func EnqueueKPIDeleteRequest(rabbitMQClient rabbitmq.Client, kpiDefinitionID uint32) error {
+	jsonResult := sharedUtils.SerializeToJSON(sharedModel.KPIDeleteResultsRequestISCMessage{
+		KPIDefinitionID: kpiDefinitionID,
+	})
+	if jsonResult.IsFailure() {
+		return jsonResult.GetError()
+	}
+	return rabbitMQClient.PublishJSONMessage(sharedUtils.NewEmptyOptional[string](), sharedUtils.NewOptionalOf(sharedConstants.TimeSeriesDeleteRequestQueueName), jsonResult.GetPayload())
 }

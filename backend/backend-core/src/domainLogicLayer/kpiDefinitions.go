@@ -3,6 +3,9 @@ package domainLogicLayer
 import (
 	"errors"
 	"fmt"
+	"log"
+	"time"
+
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/db/dbClient"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/isc"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
@@ -25,6 +28,10 @@ func CreateKPIDefinition(kpiDefinitionInput graphQLModel.KPIDefinitionInput) sha
 	isc.EnqueueMessageRepresentingCurrentKPIDefinitionConfiguration(getDLLRabbitMQClient())
 	id := persistResult.GetPayload()
 	kpiDefinition.ID = &id
+	log.Printf("Začalo se zpracovávat KPI")
+	if err := isc.EnqueueKPIReprocessRequest(getDLLRabbitMQClient(), kpiDefinition, time.Now().UTC()); err != nil {
+		return sharedUtils.NewFailureResult[graphQLModel.KPIDefinition](err)
+	}
 	return sharedUtils.NewSuccessResult[graphQLModel.KPIDefinition](dll2gql.ToGraphQLModelKPIDefinition(kpiDefinition))
 }
 
@@ -39,12 +46,21 @@ func UpdateKPIDefinition(id uint32, kpiDefinitionInput graphQLModel.KPIDefinitio
 	if persistResult.IsFailure() {
 		return sharedUtils.NewFailureResult[graphQLModel.KPIDefinition](persistResult.GetError())
 	}
+	if err := isc.EnqueueKPIDeleteRequest(getDLLRabbitMQClient(), id); err != nil {
+		return sharedUtils.NewFailureResult[graphQLModel.KPIDefinition](err)
+	}
+	if err := isc.EnqueueKPIReprocessRequest(getDLLRabbitMQClient(), kpiDefinition, time.Now().UTC()); err != nil {
+		return sharedUtils.NewFailureResult[graphQLModel.KPIDefinition](err)
+	}
 	isc.EnqueueMessageRepresentingCurrentKPIDefinitionConfiguration(getDLLRabbitMQClient())
 	return sharedUtils.NewSuccessResult[graphQLModel.KPIDefinition](dll2gql.ToGraphQLModelKPIDefinition(kpiDefinition))
 }
 
 func DeleteKPIDefinition(id uint32) error {
 	if err := dbClient.GetRelationalDatabaseClientInstance().DeleteKPIDefinition(id); err != nil {
+		return err
+	}
+	if err := isc.EnqueueKPIDeleteRequest(getDLLRabbitMQClient(), id); err != nil {
 		return err
 	}
 	isc.EnqueueMessageRepresentingCurrentKPIDefinitionConfiguration(getDLLRabbitMQClient())

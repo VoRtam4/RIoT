@@ -3,6 +3,11 @@ package dbClient
 import (
 	"errors"
 	"fmt"
+	"log"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/db/dbUtil"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dbModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dllModel"
@@ -13,10 +18,6 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-	"log"
-	"strings"
-	"sync"
-	"time"
 )
 
 var (
@@ -31,6 +32,7 @@ type RelationalDatabaseClient interface {
 	LoadKPIDefinitions() sharedUtils.Result[[]sharedModel.KPIDefinition]
 	DeleteKPIDefinition(id uint32) error
 	PersistSDType(sdType dllModel.SDType) sharedUtils.Result[dllModel.SDType]
+	UpsertSDType(sdType dllModel.SDType) sharedUtils.Result[dllModel.SDType]
 	LoadSDType(id uint32) sharedUtils.Result[dllModel.SDType]
 	LoadSDTypeBasedOnDenotation(denotation string) sharedUtils.Result[dllModel.SDType]
 	LoadSDTypes() sharedUtils.Result[[]dllModel.SDType]
@@ -40,7 +42,7 @@ type RelationalDatabaseClient interface {
 	LoadSDInstance(id uint32) sharedUtils.Result[dllModel.SDInstance]
 	LoadSDInstanceBasedOnUID(uid string) sharedUtils.Result[sharedUtils.Optional[dllModel.SDInstance]]
 	LoadSDInstances() sharedUtils.Result[[]dllModel.SDInstance]
-	PersistKPIFulFulfillmentCheckResultTuple(sdInstanceUID string, kpiDefinitionIDs []uint32, fulfillmentStatuses []bool) sharedUtils.Result[[]dllModel.KPIFulfillmentCheckResult]
+	PersistKPIFulFulfillmentCheckResultTuple(sdInstanceUID string, kpiDefinitionIDs []uint32, fulfillmentStatuses []bool, eventTimes []time.Time) sharedUtils.Result[[]dllModel.KPIFulfillmentCheckResult]
 	LoadKPIFulFulfillmentCheckResult(kpiDefinitionID uint32, sdInstanceID uint32) sharedUtils.Result[sharedUtils.Optional[dllModel.KPIFulfillmentCheckResult]]
 	LoadKPIFulFulfillmentCheckResults() sharedUtils.Result[[]dllModel.KPIFulfillmentCheckResult]
 	LoadSDInstanceGroups() sharedUtils.Result[[]dllModel.SDInstanceGroup]
@@ -238,6 +240,50 @@ func (r *relationalDatabaseClientImpl) PersistSDType(sdType dllModel.SDType) sha
 	return sharedUtils.NewSuccessResult[dllModel.SDType](db2dll.ToDLLModelSDType(sdTypeEntity))
 }
 
+func (r *relationalDatabaseClientImpl) UpsertSDType(sdType dllModel.SDType) sharedUtils.Result[dllModel.SDType] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	existingResult := dbUtil.LoadEntityFromDB[dbModel.SDTypeEntity](
+		r.db,
+		dbUtil.Preload("Parameters"),
+		dbUtil.Where("denotation = ?", sdType.Denotation),
+	)
+	if existingResult.IsFailure() {
+		if errors.Is(existingResult.GetError(), gorm.ErrRecordNotFound) {
+			sdTypeEntity := dll2db.ToDBModelEntitySDType(sdType)
+			if err := dbUtil.PersistEntityIntoDB(r.db, &sdTypeEntity); err != nil {
+				return sharedUtils.NewFailureResult[dllModel.SDType](err)
+			}
+			return sharedUtils.NewSuccessResult(db2dll.ToDLLModelSDType(sdTypeEntity))
+		}
+		return sharedUtils.NewFailureResult[dllModel.SDType](existingResult.GetError())
+	}
+	existing := existingResult.GetPayload()
+	existingParams := map[string]bool{}
+	for _, p := range existing.Parameters {
+		existingParams[p.Denotation] = true
+	}
+	for _, newParam := range sdType.Parameters {
+		if existingParams[newParam.Denotation] {
+			continue
+		}
+		paramEntity := dbModel.SDParameterEntity{
+			Denotation: newParam.Denotation,
+			Type:       string(newParam.Type),
+			SDTypeID:   existing.ID,
+		}
+		if err := dbUtil.PersistEntityIntoDB(r.db, &paramEntity); err != nil {
+			return sharedUtils.NewFailureResult[dllModel.SDType](err)
+		}
+		log.Printf("SDType %s rozšířen o parametr %s", sdType.Denotation, newParam.Denotation)
+	}
+	updated := loadSDType(r.db, dbUtil.Where("id = ?", existing.ID))
+	if updated.IsFailure() {
+		return sharedUtils.NewFailureResult[dllModel.SDType](updated.GetError())
+	}
+	return updated
+}
+
 func loadSDType(g *gorm.DB, whereClause dbUtil.WhereClause) sharedUtils.Result[dllModel.SDType] {
 	sdTypeEntityLoadResult := dbUtil.LoadEntityFromDB[dbModel.SDTypeEntity](g, dbUtil.Preload("Parameters"), whereClause)
 	if sdTypeEntityLoadResult.IsFailure() {
@@ -362,7 +408,7 @@ func (r *relationalDatabaseClientImpl) LoadSDInstances() sharedUtils.Result[[]dl
 	return sharedUtils.NewSuccessResult[[]dllModel.SDInstance](sharedUtils.Map(sdInstanceEntitiesLoadResult.GetPayload(), db2dll.ToDLLModelSDInstance))
 }
 
-func (r *relationalDatabaseClientImpl) PersistKPIFulFulfillmentCheckResultTuple(sdInstanceUID string, kpiDefinitionIDs []uint32, fulfillmentStatuses []bool) sharedUtils.Result[[]dllModel.KPIFulfillmentCheckResult] {
+func (r *relationalDatabaseClientImpl) PersistKPIFulFulfillmentCheckResultTuple(sdInstanceUID string, kpiDefinitionIDs []uint32, fulfillmentStatuses []bool, eventTimes []time.Time) sharedUtils.Result[[]dllModel.KPIFulfillmentCheckResult] {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	referencedKPIDefinitionEntitiesExistCheckResult := dbUtil.DoIDsExist[dbModel.KPIDefinitionEntity](r.db, kpiDefinitionIDs)
@@ -382,15 +428,33 @@ func (r *relationalDatabaseClientImpl) PersistKPIFulFulfillmentCheckResultTuple(
 	kpiFulfillmentCheckResultEntities := make([]dbModel.KPIFulfillmentCheckResultEntity, 0)
 	err := r.db.Transaction(func(tx *gorm.DB) error {
 		for index, kpiDefinitionID := range kpiDefinitionIDs {
-			kpiFulfillmentCheckResultEntity := dbModel.KPIFulfillmentCheckResultEntity{
-				KPIDefinitionID: kpiDefinitionID,
-				SDInstanceID:    referencedSDInstanceEntityID,
-				Fulfilled:       fulfillmentStatuses[index],
-			}
-			if err := dbUtil.PersistEntityIntoDB(r.db, &kpiFulfillmentCheckResultEntity); err != nil {
+			eventTime := eventTimes[index]
+			existingResult := dbModel.KPIFulfillmentCheckResultEntity{}
+			err := tx.Where("kpi_definition_id = ? AND sd_instance_id = ?", kpiDefinitionID, referencedSDInstanceEntityID).First(&existingResult).Error
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					newResult := dbModel.KPIFulfillmentCheckResultEntity{
+						KPIDefinitionID: kpiDefinitionID,
+						SDInstanceID:    referencedSDInstanceEntityID,
+						Fulfilled:       fulfillmentStatuses[index],
+						EventTime:       eventTime,
+					}
+					if err := tx.Create(&newResult).Error; err != nil {
+						return err
+					}
+					kpiFulfillmentCheckResultEntities = append(kpiFulfillmentCheckResultEntities, newResult)
+					continue
+				}
 				return err
 			}
-			kpiFulfillmentCheckResultEntities = append(kpiFulfillmentCheckResultEntities, kpiFulfillmentCheckResultEntity)
+			if eventTime.After(existingResult.EventTime) {
+				existingResult.Fulfilled = fulfillmentStatuses[index]
+				existingResult.EventTime = eventTime
+				if err := tx.Save(&existingResult).Error; err != nil {
+					return err
+				}
+				kpiFulfillmentCheckResultEntities = append(kpiFulfillmentCheckResultEntities, existingResult)
+			}
 		}
 		return nil
 	})

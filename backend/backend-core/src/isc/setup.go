@@ -17,6 +17,7 @@ func SetupRabbitMQInfrastructureForISC(rabbitMQClient rabbitmq.Client) {
 		sharedConstants.KPIFulfillmentCheckResultsQueueName,
 		sharedConstants.KPIFulfillmentCheckRequestsQueueName,
 		sharedConstants.SDInstanceRegistrationRequestsQueueName,
+		sharedConstants.SDTypeRegistrationRequestsQueueName,
 		sharedConstants.SetOfSDTypesUpdatesQueueName,
 		sharedConstants.SetOfSDInstancesUpdatesQueueName,
 		sharedConstants.MessageProcessingUnitConnectionNotificationsQueueName,
@@ -24,6 +25,8 @@ func SetupRabbitMQInfrastructureForISC(rabbitMQClient rabbitmq.Client) {
 		sharedConstants.TimeSeriesKPIResultQueueName,
 		sharedConstants.TimeSeriesReadRequestQueueName,
 		sharedConstants.TimeSeriesReadResponseQueueName,
+		sharedConstants.KPIReprocessRequestQueueName,
+		sharedConstants.TimeSeriesDeleteRequestQueueName,
 	)
 	sharedUtils.ForEach(namesOfQueuesToDeclare, func(nameOfQueuesToDeclare string) {
 		sharedUtils.TerminateOnError(rabbitMQClient.DeclareQueue(nameOfQueuesToDeclare), getQueueDeclarationErrorMessage(nameOfQueuesToDeclare))

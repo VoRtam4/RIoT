@@ -2,13 +2,14 @@ package dbClient
 
 import (
 	"database/sql"
+	"testing"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dllModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-	"testing"
 )
 
 func setupStubDatabaseConnection(t *testing.T) (*sql.DB, sqlmock.Sqlmock, *relationalDatabaseClientImpl) {
@@ -49,7 +50,7 @@ func TestPersistSDType(t *testing.T) {
 		}, {
 			ID:         sharedUtils.NewEmptyOptional[uint32](),
 			Denotation: "relay_0_output",
-			Type:       dllModel.SDParameterTypeTypeBoolean,
+			Type:       dllModel.SDParameterTypeBoolean,
 		}},
 	}
 	if sdTypePersistResult := client.PersistSDType(sdType); sdTypePersistResult.IsFailure() {

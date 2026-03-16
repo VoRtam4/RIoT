@@ -36,3 +36,23 @@ type SDInstanceConfigurationUpdateISCMessage []SDInstanceInfo
 type KPIConfigurationUpdateISCMessage map[string][]KPIDefinition
 
 type MessageProcessingUnitConnectionNotification struct{}
+
+type SDTypeRegistrationRequestISCMessage struct {
+	SDTypeSpecification string        `json:"sdTypeSpecification"`
+	Parameters          []SDParameter `json:"parameters"`
+}
+
+type SDParameter struct {
+	Denotation string `json:"denotation"`
+	Type       string `json:"type"`
+}
+
+type KPIReprocessRequestISCMessage struct {
+	KPIDefinitionID     uint32    `json:"kpiDefinitionID"`
+	SDTypeSpecification string    `json:"sdTypeSpecification"`
+	From                time.Time `json:"from"`
+}
+
+type KPIDeleteResultsRequestISCMessage struct {
+	KPIDefinitionID uint32 `json:"kpiDefinitionID"`
+}

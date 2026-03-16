@@ -2,14 +2,15 @@ package main
 
 import (
 	"fmt"
-	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/graphql"
-	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/isc"
-	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/rabbitmq"
-	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 	"log"
 	"net/url"
 	"os"
 	"time"
+
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/graphql"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/isc"
+	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/rabbitmq"
+	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 )
 
 func waitForDependencies() {
@@ -30,7 +31,9 @@ func kickstartISC() {
 	isc.SetupRabbitMQInfrastructureForISC(rabbitMQClient)
 	isc.EnqueueMessageRepresentingCurrentSDTypeConfiguration(rabbitMQClient)
 	isc.EnqueueMessageRepresentingCurrentSDInstanceConfiguration(rabbitMQClient)
+	//isc.EnqueueMessageRepresentingCurrentKPIDefinitionConfiguration(rabbitMQClient)
 	go isc.ProcessIncomingMessageProcessingUnitConnectionNotifications()
+	go isc.ProcessIncomingSDTypeRegistrationRequests()
 	go isc.ProcessIncomingSDInstanceRegistrationRequests(&graphql.SDInstanceGraphQLSubscriptionChannel)
 	go isc.ProcessIncomingKPIFulfillmentCheckResults(&graphql.KPIFulfillmentCheckResulTupleGraphQLSubscriptionChannel)
 }
