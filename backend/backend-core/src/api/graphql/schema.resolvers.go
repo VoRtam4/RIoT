@@ -200,41 +200,6 @@ func (r *queryResolver) MyUserConfig(ctx context.Context) (graphQLModel.UserConf
 	return domainLogicLayer.GetUserConfig(uint32(userId)).Unwrap()
 }
 
-func (r *queryResolver) SdCommand(ctx context.Context, id uint32) (graphQLModel.SDCommand, error) {
-	getSDCommandResult := domainLogicLayer.GetSDCommand(id)
-	if getSDCommandResult.IsFailure() {
-		log.Printf("Error occurred (get SD command): %s\n", getSDCommandResult.GetError().Error())
-		return graphQLModel.SDCommand{}, getSDCommandResult.GetError()
-	}
-	return getSDCommandResult.Unwrap()
-}
-
-func (r *queryResolver) SdCommands(ctx context.Context) ([]graphQLModel.SDCommand, error) {
-	getSDCommandsResult := domainLogicLayer.GetSDCommands()
-	if getSDCommandsResult.IsFailure() {
-		log.Printf("Error occurred (get SD commands): %s\n", getSDCommandsResult.GetError().Error())
-		return nil, getSDCommandsResult.GetError()
-	}
-	return getSDCommandsResult.Unwrap()
-}
-
-func (r *queryResolver) SdCommandInvocation(ctx context.Context, id uint32) (graphQLModel.SDCommandInvocation, error) {
-	getSDCommandInvocationResult := domainLogicLayer.GetSDCommandInvocation(id)
-	if getSDCommandInvocationResult.IsFailure() {
-		log.Printf("Error occurred (get SD command invocation): %s\n", getSDCommandInvocationResult.GetError().Error())
-		return graphQLModel.SDCommandInvocation{}, getSDCommandInvocationResult.GetError()
-	}
-	return getSDCommandInvocationResult.Unwrap()
-}
-
-func (r *queryResolver) SdCommandInvocations(ctx context.Context) ([]graphQLModel.SDCommandInvocation, error) {
-	getSDCommandInvocationsResult := domainLogicLayer.GetSDCommandInvocations()
-	if getSDCommandInvocationsResult.IsFailure() {
-		log.Printf("Error occurred (get SD command invocations): %s\n", getSDCommandInvocationsResult.GetError().Error())
-	}
-	return getSDCommandInvocationsResult.Unwrap()
-}
-
 func (r *subscriptionResolver) OnSDInstanceRegistered(ctx context.Context) (<-chan graphQLModel.SDInstance, error) {
 	return SDInstanceGraphQLSubscriptionChannel, nil
 }
