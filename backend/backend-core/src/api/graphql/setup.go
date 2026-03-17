@@ -1,6 +1,11 @@
 package graphql
 
 import (
+	"log"
+	"net/http"
+	"strings"
+	"time"
+
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
@@ -11,10 +16,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/websocket"
 	"github.com/rs/cors"
-	"log"
-	"net/http"
-	"strings"
-	"time"
 )
 
 var (

@@ -2,9 +2,10 @@ package auth
 
 import (
 	"errors"
-	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 	"net/http"
 	"time"
+
+	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 )
 
 const (

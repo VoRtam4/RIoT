@@ -8,9 +8,10 @@ import (
 )
 
 func ToDBModelEntityUser(user dllModel.User) dbModel.UserEntity {
+	id := user.ID.GetPayloadOrDefault(0)
 	return dbModel.UserEntity{
 		Model: gorm.Model{
-			ID: user.ID.GetPayloadOrDefault(0),
+			ID: id,
 		},
 		Username:               user.Username,
 		Email:                  user.Email,

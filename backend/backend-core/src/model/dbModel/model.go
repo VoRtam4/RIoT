@@ -1,8 +1,9 @@
 package dbModel
 
 import (
-	"gorm.io/gorm"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type KPIDefinitionEntity struct {
@@ -142,6 +143,7 @@ type UserEntity struct {
 	LastLoginAt            *time.Time                  `gorm:"column:last_login_at"`
 	Sessions               []UserSessionEntity         `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
 	Invocations            []SDCommandInvocationEntity `gorm:"foreignKey:UserId;constraint:OnDelete:CASCADE"`
+	UserConfig             UserConfigEntity            `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
 }
 
 func (UserEntity) TableName() string { // TODO: Standardize table names, e.g. 'user' × 'users'

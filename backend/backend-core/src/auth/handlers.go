@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"log"
+	"net/http"
+	"time"
+
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/db/dbClient"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/idtoken"
-	"log"
-	"net/http"
-	"time"
 )
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
