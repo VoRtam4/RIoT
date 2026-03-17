@@ -2,6 +2,7 @@ package processing
 
 import (
 	"fmt"
+
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 )

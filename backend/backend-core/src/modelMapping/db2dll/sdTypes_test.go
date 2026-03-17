@@ -1,11 +1,12 @@
 package db2dll
 
 import (
+	"testing"
+
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dbModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dllModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 	"github.com/google/go-cmp/cmp"
-	"testing"
 )
 
 func TestToDLLModelSDType(t *testing.T) {

@@ -1,10 +1,11 @@
 package dbUtil
 
 import (
-	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
-	"gorm.io/gorm"
 	"log"
 	"reflect"
+
+	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
+	"gorm.io/gorm"
 )
 
 type WhereClause = sharedUtils.Pair[string, []any]

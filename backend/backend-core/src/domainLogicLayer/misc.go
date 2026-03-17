@@ -1,8 +1,9 @@
 package domainLogicLayer
 
 import (
-	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/rabbitmq"
 	"sync"
+
+	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/rabbitmq"
 )
 
 var (

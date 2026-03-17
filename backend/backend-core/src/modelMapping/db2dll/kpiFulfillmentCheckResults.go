@@ -10,6 +10,6 @@ func ToDLLModelKPIFulfillmentCheckResult(kpiFulfillmentCheckResultEntity dbModel
 		KPIDefinitionID: kpiFulfillmentCheckResultEntity.KPIDefinitionID,
 		SDInstanceID:    kpiFulfillmentCheckResultEntity.SDInstanceID,
 		Fulfilled:       kpiFulfillmentCheckResultEntity.Fulfilled,
-		EventTime:		 kpiFulfillmentCheckResultEntity.EventTime,
+		EventTime:       kpiFulfillmentCheckResultEntity.EventTime,
 	}
 }

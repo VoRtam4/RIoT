@@ -3,11 +3,12 @@ package dbClient
 import (
 	"errors"
 	"fmt"
-	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/db/misc"
 	"log"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/db/misc"
 
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/db/dbUtil"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dbModel"

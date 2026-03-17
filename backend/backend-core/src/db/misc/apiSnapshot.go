@@ -1,11 +1,12 @@
 package misc
 
 import (
+	"os"
+	"path/filepath"
+
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 	"github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
-	"os"
-	"path/filepath"
 )
 
 type graphQLOperationType string

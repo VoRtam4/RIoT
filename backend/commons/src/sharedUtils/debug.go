@@ -2,8 +2,9 @@ package sharedUtils
 
 import (
 	"bytes"
-	"github.com/davecgh/go-spew/spew"
 	"log"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 func Dump(a ...any) {

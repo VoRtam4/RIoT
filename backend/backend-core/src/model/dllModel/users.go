@@ -1,8 +1,9 @@
 package dllModel
 
 import (
-	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 	"time"
+
+	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 )
 
 type User struct {

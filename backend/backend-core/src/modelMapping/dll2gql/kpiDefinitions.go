@@ -2,10 +2,11 @@ package dll2gql
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
-	"strings"
 )
 
 func toGraphQLModelKPINode(kpiNode sharedModel.KPINode, id uint32, parentNodeID *uint32) graphQLModel.KPINode {

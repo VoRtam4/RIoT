@@ -2,10 +2,11 @@ package gql2dll
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
-	"strings"
 )
 
 func failureResultDueToMissingInputProperty() sharedUtils.Result[sharedModel.KPINode] {

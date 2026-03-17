@@ -1,10 +1,11 @@
 package db2dll
 
 import (
+	"time"
+
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dbModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dllModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
-	"time"
 )
 
 func ToDLLModelUser(userEntity dbModel.UserEntity) dllModel.User {
