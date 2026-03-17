@@ -61,6 +61,8 @@ type MutationResolver interface {
 	UpdateSDInstanceGroup(ctx context.Context, id uint32, input graphQLModel.SDInstanceGroupInput) (graphQLModel.SDInstanceGroup, error)
 	DeleteSDInstanceGroup(ctx context.Context, id uint32) (bool, error)
 	StatisticsMutate(ctx context.Context, inputData graphQLModel.InputData) (bool, error)
+	UpdateUserConfig(ctx context.Context, userID uint32, input graphQLModel.UserConfigInput) (graphQLModel.UserConfig, error)
+	DeleteUserConfig(ctx context.Context, userID uint32) (bool, error)
 }
 type QueryResolver interface {
 	SdType(ctx context.Context, id uint32) (graphQLModel.SDType, error)
@@ -121,6 +123,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputSensorsWithFields,
 		ec.unmarshalInputSimpleSensors,
 		ec.unmarshalInputStatisticsInput,
+		ec.unmarshalInputUserConfigInput,
 	)
 	first := true
 
@@ -526,6 +529,18 @@ input InputData {
   data: JSON!
 }
 
+
+# ----- Users and their configurations ----
+
+type UserConfig {
+  userId: ID!
+  config: JSON!
+}
+
+input UserConfigInput {
+  config: JSON!
+}
+
 # ----- Queries, mutations and subscriptions -----
 
 type Query {
@@ -558,6 +573,8 @@ type Mutation {
   updateSDInstanceGroup(id: ID!, input: SDInstanceGroupInput!): SDInstanceGroup!
   deleteSDInstanceGroup(id: ID!): Boolean!
   statisticsMutate(inputData: InputData!): Boolean!
+  updateUserConfig(userId: ID!, input: UserConfigInput!): UserConfig!
+  deleteUserConfig(userId: ID!): Boolean!
 }
 
 type Subscription {
@@ -9644,6 +9661,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "updateUserConfig":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateUserConfig(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deleteUserConfig":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_deleteUserConfig(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -10712,6 +10743,50 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 	default:
 		panic("unknown field " + strconv.Quote(fields[0].Name))
 	}
+}
+
+var userConfigImplementors = []string{"UserConfig"}
+
+func (ec *executionContext) _UserConfig(ctx context.Context, sel ast.SelectionSet, obj *graphQLModel.UserConfig) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, userConfigImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("UserConfig")
+		case "userId":
+			out.Values[i] = ec._UserConfig_userId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "config":
+			out.Values[i] = ec._UserConfig_config(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
 }
 
 var __DirectiveImplementors = []string{"__Directive"}
