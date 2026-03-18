@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -23,73 +22,20 @@ var (
 
 func JWTAuthenticationMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !jwtAuthenticationMiddlewareEnabled {
-			ctx := context.WithValue(r.Context(), UserIdContextIdentifier, "1")
-			next.ServeHTTP(w, r.WithContext(ctx))
+
+		authResult := AuthenticateRequest(r)
+
+		if authResult.IsFailure() {
+			http.Error(w, authResult.GetError().Error(), http.StatusUnauthorized)
 			return
 		}
 
-		if isCookieSet(r, SessionJWTCookieIdentifier) {
-			sessionJWT, err := parseJWT(getSessionJWTCookieValue(r).GetPayload())
-			if err != nil {
-				http.Error(w, "failed to parse session JWT", http.StatusUnauthorized)
-				return
-			}
-
-			if isJWTValid(sessionJWT) {
-				subject := extractSubjectFromJWT(getSessionJWTCookieValue(r).GetPayload())
-				if subject.IsFailure() {
-					http.Error(w, "failed to parse session JWT", http.StatusUnauthorized)
-					return
-				}
-
-				ctx := context.WithValue(r.Context(), UserIdContextIdentifier, subject.GetPayload())
-				next.ServeHTTP(w, r.WithContext(ctx))
-				return
-			}
-
-			timeUntilSessionJWTExpiryResult := getTimeUntilJWTExpiry(sessionJWT)
-			if timeUntilSessionJWTExpiryResult.IsFailure() {
-				http.Error(w, "failed to check session JWT expiry", http.StatusInternalServerError)
-				return
-			}
-
-			if timeUntilSessionJWTExpiryResult.GetPayload() > 0 {
-				http.Error(w, "invalid session JWT", http.StatusUnauthorized)
-				return
-			}
-		}
-
-		refreshToken := getRefreshTokenCookieValue(r).GetPayloadOrDefault("")
-		if refreshToken == "" {
-			http.Error(w, "expired session JWT | missing refresh token", http.StatusUnauthorized)
+		if err := ApplyAuthenticationResult(w, authResult.GetPayload()); err != nil {
+			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
 
-		refreshTokenHash := sharedUtils.GenerateHexHash(refreshToken)
-		rawSessionRefreshResultObject, err, _ := sameOriginExpiredSessionJWTRequestGroup.Do(refreshTokenHash, func() (any, error) {
-			return performSessionRefresh(refreshTokenHash)
-		})
-		if err != nil {
-			http.Error(w, fmt.Sprintf("expired session JWT | failed to generate new session JWT using refresh token: %s", err.Error()), http.StatusUnauthorized)
-			return
-		}
-		sessionRefreshResultObject := rawSessionRefreshResultObject.(*sessionRefreshResult)
-
-		err = setupSessionJWTCookie(w, sessionRefreshResultObject.newSessionJWT)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("expired session JWT | failed to set up session JWT cookie: %s", err.Error()), http.StatusUnauthorized)
-			return
-		}
-
-		setupRefreshTokenCookie(w, sessionRefreshResultObject.newRefreshToken, time.Until(sessionRefreshResultObject.refreshTokenExpiresAt))
-
-		subject := extractSubjectFromJWT(sessionRefreshResultObject.newSessionJWT)
-		if subject.IsFailure() {
-			http.Error(w, "failed to parse session JWT", http.StatusUnauthorized)
-			return
-		}
-		ctx := context.WithValue(r.Context(), UserIdContextIdentifier, subject.GetPayload())
+		ctx := ContextWithUser(r.Context(), authResult.GetPayload())
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

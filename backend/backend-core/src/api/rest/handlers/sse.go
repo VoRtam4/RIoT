@@ -4,34 +4,58 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/events"
 )
 
-func EventStream(w http.ResponseWriter, r *http.Request) {
-
+func EventsStream(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+		http.Error(w, "streaming not supported", http.StatusInternalServerError)
 		return
 	}
-
-	w.Header().Set("Content-Type", "text/event-stream")
-
-	for {
-		select {
-
-		case ev := <-events.SDInstanceRegistered:
-			send(w, flusher, ev)
-
-		case ev := <-events.KPIFulfillmentChecked:
-			send(w, flusher, ev)
+	userId := r.Context().Value(auth.UserIdContextIdentifier)
+	if userId == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	query := r.URL.Query().Get("topics")
+	var subscribedTypes []events.EventType
+	if query == "" {
+		subscribedTypes = []events.EventType{
+			events.SDInstanceRegisteredEventType,
+			events.KPIFulfillmentCheckedEventType,
+		}
+	} else {
+		for _, t := range strings.Split(query, ",") {
+			subscribedTypes = append(subscribedTypes, events.EventType(t))
 		}
 	}
-}
-
-func send(w http.ResponseWriter, f http.Flusher, v any) {
-	data, _ := json.Marshal(v)
-	fmt.Fprintf(w, "data: %s\n\n", data)
-	f.Flush()
+	sub := events.GetEventBus().Subscribe(subscribedTypes, 32)
+	defer events.GetEventBus().Unsubscribe(sub.ID)
+	fmt.Fprintf(w, ": connected\n\n")
+	flusher.Flush()
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case event, ok := <-sub.Channel:
+			if !ok {
+				return
+			}
+			data, err := json.Marshal(event)
+			if err != nil {
+				continue
+			}
+			fmt.Fprintf(w, "event: %s\n", event.Type)
+			fmt.Fprintf(w, "data: %s\n\n", data)
+			flusher.Flush()
+		}
+	}
 }

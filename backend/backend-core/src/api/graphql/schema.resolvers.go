@@ -7,7 +7,9 @@ import (
 	"strconv"
 
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/graphql/gsc"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/events"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
 )
 
@@ -188,7 +190,7 @@ func (r *queryResolver) UserConfig(ctx context.Context, id uint32) (graphQLModel
 }
 
 func (r *queryResolver) MyUserConfig(ctx context.Context) (graphQLModel.UserConfig, error) {
-	userIdString, ok := ctx.Value("userId").(string)
+	userIdString, ok := ctx.Value(auth.UserIdContextIdentifier).(string)
 	if !ok {
 		return graphQLModel.UserConfig{}, fmt.Errorf("user config id not set")
 	}
@@ -201,11 +203,61 @@ func (r *queryResolver) MyUserConfig(ctx context.Context) (graphQLModel.UserConf
 }
 
 func (r *subscriptionResolver) OnSDInstanceRegistered(ctx context.Context) (<-chan graphQLModel.SDInstance, error) {
-	return SDInstanceGraphQLSubscriptionChannel, nil
+	output := make(chan graphQLModel.SDInstance, 16)
+	subscription := events.GetEventBus().Subscribe([]events.EventType{events.SDInstanceRegisteredEventType}, 16)
+	go func() {
+		defer close(output)
+		defer events.GetEventBus().Unsubscribe(subscription.ID)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case event, ok := <-subscription.Channel:
+				if !ok {
+					return
+				}
+				payload, ok := event.Payload.(graphQLModel.SDInstance)
+				if !ok {
+					continue
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case output <- payload:
+				}
+			}
+		}
+	}()
+	return output, nil
 }
 
 func (r *subscriptionResolver) OnKPIFulfillmentChecked(ctx context.Context) (<-chan graphQLModel.KPIFulfillmentCheckResultTuple, error) {
-	return KPIFulfillmentCheckResulTupleGraphQLSubscriptionChannel, nil
+	output := make(chan graphQLModel.KPIFulfillmentCheckResultTuple, 16)
+	subscription := events.GetEventBus().Subscribe([]events.EventType{events.KPIFulfillmentCheckedEventType}, 16)
+	go func() {
+		defer close(output)
+		defer events.GetEventBus().Unsubscribe(subscription.ID)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case event, ok := <-subscription.Channel:
+				if !ok {
+					return
+				}
+				payload, ok := event.Payload.(graphQLModel.KPIFulfillmentCheckResultTuple)
+				if !ok {
+					continue
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case output <- payload:
+				}
+			}
+		}
+	}()
+	return output, nil
 }
 
 func (r *Resolver) Mutation() gsc.MutationResolver { return &mutationResolver{r} }

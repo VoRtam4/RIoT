@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/db/dbClient"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/events"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dllModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/modelMapping/dll2gql"
@@ -26,7 +27,7 @@ func ProcessIncomingMessageProcessingUnitConnectionNotifications() {
 	}, rabbitMQClient)
 }
 
-func ProcessIncomingSDInstanceRegistrationRequests(sdInstanceGraphQLSubscriptionChannel *chan graphQLModel.SDInstance) {
+func ProcessIncomingSDInstanceRegistrationRequests() {
 	rabbitMQClient := rabbitmq.NewClient()
 	defer rabbitMQClient.Dispose()
 	consumeSDInstanceRegistrationRequestJSONMessages(func(sdInstanceRegistrationRequestISCMessage sharedModel.SDInstanceRegistrationRequestISCMessage) error {
@@ -34,10 +35,7 @@ func ProcessIncomingSDInstanceRegistrationRequests(sdInstanceGraphQLSubscription
 		newSDInstanceSDTypeSpecification := sdInstanceRegistrationRequestISCMessage.SDTypeSpecification
 		newSDInstancePersistResult := dbClient.GetRelationalDatabaseClientInstance().PersistNewSDInstance(newSDInstanceUID, newSDInstanceSDTypeSpecification)
 		if newSDInstancePersistResult.IsSuccess() {
-			select {
-			case *sdInstanceGraphQLSubscriptionChannel <- dll2gql.ToGraphQLModelSDInstance(newSDInstancePersistResult.GetPayload()):
-			default:
-			}
+			events.GetEventBus().Publish(events.SDInstanceRegisteredEventType, dll2gql.ToGraphQLModelSDInstance(newSDInstancePersistResult.GetPayload()))
 			eventTime := sdInstanceRegistrationRequestISCMessage.EventTime
 			if eventTime.IsZero() {
 				eventTime = time.Now().UTC()
@@ -63,7 +61,7 @@ func ProcessIncomingSDInstanceRegistrationRequests(sdInstanceGraphQLSubscription
 	}, rabbitMQClient)
 }
 
-func ProcessIncomingKPIFulfillmentCheckResults(kpiFulfillmentCheckResultGraphQLSubscriptionChannel *chan graphQLModel.KPIFulfillmentCheckResultTuple) {
+func ProcessIncomingKPIFulfillmentCheckResults() {
 	rabbitMQClient := rabbitmq.NewClient()
 	defer rabbitMQClient.Dispose()
 	consumeKPIFulfillmentCheckResultJSONMessages(func(kpiFulfillmentCheckResultTuple sharedModel.KPIFulfillmentCheckResultTupleISCMessage) error {
@@ -89,10 +87,7 @@ func ProcessIncomingKPIFulfillmentCheckResults(kpiFulfillmentCheckResultGraphQLS
 			gqlKPIFulfillmentCheckResultTuple := graphQLModel.KPIFulfillmentCheckResultTuple{
 				KpiFulfillmentCheckResults: sharedUtils.Map(kpiFulfillmentCheckResultTuplePersistResult.GetPayload(), dll2gql.ToGraphQLModelKPIFulfillmentCheckResult),
 			}
-			select {
-			case *kpiFulfillmentCheckResultGraphQLSubscriptionChannel <- gqlKPIFulfillmentCheckResultTuple:
-			default:
-			}
+			events.GetEventBus().Publish(events.KPIFulfillmentCheckedEventType, gqlKPIFulfillmentCheckResultTuple)
 		} else if kpiFulfillmentCheckResultTuplePersistError := kpiFulfillmentCheckResultTuplePersistResult.GetError(); !errors.Is(kpiFulfillmentCheckResultTuplePersistError, dbClient.ErrOperationWouldLeadToForeignKeyIntegrityBreach) {
 			return fmt.Errorf("failed to persist KPI fulfillment check result tuple: %w", kpiFulfillmentCheckResultTuplePersistError)
 		}

@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/graphql"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/db/dbClient"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/isc"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/rabbitmq"
@@ -35,8 +35,8 @@ func kickstartISC() {
 	//isc.EnqueueMessageRepresentingCurrentKPIDefinitionConfiguration(rabbitMQClient)
 	go isc.ProcessIncomingMessageProcessingUnitConnectionNotifications()
 	go isc.ProcessIncomingSDTypeRegistrationRequests()
-	go isc.ProcessIncomingSDInstanceRegistrationRequests(&graphql.SDInstanceGraphQLSubscriptionChannel)
-	go isc.ProcessIncomingKPIFulfillmentCheckResults(&graphql.KPIFulfillmentCheckResulTupleGraphQLSubscriptionChannel)
+	go isc.ProcessIncomingSDInstanceRegistrationRequests()
+	go isc.ProcessIncomingKPIFulfillmentCheckResults()
 }
 
 func main() {
@@ -48,5 +48,5 @@ func main() {
 	sharedUtils.TerminateOnError(err, "Unable to perform on-startup database operations")
 	//sharedUtils.StartLoggingProfilingInformationPeriodically(time.Minute)
 	kickstartISC()
-	graphql.SetupGraphQLServer()
+	api.StartServer()
 }
