@@ -7,6 +7,7 @@ import (
 
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/graphql"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/rest"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/websocket"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 	"github.com/go-chi/chi/v5"
@@ -28,6 +29,10 @@ func StartServer() {
 	r.Get("/auth/callback", auth.CallbackHandler)
 
 	rest.SetupRouter(r)
+
+	hub := websocket.NewHub()
+	go hub.StartEventListener()
+	r.Get("/ws", websocket.ServeWebSocket(hub))
 
 	r.Handle("/graphql", graphql.GetHandler())
 
