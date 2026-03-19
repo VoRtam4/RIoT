@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/db/dbClient"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/isc"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/rabbitmq"
@@ -44,7 +45,7 @@ func main() {
 	log.Println("Waiting for dependencies...")
 	waitForDependencies()
 	log.Println("Dependencies ready...")
-	err := dbClient.GetRelationalDatabaseClientInstance().PerformOnStartupOperations()
+	err := dbClient.GetRelationalDatabaseClientInstance().PerformOnStartupOperations(auth.RolePermissions)
 	sharedUtils.TerminateOnError(err, "Unable to perform on-startup database operations")
 	//sharedUtils.StartLoggingProfilingInformationPeriodically(time.Minute)
 	kickstartISC()

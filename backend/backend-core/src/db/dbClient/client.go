@@ -8,8 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/db/misc"
-
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/db/dbUtil"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dbModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dllModel"
@@ -29,7 +27,7 @@ var (
 
 type RelationalDatabaseClient interface {
 	setup()
-	PerformOnStartupOperations() error
+	PerformOnStartupOperations(permissions map[string]map[string]bool) error
 	PersistKPIDefinition(kpiDefinition sharedModel.KPIDefinition) sharedUtils.Result[uint32]
 	LoadKPIDefinition(id uint32) sharedUtils.Result[sharedModel.KPIDefinition]
 	LoadKPIDefinitions() sharedUtils.Result[[]sharedModel.KPIDefinition]
@@ -60,6 +58,10 @@ type RelationalDatabaseClient interface {
 	PersistUserConfig(userConfig dllModel.UserConfig) sharedUtils.Result[uint32]
 	LoadUserConfig(userId uint32) sharedUtils.Result[dllModel.UserConfig]
 	DeleteUserConfig(userId uint32) error
+	LoadUserRole(userID uint32) sharedUtils.Result[sharedUtils.Optional[string]]
+	AssignRoleToUser(userID uint32, roleLabel string) error
+	LoadPermissionsForUser(userID uint32) sharedUtils.Result[[]dbModel.PermissionEntity]
+	LoadRoleByLabel(label string) sharedUtils.Result[dbModel.RoleEntity]
 }
 
 var ErrOperationWouldLeadToForeignKeyIntegrityBreach = errors.New("operation would lead to foreign key integrity breach")
@@ -115,110 +117,32 @@ func (r *relationalDatabaseClientImpl) setup() {
 		new(dbModel.PermissionEntity),
 		new(dbModel.OperationTypeAccessPermissionEntity),
 		new(dbModel.SingleOperationPermissionEntity),
+		new(dbModel.UsersRolesMappingEntity),
 	), "[RDB client (GORM)]: auto-migration failed")
 }
 
-func (r *relationalDatabaseClientImpl) PerformOnStartupOperations() error {
-	// Begin by creating a snapshot of the GraphQL API based on the 'schema.graphqls' file
-	createGraphQLAPISnapshotResult := misc.CreateGraphQLAPISnapshot()
-	if createGraphQLAPISnapshotResult.IsFailure() {
-		return createGraphQLAPISnapshotResult.GetError()
-	}
-	graphQLAPISnapshot := createGraphQLAPISnapshotResult.GetPayload()
-
-	// Determine which operations are missing and which are redundant
-	setOfIdentifiersOfCurrentlyDefinedGraphQLOperations := sharedUtils.NewSetFromSlice(sharedUtils.Map(graphQLAPISnapshot, func(graphQLOperationSnapshot misc.GraphQLOperation) string {
-		return graphQLOperationSnapshot.Identifier
-	}))
-	graphQLOperationEntitiesLoadResult := dbUtil.LoadEntitiesFromDB[dbModel.GraphQLOperationEntity](r.db)
-	if graphQLOperationEntitiesLoadResult.IsFailure() {
-		return graphQLOperationEntitiesLoadResult.GetError()
-	}
-	setOfIdentifiersOfGraphQLOperationsPersistedInTheDatabase := sharedUtils.NewSetFromSlice(sharedUtils.Map(graphQLOperationEntitiesLoadResult.GetPayload(), func(graphQLOperationEntity dbModel.GraphQLOperationEntity) string {
-		return graphQLOperationEntity.Identifier
-	}))
-	toDelete := (setOfIdentifiersOfGraphQLOperationsPersistedInTheDatabase.GenerateDifferenceWith(setOfIdentifiersOfCurrentlyDefinedGraphQLOperations)).ToSlice()
-	toAdd := setOfIdentifiersOfCurrentlyDefinedGraphQLOperations.GenerateDifferenceWith(setOfIdentifiersOfGraphQLOperationsPersistedInTheDatabase)
-
-	// 1. Delete redundant GraphQL operation entries
-	// 2. Insert missing GraphQL operation entries
-	// 3. For each newly added GraphQL operation entry: add two single operation permission entries --> both effects
-	err := r.db.Transaction(func(tx *gorm.DB) error {
-		if err := dbUtil.DeleteEntitiesBasedOnWhereClauses[dbModel.GraphQLOperationEntity](r.db, dbUtil.Where("identifier IN (?)", toDelete)); err != nil {
-			return err
-		}
-		for _, graphQLOperationSnapshot := range graphQLAPISnapshot {
-			identifier := graphQLOperationSnapshot.Identifier
-			if !toAdd.Contains(identifier) {
-				continue
-			}
-
-			graphQLOperationEntity := &dbModel.GraphQLOperationEntity{
-				Identifier:    identifier,
-				OperationType: string(graphQLOperationSnapshot.OpType),
-			}
-			if err := dbUtil.PersistEntityIntoDB[dbModel.GraphQLOperationEntity](tx, graphQLOperationEntity); err != nil {
+func (r *relationalDatabaseClientImpl) PerformOnStartupOperations(permissions map[string]map[string]bool) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		for roleLabel, permissions := range permissions {
+			var role dbModel.RoleEntity
+			if err := tx.Where("label = ?", roleLabel).FirstOrCreate(&role).Error; err != nil {
 				return err
 			}
-			graphQLOperationID := graphQLOperationEntity.ID
-
-			for _, effect := range sharedUtils.SliceOf("allow", "deny") {
-				singleOperationPermissionEntity := &dbModel.PermissionEntity{
-					Label: fmt.Sprintf("GraphQL operation: %s | Effect: %s", identifier, effect),
-					SingleOperationPermission: &dbModel.SingleOperationPermissionEntity{
-						GraphQLOperationID: graphQLOperationID,
-						Effect:             effect,
-					},
+			for permissionLabel, allowed := range permissions {
+				if !allowed {
+					continue
 				}
-				if err := dbUtil.PersistEntityIntoDB[dbModel.PermissionEntity](tx, singleOperationPermissionEntity); err != nil {
+				var perm dbModel.PermissionEntity
+				if err := tx.Where("label = ?", permissionLabel).FirstOrCreate(&perm).Error; err != nil {
+					return err
+				}
+				if err := tx.Model(&role).Association("Permissions").Append(&perm); err != nil {
 					return err
 				}
 			}
 		}
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-
-	// The 'migration' will proceed only if the 'Role' table is empty (= has no rows)
-	roleTableEmptinessCheckResult := dbUtil.IsTableEmpty[dbModel.RoleEntity](r.db)
-	if roleTableEmptinessCheckResult.IsFailure() {
-		return roleTableEmptinessCheckResult.GetError()
-	}
-	if isRoleTableEmpty := roleTableEmptinessCheckResult.GetPayload(); !isRoleTableEmpty {
-		log.Println("Role table is NOT empty: no more on-startup operations...")
-		return nil
-	}
-
-	// Create a 'Root-Administrator' role along with the operation-type-access permission entries
-	// Anyone with the aforementioned role will be able to access all GraphQL operations (unless explicitly denied)
-	rootAdministratorRoleEntity := &dbModel.RoleEntity{
-		Label: "Root-Administrator",
-		Permissions: []dbModel.PermissionEntity{
-			{
-				Label: "Permission to access the GraphQL operation type: query.",
-				OperationTypeAccessPermission: &dbModel.OperationTypeAccessPermissionEntity{
-					OperationType: "query",
-				},
-			},
-			{
-				Label: "Permission to access the GraphQL operation type: mutation.",
-				OperationTypeAccessPermission: &dbModel.OperationTypeAccessPermissionEntity{
-					OperationType: "mutation",
-				},
-			},
-			{
-				Label: "Permission to access the GraphQL operation type: subscription.",
-				OperationTypeAccessPermission: &dbModel.OperationTypeAccessPermissionEntity{
-					OperationType: "subscription",
-				},
-			},
-		},
-	}
-	return dbUtil.PersistEntityIntoDB[dbModel.RoleEntity](r.db, rootAdministratorRoleEntity)
-
-	// TODO: Give the 'Root-Administrator' role to a selected user (likely provided by .env)
 }
 
 func (r *relationalDatabaseClientImpl) PersistKPIDefinition(kpiDefinition sharedModel.KPIDefinition) sharedUtils.Result[uint32] {
@@ -736,4 +660,79 @@ func (r *relationalDatabaseClientImpl) DeleteUserConfig(userId uint32) error {
 	defer r.mu.Unlock()
 
 	return dbUtil.DeleteCertainEntityBasedOnId[dbModel.UserConfigEntity](r.db, userId)
+}
+
+func (r *relationalDatabaseClientImpl) LoadUserRole(userID uint32) sharedUtils.Result[sharedUtils.Optional[string]] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	type result struct {
+		Label string
+	}
+	var res result
+	err := r.db.Table("roles").Select("roles.label").Joins("JOIN users_roles_mapping urm ON urm.role_id = roles.id").Where("urm.user_id = ?", userID).Limit(1).Scan(&res).Error
+	if err != nil {
+		return sharedUtils.NewFailureResult[sharedUtils.Optional[string]](err)
+	}
+	if res.Label == "" {
+		return sharedUtils.NewSuccessResult(sharedUtils.NewEmptyOptional[string]())
+	}
+	return sharedUtils.NewSuccessResult(sharedUtils.NewOptionalOf(res.Label))
+}
+
+func (r *relationalDatabaseClientImpl) AssignRoleToUser(userID uint32, roleLabel string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var role dbModel.RoleEntity
+	if err := r.db.Where("label = ?", roleLabel).First(&role).Error; err != nil {
+		return err
+	}
+	type mapping struct {
+		UserID uint32
+		RoleID uint32
+	}
+	var existing mapping
+	err := r.db.Table("users_roles_mapping").Where("user_id = ? AND role_id = ?", userID, role.ID).First(&existing).Error
+	if err == nil {
+		return nil
+	}
+	return r.db.Table("users_roles_mapping").Create(&mapping{
+		UserID: userID,
+		RoleID: role.ID,
+	}).Error
+}
+
+func (r *relationalDatabaseClientImpl) LoadPermissionsForUser(userID uint32) sharedUtils.Result[[]dbModel.PermissionEntity] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	var roles []dbModel.RoleEntity
+
+	err := r.db.
+		Joins("JOIN users_roles_mapping urm ON urm.role_id = roles.id").
+		Where("urm.user_id = ?", userID).
+		Preload("Permissions").
+		Preload("Permissions.OperationTypeAccessPermission").
+		Preload("Permissions.SingleOperationPermission.GraphQLOperation").
+		Find(&roles).Error
+
+	if err != nil {
+		return sharedUtils.NewFailureResult[[]dbModel.PermissionEntity](err)
+	}
+
+	var permissions []dbModel.PermissionEntity
+	for _, role := range roles {
+		permissions = append(permissions, role.Permissions...)
+	}
+
+	return sharedUtils.NewSuccessResult(permissions)
+}
+
+func (r *relationalDatabaseClientImpl) LoadRoleByLabel(label string) sharedUtils.Result[dbModel.RoleEntity] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var role dbModel.RoleEntity
+	if err := r.db.Where("label = ?", label).First(&role).Error; err != nil {
+		return sharedUtils.NewFailureResult[dbModel.RoleEntity](err)
+	}
+	return sharedUtils.NewSuccessResult(role)
 }

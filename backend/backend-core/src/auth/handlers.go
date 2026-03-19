@@ -9,10 +9,13 @@ import (
 	"time"
 
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/db/dbClient"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/idtoken"
 )
+
+var rootAdminEmail = sharedUtils.GetEnvironmentVariableValue("ROOT_ADMIN_EMAIL").GetPayloadOrDefault("")
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if isCookieSet(r, SessionJWTCookieIdentifier) || isCookieSet(r, RefreshTokenCookieIdentifier) {
@@ -141,8 +144,21 @@ func CallbackHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, userRecordUpsertResult.GetError().Error(), http.StatusInternalServerError)
 	}
 	user := userRecordUpsertResult.GetPayload()
-
-	sessionJWT, err := createSessionJWT(fmt.Sprintf("%d", user.ID.GetPayload()))
+	userID := uint32(user.ID.GetPayload())
+	roleResult := domainLogicLayer.LoadUserRole(userID)
+	if roleResult.IsFailure() {
+		http.Error(w, roleResult.GetError().Error(), http.StatusInternalServerError)
+		return
+	}
+	roleOpt := roleResult.GetPayload()
+	if roleOpt.IsEmpty() {
+		if user.Email == rootAdminEmail {
+			_ = domainLogicLayer.AssignRoleToUser(userID, RoleAdmin)
+		} else {
+			_ = domainLogicLayer.AssignRoleToUser(userID, RoleUser)
+		}
+	}
+	sessionJWT, err := createSessionJWT(fmt.Sprintf("%d", userID))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to create session JWT: %s", err.Error()), http.StatusInternalServerError)
 		return

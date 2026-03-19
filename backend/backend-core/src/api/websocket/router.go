@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/websocket/handlers"
 )
 
@@ -26,21 +27,41 @@ var requestHandlers = map[string]RequestHandler{
 	"delete_sd_instance_group": handlers.DeleteSDInstanceGroup,
 	"get_user_config":          handlers.GetUserConfig,
 	"update_user_config":       handlers.UpdateUserConfig,
-	//"delete_user_config":       handlers.DeleteUserConfig,
+	"delete_user_config":       handlers.DeleteUserConfig,
 }
 
 func RouteMessage(h *Hub, c *Client, msg WebSocketMessage) {
 	switch msg.Type {
 	case MessageSubscribe:
+		if !auth.CanAccessOperation(c.Ctx, auth.ResourceEvents, auth.OperationSubscribe) {
+			c.SafeSend(WebSocketMessage{
+				Type:  MessageResponse,
+				ID:    msg.ID,
+				Error: "forbidden",
+			})
+			return
+		}
 		c.subscriptions[msg.Topic] = true
 
 	case MessageUnsubscribe:
+		if !auth.CanAccessOperation(c.Ctx, auth.ResourceEvents, auth.OperationSubscribe) {
+			c.SafeSend(WebSocketMessage{
+				Type:  MessageResponse,
+				ID:    msg.ID,
+				Error: "forbidden",
+			})
+			return
+		}
 		delete(c.subscriptions, msg.Topic)
 
 	case MessageRequest:
 		handler, ok := requestHandlers[msg.Action]
 		if !ok {
-			c.SafeSend(WebSocketMessage{Type: MessageResponse, ID: msg.ID, Error: "unknown action"})
+			c.SafeSend(WebSocketMessage{
+				Type:  MessageResponse,
+				ID:    msg.ID,
+				Error: "unknown action",
+			})
 			return
 		}
 		handler(c, msg)

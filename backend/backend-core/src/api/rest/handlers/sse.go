@@ -11,6 +11,10 @@ import (
 )
 
 func EventsStream(w http.ResponseWriter, r *http.Request) {
+	if !auth.CanAccessOperation(r.Context(), auth.ResourceEvents, auth.OperationSubscribe) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -18,11 +22,6 @@ func EventsStream(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "streaming not supported", http.StatusInternalServerError)
-		return
-	}
-	userId := r.Context().Value(auth.UserIdContextIdentifier)
-	if userId == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 	query := r.URL.Query().Get("topics")
@@ -45,14 +44,17 @@ func EventsStream(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-r.Context().Done():
 			return
+
 		case event, ok := <-sub.Channel:
 			if !ok {
 				return
 			}
+
 			data, err := json.Marshal(event)
 			if err != nil {
 				continue
 			}
+
 			fmt.Fprintf(w, "event: %s\n", event.Type)
 			fmt.Fprintf(w, "data: %s\n\n", data)
 			flusher.Flush()

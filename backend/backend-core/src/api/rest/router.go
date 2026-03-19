@@ -34,7 +34,7 @@ func SetupRouter(r chi.Router) {
 
 		r.Get("/user-config", handlers.GetUserConfig)
 		r.Post("/user-config", handlers.UpdateUserConfig)
-		//r.Delete("/user-config", handlers.DeleteUserConfig)
+		r.Delete("/user-config", handlers.DeleteUserConfig)
 
 		r.Get("/subscribe", handlers.EventsStream)
 	})

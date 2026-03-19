@@ -1,19 +1,19 @@
 package websocket
 
 import (
+	"context"
 	"log"
 
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/gorilla/websocket"
 )
 
 type Client struct {
-	conn *websocket.Conn
-	send chan WebSocketMessage
-
+	conn          *websocket.Conn
+	send          chan WebSocketMessage
+	Ctx           context.Context
+	Principal     auth.Principal
 	subscriptions map[string]bool
-
-	UserID string
-	roles  []string
 }
 
 func NewClient(conn *websocket.Conn) *Client {

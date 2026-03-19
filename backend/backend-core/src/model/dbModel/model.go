@@ -198,6 +198,16 @@ func (UserConfigEntity) TableName() string {
 	return "user_config"
 }
 
+type UsersRolesMappingEntity struct {
+	UserID uint32     `gorm:"column:user_id;primaryKey;not null;index"`
+	RoleID uint32     `gorm:"column:role_id;primaryKey;not null;index"`
+	Role   RoleEntity `gorm:"foreignKey:RoleID;references:ID;constraint:OnDelete:CASCADE"`
+}
+
+func (UsersRolesMappingEntity) TableName() string {
+	return "users_roles_mapping"
+}
+
 type SDCommandEntity struct {
 	ID          uint32                      `gorm:"column:id;primaryKey;not null"`
 	SDTypeID    uint32                      `gorm:"column:sd_type_id;not null"`

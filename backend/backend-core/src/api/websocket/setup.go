@@ -18,13 +18,9 @@ var upgrader = websocket.Upgrader{
 
 func ServeWebSocket(hub *Hub) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		authResult := auth.AuthenticateRequest(r)
-		if authResult.IsFailure() {
+		principal, err := auth.AuthenticatePrincipal(w, r)
+		if err != nil {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
-		if err := auth.ApplyAuthenticationResult(w, authResult.GetPayload()); err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -32,7 +28,7 @@ func ServeWebSocket(hub *Hub) http.HandlerFunc {
 			return
 		}
 		client := NewClient(conn)
-		client.UserID = authResult.GetPayload().UserID
+		client.Principal = *principal
 		hub.Register(client)
 		go client.writePump()
 		go client.readPump(hub)

@@ -21,12 +21,12 @@ func createSessionJWT(userID string) (string, error) {
 	return token.SignedString(jwtSecret)
 }
 
-func parseJWT(jwtString string) (*jwt.Token, error) {
+func ParseJWT(jwtString string) (*jwt.Token, error) {
 	keyFunc := func(token *jwt.Token) (any, error) { return jwtSecret, nil }
 	return jwt.Parse(jwtString, keyFunc, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 }
 
-func isJWTValid(token *jwt.Token) bool {
+func IsJWTValid(token *jwt.Token) bool {
 	if !token.Valid {
 		return false
 	}

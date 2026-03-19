@@ -23,25 +23,19 @@ var (
 func JWTAuthenticationMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		authResult := AuthenticateRequest(r)
-
-		if authResult.IsFailure() {
-			http.Error(w, authResult.GetError().Error(), http.StatusUnauthorized)
+		principal, err := AuthenticatePrincipal(w, r)
+		if err != nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
-		if err := ApplyAuthenticationResult(w, authResult.GetPayload()); err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
-			return
-		}
-
-		ctx := ContextWithUser(r.Context(), authResult.GetPayload())
+		ctx := ContextWithPrincipal(r.Context(), *principal)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
 func extractSubjectFromJWT(jwt string) sharedUtils.Result[string] {
-	sessionJWT, err := parseJWT(jwt)
+	sessionJWT, err := ParseJWT(jwt)
 	if err != nil {
 		return sharedUtils.NewFailureResult[string](err)
 	}

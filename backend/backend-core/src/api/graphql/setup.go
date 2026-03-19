@@ -1,7 +1,10 @@
 package graphql
 
 import (
+	"context"
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,46 +17,55 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-/*
-	func SetupGraphQLServer() {
-		allowedOrigins := sharedUtils.NewSetFromSlice(strings.Split(sharedUtils.GetEnvironmentVariableValue("ALLOWED_ORIGINS").GetPayloadOrDefault("http://localhost:8080,http://localhost:1234"), ","))
-		graphQLServer := handler.New(gsc.NewExecutableSchema(gsc.Config{Resolvers: new(Resolver)}))
-		graphQLServer.AddTransport(transport.POST{})
-		graphQLServer.AddTransport(transport.Websocket{
-			KeepAlivePingInterval: 10 * time.Second,
-			Upgrader: websocket.Upgrader{
-				CheckOrigin: func(r *http.Request) bool {
-					origin := r.Header.Get("Origin")
-					return allowedOrigins.Contains(origin)
-				},
-			},
-		})
-		graphQLServer.Use(extension.Introspection{})
-		router := chi.NewRouter()
-		router.Use(cors.New(cors.Options{
-			AllowedOrigins:   allowedOrigins.ToSlice(),
-			AllowCredentials: true,
-			Debug:            false,
-		}).Handler)
-		router.Handle("/", auth.JWTAuthenticationMiddleware(graphQLServer))
-		router.Get("/auth/login", auth.LoginHandler)
-		router.Get("/auth/logout", auth.LogoutHandler)
-		router.Get("/auth/callback", auth.CallbackHandler)
-		log.Fatal(http.ListenAndServe(":9090", router))
-	}
-*/
-
 func GetHandler() http.Handler {
 	allowedOrigins := sharedUtils.NewSetFromSlice(strings.Split(sharedUtils.GetEnvironmentVariableValue("ALLOWED_ORIGINS").GetPayloadOrDefault("http://localhost:8080,http://localhost:1234"), ","))
 	graphQLServer := handler.New(gsc.NewExecutableSchema(gsc.Config{Resolvers: new(Resolver)}))
 	graphQLServer.AddTransport(transport.POST{})
 	graphQLServer.AddTransport(transport.Websocket{
 		KeepAlivePingInterval: 10 * time.Second,
+
 		Upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				origin := r.Header.Get("Origin")
 				return allowedOrigins.Contains(origin)
 			},
+		},
+
+		InitFunc: func(ctx context.Context, initPayload transport.InitPayload) (context.Context, *transport.InitPayload, error) {
+			tokenRaw, ok := initPayload["Authorization"]
+			if !ok {
+				return ctx, nil, fmt.Errorf("missing auth")
+			}
+			tokenStr, ok := tokenRaw.(string)
+			if !ok {
+				return ctx, nil, fmt.Errorf("invalid auth format")
+			}
+			tokenStr = strings.TrimPrefix(tokenStr, "Bearer ")
+			token, err := auth.ParseJWT(tokenStr)
+			if err != nil {
+				return ctx, nil, fmt.Errorf("unauthorized")
+			}
+			if !auth.IsJWTValid(token) {
+				return ctx, nil, fmt.Errorf("unauthorized")
+			}
+			subject, err := token.Claims.GetSubject()
+			if err != nil {
+				return ctx, nil, fmt.Errorf("invalid subject")
+			}
+			userIDUint64, err := strconv.ParseUint(subject, 10, 32)
+			if err != nil {
+				return ctx, nil, fmt.Errorf("invalid user id")
+			}
+			role := auth.RoleUser
+			if userIDUint64 == 1 {
+				role = auth.RoleAdmin
+			}
+			principal := auth.Principal{
+				Type:   auth.PrincipalUserSession,
+				UserID: uint32(userIDUint64),
+				Role:   role,
+			}
+			return auth.ContextWithPrincipal(ctx, principal), nil, nil
 		},
 	})
 	graphQLServer.Use(extension.Introspection{})

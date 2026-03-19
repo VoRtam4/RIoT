@@ -85,10 +85,14 @@ func handleUserRecordUpsert(userData idTokenData, newRefreshToken string) shared
 		IPAddress:        "", // TODO: plug these fields in... or get rid of them if proven unnecessary
 		UserAgent:        "",
 	})
-
 	persistResult := dbClientInstance.PersistUser(user)
 	if persistResult.IsFailure() {
 		return sharedUtils.NewFailureResult[dllModel.User](fmt.Errorf("user record upsert failure - failed to persist user record: %s", persistResult.GetError().Error()))
+	}
+	db := dbClient.GetRelationalDatabaseClientInstance()
+	roleLoad := db.LoadUserRole(uint32(user.ID.GetPayload()))
+	if roleLoad.IsFailure() {
+		_ = db.AssignRoleToUser(uint32(user.ID.GetPayload()), RoleUser)
 	}
 	user.ID = sharedUtils.NewOptionalOf(persistResult.GetPayload())
 	return sharedUtils.NewSuccessResult(user)

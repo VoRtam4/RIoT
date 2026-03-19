@@ -70,7 +70,7 @@ func clearOauth2OIDCFlowStateCookie(w http.ResponseWriter) {
 // ----- session JWT -----
 
 func setupSessionJWTCookie(w http.ResponseWriter, sessionJWTString string) error {
-	sessionJWT, err := parseJWT(sessionJWTString)
+	sessionJWT, err := ParseJWT(sessionJWTString)
 	if err != nil {
 		return err
 	}

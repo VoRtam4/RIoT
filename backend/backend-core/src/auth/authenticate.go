@@ -26,11 +26,11 @@ func AuthenticateRequest(r *http.Request) sharedUtils.Result[AuthenticatedReques
 
 	if isCookieSet(r, SessionJWTCookieIdentifier) {
 		sessionJWTString := getSessionJWTCookieValue(r).GetPayload()
-		sessionJWT, err := parseJWT(sessionJWTString)
+		sessionJWT, err := ParseJWT(sessionJWTString)
 		if err != nil {
 			return sharedUtils.NewFailureResult[AuthenticatedRequest](fmt.Errorf("failed to parse JWT: %w", err))
 		}
-		if isJWTValid(sessionJWT) {
+		if IsJWTValid(sessionJWT) {
 			subject := extractSubjectFromJWT(sessionJWTString)
 			if subject.IsFailure() {
 				return sharedUtils.NewFailureResult[AuthenticatedRequest](subject.GetError())
