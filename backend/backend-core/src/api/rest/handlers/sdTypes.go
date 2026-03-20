@@ -12,8 +12,7 @@ import (
 )
 
 func GetSDTypes(w http.ResponseWriter, r *http.Request) {
-	if !auth.CanAccessOperation(r.Context(), auth.ResourceSDTypes, auth.OperationRead) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	if principal := authorizeOperation(w, r, auth.ResourceSDTypes, auth.OperationRead); principal == nil {
 		return
 	}
 	result := domainLogicLayer.GetSDTypes()
@@ -25,8 +24,7 @@ func GetSDTypes(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetSDType(w http.ResponseWriter, r *http.Request) {
-	if !auth.CanAccessOperation(r.Context(), auth.ResourceSDTypes, auth.OperationRead) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	if principal := authorizeOperation(w, r, auth.ResourceSDTypes, auth.OperationRead); principal == nil {
 		return
 	}
 	idParam := chi.URLParam(r, "id")
@@ -44,8 +42,7 @@ func GetSDType(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateSDType(w http.ResponseWriter, r *http.Request) {
-	if !auth.CanAccessOperation(r.Context(), auth.ResourceSDTypes, auth.OperationCreate) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	if principal := authorizeOperation(w, r, auth.ResourceSDTypes, auth.OperationCreate); principal == nil {
 		return
 	}
 	var input graphQLModel.SDTypeInput
@@ -64,8 +61,7 @@ func CreateSDType(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteSDType(w http.ResponseWriter, r *http.Request) {
-	if !auth.CanAccessOperation(r.Context(), auth.ResourceSDTypes, auth.OperationDelete) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	if principal := authorizeOperation(w, r, auth.ResourceSDTypes, auth.OperationDelete); principal == nil {
 		return
 	}
 	idParam := chi.URLParam(r, "id")

@@ -1,11 +1,13 @@
 package websocket
 
 import (
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/websocket/connection"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/websocket/handlers"
+	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedModel"
 )
 
-type RequestHandler func(c *Client, msg WebSocketMessage)
+type RequestHandler func(c *connection.Client, msg sharedModel.WebSocketMessage)
 
 var requestHandlers = map[string]RequestHandler{
 	"get_sd_types":             handlers.GetSDTypes,
@@ -28,42 +30,38 @@ var requestHandlers = map[string]RequestHandler{
 	"get_user_config":          handlers.GetUserConfig,
 	"update_user_config":       handlers.UpdateUserConfig,
 	"delete_user_config":       handlers.DeleteUserConfig,
+	"get_api_keys":             handlers.GetAPIKeys,
+	"create_api_key":           handlers.CreateAPIKey,
+	"update_api_key":           handlers.UpdateAPIKey,
+	"delete_api_key":           handlers.DeleteAPIKey,
 }
 
-func RouteMessage(h *Hub, c *Client, msg WebSocketMessage) {
-	switch msg.Type {
-	case MessageSubscribe:
-		if !auth.CanAccessOperation(c.Ctx, auth.ResourceEvents, auth.OperationSubscribe) {
-			c.SafeSend(WebSocketMessage{
-				Type:  MessageResponse,
-				ID:    msg.ID,
-				Error: "forbidden",
-			})
-			return
-		}
-		c.subscriptions[msg.Topic] = true
+func RouteMessage() func(h *connection.Hub, c *connection.Client, msg sharedModel.WebSocketMessage) {
+	return func(h *connection.Hub, c *connection.Client, msg sharedModel.WebSocketMessage) {
+		switch msg.Type {
+		case sharedModel.MessageSubscribe:
+			if principle := handlers.authorizeOperation(c, msg, auth.ResourceEvents, auth.OperationSubscribe); principle == nil {
+				return
+			}
+			c.Subscriptions[msg.Topic] = true
 
-	case MessageUnsubscribe:
-		if !auth.CanAccessOperation(c.Ctx, auth.ResourceEvents, auth.OperationSubscribe) {
-			c.SafeSend(WebSocketMessage{
-				Type:  MessageResponse,
-				ID:    msg.ID,
-				Error: "forbidden",
-			})
-			return
-		}
-		delete(c.subscriptions, msg.Topic)
+		case sharedModel.MessageUnsubscribe:
+			if principle := handlers.authorizeOperation(c, msg, auth.ResourceEvents, auth.OperationSubscribe); principle == nil {
+				return
+			}
+			delete(c.Subscriptions, msg.Topic)
 
-	case MessageRequest:
-		handler, ok := requestHandlers[msg.Action]
-		if !ok {
-			c.SafeSend(WebSocketMessage{
-				Type:  MessageResponse,
-				ID:    msg.ID,
-				Error: "unknown action",
-			})
-			return
+		case sharedModel.MessageRequest:
+			handler, ok := requestHandlers[msg.Action]
+			if !ok {
+				c.SafeSend(sharedModel.WebSocketMessage{
+					Type:  sharedModel.MessageResponse,
+					ID:    msg.ID,
+					Error: "unknown action",
+				})
+				return
+			}
+			handler(c, msg)
 		}
-		handler(c, msg)
 	}
 }

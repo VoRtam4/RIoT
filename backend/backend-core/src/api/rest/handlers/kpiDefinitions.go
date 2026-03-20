@@ -12,8 +12,7 @@ import (
 )
 
 func GetKPIDefinitions(w http.ResponseWriter, r *http.Request) {
-	if !auth.CanAccessOperation(r.Context(), auth.ResourceKPIDefinitions, auth.OperationRead) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	if principal := authorizeOperation(w, r, auth.ResourceKPIDefinitions, auth.OperationRead); principal == nil {
 		return
 	}
 	result := domainLogicLayer.GetKPIDefinitions()
@@ -25,8 +24,7 @@ func GetKPIDefinitions(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetKPIDefinition(w http.ResponseWriter, r *http.Request) {
-	if !auth.CanAccessOperation(r.Context(), auth.ResourceKPIDefinitions, auth.OperationRead) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	if principal := authorizeOperation(w, r, auth.ResourceKPIDefinitions, auth.OperationRead); principal == nil {
 		return
 	}
 	idParam := chi.URLParam(r, "id")
@@ -44,8 +42,7 @@ func GetKPIDefinition(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateKPIDefinition(w http.ResponseWriter, r *http.Request) {
-	if !auth.CanAccessOperation(r.Context(), auth.ResourceKPIDefinitions, auth.OperationCreate) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	if principal := authorizeOperation(w, r, auth.ResourceKPIDefinitions, auth.OperationCreate); principal == nil {
 		return
 	}
 	var input graphQLModel.KPIDefinitionInput
@@ -64,8 +61,7 @@ func CreateKPIDefinition(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateKPIDefinition(w http.ResponseWriter, r *http.Request) {
-	if !auth.CanAccessOperation(r.Context(), auth.ResourceKPIDefinitions, auth.OperationUpdate) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	if principal := authorizeOperation(w, r, auth.ResourceKPIDefinitions, auth.OperationUpdate); principal == nil {
 		return
 	}
 	idParam := chi.URLParam(r, "id")
@@ -89,8 +85,7 @@ func UpdateKPIDefinition(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteKPIDefinition(w http.ResponseWriter, r *http.Request) {
-	if !auth.CanAccessOperation(r.Context(), auth.ResourceKPIDefinitions, auth.OperationDelete) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	if principal := authorizeOperation(w, r, auth.ResourceKPIDefinitions, auth.OperationDelete); principal == nil {
 		return
 	}
 	idParam := chi.URLParam(r, "id")

@@ -3,90 +3,78 @@ package handlers
 import (
 	"encoding/json"
 
-	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/websocket"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/websocket/connection"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
+	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedModel"
 )
 
-func GetUserConfig(c *websocket.Client, msg websocket.WebSocketMessage) {
-	if !auth.CanAccessOperation(c.Ctx, auth.ResourceUserConfig, auth.OperationRead) {
-		c.SafeSend(websocket.WebSocketMessage{
-			Type:  websocket.MessageResponse,
-			ID:    msg.ID,
-			Error: "forbidden",
-		})
+func GetUserConfig(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	var principal *auth.Principal
+	if principal = authorizeOperation(c, msg, auth.ResourceUserConfig, auth.OperationRead); principal == nil {
 		return
 	}
-	userID := c.Principal.UserID
+	userID := principal.UserID
 	result := domainLogicLayer.GetUserConfig(userID)
 	if result.IsFailure() {
-		c.SafeSend(websocket.WebSocketMessage{
-			Type:  websocket.MessageResponse,
+		c.SafeSend(sharedModel.WebSocketMessage{
+			Type:  sharedModel.MessageResponse,
 			ID:    msg.ID,
 			Error: result.GetError().Error(),
 		})
 		return
 	}
-	c.SafeSend(websocket.WebSocketMessage{
-		Type:    websocket.MessageResponse,
+	c.SafeSend(sharedModel.WebSocketMessage{
+		Type:    sharedModel.MessageResponse,
 		ID:      msg.ID,
 		Success: true,
 		Payload: result.GetPayload(),
 	})
 }
 
-func UpdateUserConfig(c *websocket.Client, msg websocket.WebSocketMessage) {
-	if !auth.CanAccessOperation(c.Ctx, auth.ResourceUserConfig, auth.OperationUpdate) {
-		c.SafeSend(websocket.WebSocketMessage{
-			Type:  websocket.MessageResponse,
-			ID:    msg.ID,
-			Error: "forbidden",
-		})
+func UpdateUserConfig(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	var principal *auth.Principal
+	if principal = authorizeOperation(c, msg, auth.ResourceUserConfig, auth.OperationUpdate); principal == nil {
 		return
 	}
-	userID := c.Principal.UserID
+	userID := principal.UserID
 	bytes, _ := json.Marshal(msg.Payload)
 	var input graphQLModel.UserConfigInput
 	json.Unmarshal(bytes, &input)
 	result := domainLogicLayer.UpdateUserConfig(userID, input)
 	if result.IsFailure() {
-		c.SafeSend(websocket.WebSocketMessage{
-			Type:  websocket.MessageResponse,
+		c.SafeSend(sharedModel.WebSocketMessage{
+			Type:  sharedModel.MessageResponse,
 			ID:    msg.ID,
 			Error: result.GetError().Error(),
 		})
 		return
 	}
-	c.SafeSend(websocket.WebSocketMessage{
-		Type:    websocket.MessageResponse,
+	c.SafeSend(sharedModel.WebSocketMessage{
+		Type:    sharedModel.MessageResponse,
 		ID:      msg.ID,
 		Success: true,
 		Payload: result.GetPayload(),
 	})
 }
 
-func DeleteUserConfig(c *websocket.Client, msg websocket.WebSocketMessage) {
-	if !auth.CanAccessOperation(c.Ctx, auth.ResourceUserConfig, auth.OperationUpdate) {
-		c.SafeSend(websocket.WebSocketMessage{
-			Type:  websocket.MessageResponse,
-			ID:    msg.ID,
-			Error: "forbidden",
-		})
+func DeleteUserConfig(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	var principal *auth.Principal
+	if principal = authorizeOperation(c, msg, auth.ResourceUserConfig, auth.OperationDelete); principal == nil {
 		return
 	}
-	userID := c.Principal.UserID
-	err := domainLogicLayer.DeleteUserConfig(userID)
+	err := domainLogicLayer.DeleteUserConfig(principal.UserID)
 	if err != nil {
-		c.SafeSend(websocket.WebSocketMessage{
-			Type:  websocket.MessageResponse,
+		c.SafeSend(sharedModel.WebSocketMessage{
+			Type:  sharedModel.MessageResponse,
 			ID:    msg.ID,
 			Error: err.Error(),
 		})
 		return
 	}
-	c.SafeSend(websocket.WebSocketMessage{
-		Type:    websocket.MessageResponse,
+	c.SafeSend(sharedModel.WebSocketMessage{
+		Type:    sharedModel.MessageResponse,
 		ID:      msg.ID,
 		Success: true,
 	})

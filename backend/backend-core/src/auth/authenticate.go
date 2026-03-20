@@ -23,7 +23,6 @@ func AuthenticateRequest(r *http.Request) sharedUtils.Result[AuthenticatedReques
 			UserID: "1",
 		})
 	}
-
 	if isCookieSet(r, SessionJWTCookieIdentifier) {
 		sessionJWTString := getSessionJWTCookieValue(r).GetPayload()
 		sessionJWT, err := ParseJWT(sessionJWTString)

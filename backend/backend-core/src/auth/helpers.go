@@ -9,12 +9,18 @@ import (
 	"time"
 
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/db/dbClient"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dllModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 	"google.golang.org/api/idtoken"
 )
 
-var allowedOrigins = sharedUtils.NewSetFromSlice(strings.Split(sharedUtils.GetEnvironmentVariableValue("ALLOWED_ORIGINS").GetPayloadOrDefault("http://localhost:8080,http://localhost:1234"), ","))
+var (
+	allowedOrigins = sharedUtils.NewSetFromSlice(strings.Split(sharedUtils.GetEnvironmentVariableValue("ALLOWED_ORIGINS").GetPayloadOrDefault("http://localhost:8080,http://localhost:1234"), ","))
+	rootAdminEmail = sharedUtils.GetEnvironmentVariableValue("ROOT_ADMIN_EMAIL").GetPayloadOrDefault("")
+	AdminRoleID    uint32
+	UserRoleID     uint32
+)
 
 // ----- types -----
 
@@ -89,11 +95,8 @@ func handleUserRecordUpsert(userData idTokenData, newRefreshToken string) shared
 	if persistResult.IsFailure() {
 		return sharedUtils.NewFailureResult[dllModel.User](fmt.Errorf("user record upsert failure - failed to persist user record: %s", persistResult.GetError().Error()))
 	}
-	db := dbClient.GetRelationalDatabaseClientInstance()
-	roleLoad := db.LoadUserRole(uint32(user.ID.GetPayload()))
-	if roleLoad.IsFailure() {
-		_ = db.AssignRoleToUser(uint32(user.ID.GetPayload()), RoleUser)
-	}
+	userID := uint32(persistResult.GetPayload())
+	setRole(userID, user.Email)
 	user.ID = sharedUtils.NewOptionalOf(persistResult.GetPayload())
 	return sharedUtils.NewSuccessResult(user)
 }
@@ -119,4 +122,30 @@ func extractIDTokenData(idTokenPayload *idtoken.Payload) sharedUtils.Result[idTo
 
 func generateRefreshToken() string {
 	return sharedUtils.GenerateRandomAlphanumericString(16)
+}
+
+func setRole(userID uint32, email string) error {
+	roleResult := domainLogicLayer.LoadUserRole(userID)
+	if roleResult.IsFailure() {
+		if AdminRoleID == 0 {
+			adminRoleResult := domainLogicLayer.LoadRoleByLabel("Admin")
+			if adminRoleResult.IsFailure() {
+				return fmt.Errorf("failed to load 'Admin' role from the database: %w", adminRoleResult.GetError())
+			}
+			AdminRoleID = adminRoleResult.GetPayload().ID
+		}
+		if UserRoleID == 0 {
+			userRoleResult := domainLogicLayer.LoadRoleByLabel("User")
+			if userRoleResult.IsFailure() {
+				return fmt.Errorf("failed to load 'User' role from the database: %w", userRoleResult.GetError())
+			}
+			UserRoleID = userRoleResult.GetPayload().ID
+		}
+		if email == rootAdminEmail {
+			domainLogicLayer.AssignRoleToUser(userID, AdminRoleID)
+		} else {
+			domainLogicLayer.AssignRoleToUser(userID, UserRoleID)
+		}
+	}
+	return nil
 }

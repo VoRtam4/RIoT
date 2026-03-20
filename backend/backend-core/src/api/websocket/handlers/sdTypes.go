@@ -3,51 +3,42 @@ package handlers
 import (
 	"encoding/json"
 
-	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/websocket"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/websocket/connection"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
+	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedModel"
 )
 
-func GetSDTypes(c *websocket.Client, msg websocket.WebSocketMessage) {
-	if !auth.CanAccessOperation(c.Ctx, auth.ResourceSDTypes, auth.OperationRead) {
-		c.SafeSend(websocket.WebSocketMessage{
-			Type:  websocket.MessageResponse,
-			ID:    msg.ID,
-			Error: "forbidden",
-		})
+func GetSDTypes(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	if principal := authorizeOperation(c, msg, auth.ResourceSDTypes, auth.OperationRead); principal == nil {
 		return
 	}
 	result := domainLogicLayer.GetSDTypes()
 	if result.IsFailure() {
-		c.SafeSend(websocket.WebSocketMessage{
-			Type:  websocket.MessageResponse,
+		c.SafeSend(sharedModel.WebSocketMessage{
+			Type:  sharedModel.MessageResponse,
 			ID:    msg.ID,
 			Error: result.GetError().Error(),
 		})
 		return
 	}
-	c.SafeSend(websocket.WebSocketMessage{
-		Type:    websocket.MessageResponse,
+	c.SafeSend(sharedModel.WebSocketMessage{
+		Type:    sharedModel.MessageResponse,
 		ID:      msg.ID,
 		Success: true,
 		Payload: result.GetPayload(),
 	})
 }
 
-func GetSDType(c *websocket.Client, msg websocket.WebSocketMessage) {
-	if !auth.CanAccessOperation(c.Ctx, auth.ResourceSDTypes, auth.OperationRead) {
-		c.SafeSend(websocket.WebSocketMessage{
-			Type:  websocket.MessageResponse,
-			ID:    msg.ID,
-			Error: "forbidden",
-		})
+func GetSDType(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	if principal := authorizeOperation(c, msg, auth.ResourceSDTypes, auth.OperationRead); principal == nil {
 		return
 	}
 	idFloat, ok := msg.Payload.(map[string]any)["id"].(float64)
 	if !ok {
-		c.SafeSend(websocket.WebSocketMessage{
-			Type:  websocket.MessageResponse,
+		c.SafeSend(sharedModel.WebSocketMessage{
+			Type:  sharedModel.MessageResponse,
 			ID:    msg.ID,
 			Error: "invalid id",
 		})
@@ -55,35 +46,30 @@ func GetSDType(c *websocket.Client, msg websocket.WebSocketMessage) {
 	}
 	result := domainLogicLayer.GetSDType(uint32(idFloat))
 	if result.IsFailure() {
-		c.SafeSend(websocket.WebSocketMessage{
-			Type:  websocket.MessageResponse,
+		c.SafeSend(sharedModel.WebSocketMessage{
+			Type:  sharedModel.MessageResponse,
 			ID:    msg.ID,
 			Error: result.GetError().Error(),
 		})
 		return
 	}
-	c.SafeSend(websocket.WebSocketMessage{
-		Type:    websocket.MessageResponse,
+	c.SafeSend(sharedModel.WebSocketMessage{
+		Type:    sharedModel.MessageResponse,
 		ID:      msg.ID,
 		Success: true,
 		Payload: result.GetPayload(),
 	})
 }
 
-func CreateSDType(c *websocket.Client, msg websocket.WebSocketMessage) {
-	if !auth.CanAccessOperation(c.Ctx, auth.ResourceSDTypes, auth.OperationCreate) {
-		c.SafeSend(websocket.WebSocketMessage{
-			Type:  websocket.MessageResponse,
-			ID:    msg.ID,
-			Error: "forbidden",
-		})
+func CreateSDType(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	if principal := authorizeOperation(c, msg, auth.ResourceSDTypes, auth.OperationCreate); principal == nil {
 		return
 	}
 	bytes, _ := json.Marshal(msg.Payload)
 	var input graphQLModel.SDTypeInput
 	if err := json.Unmarshal(bytes, &input); err != nil {
-		c.SafeSend(websocket.WebSocketMessage{
-			Type:  websocket.MessageResponse,
+		c.SafeSend(sharedModel.WebSocketMessage{
+			Type:  sharedModel.MessageResponse,
 			ID:    msg.ID,
 			Error: "invalid payload",
 		})
@@ -91,34 +77,29 @@ func CreateSDType(c *websocket.Client, msg websocket.WebSocketMessage) {
 	}
 	result := domainLogicLayer.CreateSDType(input)
 	if result.IsFailure() {
-		c.SafeSend(websocket.WebSocketMessage{
-			Type:  websocket.MessageResponse,
+		c.SafeSend(sharedModel.WebSocketMessage{
+			Type:  sharedModel.MessageResponse,
 			ID:    msg.ID,
 			Error: result.GetError().Error(),
 		})
 		return
 	}
-	c.SafeSend(websocket.WebSocketMessage{
-		Type:    websocket.MessageResponse,
+	c.SafeSend(sharedModel.WebSocketMessage{
+		Type:    sharedModel.MessageResponse,
 		ID:      msg.ID,
 		Success: true,
 		Payload: result.GetPayload(),
 	})
 }
 
-func DeleteSDType(c *websocket.Client, msg websocket.WebSocketMessage) {
-	if !auth.CanAccessOperation(c.Ctx, auth.ResourceSDTypes, auth.OperationDelete) {
-		c.SafeSend(websocket.WebSocketMessage{
-			Type:  websocket.MessageResponse,
-			ID:    msg.ID,
-			Error: "forbidden",
-		})
+func DeleteSDType(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	if principal := authorizeOperation(c, msg, auth.ResourceSDTypes, auth.OperationDelete); principal == nil {
 		return
 	}
 	idFloat, ok := msg.Payload.(map[string]any)["id"].(float64)
 	if !ok {
-		c.SafeSend(websocket.WebSocketMessage{
-			Type:  websocket.MessageResponse,
+		c.SafeSend(sharedModel.WebSocketMessage{
+			Type:  sharedModel.MessageResponse,
 			ID:    msg.ID,
 			Error: "invalid id",
 		})
@@ -126,15 +107,15 @@ func DeleteSDType(c *websocket.Client, msg websocket.WebSocketMessage) {
 	}
 	err := domainLogicLayer.DeleteSDType(uint32(idFloat))
 	if err != nil {
-		c.SafeSend(websocket.WebSocketMessage{
-			Type:  websocket.MessageResponse,
+		c.SafeSend(sharedModel.WebSocketMessage{
+			Type:  sharedModel.MessageResponse,
 			ID:    msg.ID,
 			Error: err.Error(),
 		})
 		return
 	}
-	c.SafeSend(websocket.WebSocketMessage{
-		Type:    websocket.MessageResponse,
+	c.SafeSend(sharedModel.WebSocketMessage{
+		Type:    sharedModel.MessageResponse,
 		ID:      msg.ID,
 		Success: true,
 	})

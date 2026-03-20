@@ -58,10 +58,16 @@ type RelationalDatabaseClient interface {
 	PersistUserConfig(userConfig dllModel.UserConfig) sharedUtils.Result[uint32]
 	LoadUserConfig(userId uint32) sharedUtils.Result[dllModel.UserConfig]
 	DeleteUserConfig(userId uint32) error
-	LoadUserRole(userID uint32) sharedUtils.Result[sharedUtils.Optional[string]]
-	AssignRoleToUser(userID uint32, roleLabel string) error
+	LoadUserRole(userID uint32) sharedUtils.Result[string]
+	AssignRoleToUser(userID uint32, roleID uint32) error
 	LoadPermissionsForUser(userID uint32) sharedUtils.Result[[]dbModel.PermissionEntity]
 	LoadRoleByLabel(label string) sharedUtils.Result[dbModel.RoleEntity]
+	LoadAPIKeyByHash(hash string) sharedUtils.Result[sharedUtils.Optional[dbModel.APIKeyEntity]]
+	LoadAPIKeyByID(id uint32) sharedUtils.Result[sharedUtils.Optional[dbModel.APIKeyEntity]]
+	PersistAPIKey(apiKey dbModel.APIKeyEntity) sharedUtils.Result[uint32]
+	LoadAPIKeysForUser(userID uint32) sharedUtils.Result[[]dbModel.APIKeyEntity]
+	UpdateAPIKey(apiKey dbModel.APIKeyEntity) error
+	DeleteAPIKey(id uint32) error
 }
 
 var ErrOperationWouldLeadToForeignKeyIntegrityBreach = errors.New("operation would lead to foreign key integrity breach")
@@ -117,7 +123,8 @@ func (r *relationalDatabaseClientImpl) setup() {
 		new(dbModel.PermissionEntity),
 		new(dbModel.OperationTypeAccessPermissionEntity),
 		new(dbModel.SingleOperationPermissionEntity),
-		new(dbModel.UsersRolesMappingEntity),
+		new(dbModel.APIKeyEntity),
+		new(dbModel.APIKeyIPRestrictionEntity),
 	), "[RDB client (GORM)]: auto-migration failed")
 }
 
@@ -632,26 +639,20 @@ func (r *relationalDatabaseClientImpl) PersistUserSession(userSession dllModel.U
 func (r *relationalDatabaseClientImpl) PersistUserConfig(userConfig dllModel.UserConfig) sharedUtils.Result[uint32] {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
 	userConfigEntity := dll2db.ToDBModelEntityUserConfig(userConfig)
-
 	if err := dbUtil.PersistEntityIntoDB(r.db, &userConfigEntity); err != nil {
 		return sharedUtils.NewFailureResult[uint32](err)
 	}
-
 	return sharedUtils.NewSuccessResult[uint32](userConfigEntity.UserID)
 }
 
 func (r *relationalDatabaseClientImpl) LoadUserConfig(userId uint32) sharedUtils.Result[dllModel.UserConfig] {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
 	userConfigEntityLoadResult := dbUtil.LoadEntityFromDB[dbModel.UserConfigEntity](r.db, dbUtil.Where("user_id = ?", userId))
-
 	if userConfigEntityLoadResult.IsFailure() {
 		return sharedUtils.NewFailureResult[dllModel.UserConfig](userConfigEntityLoadResult.GetError())
 	}
-
 	return sharedUtils.NewSuccessResult(db2dll.ToDLLModelUserConfig(userConfigEntityLoadResult.GetPayload()))
 }
 
@@ -662,69 +663,32 @@ func (r *relationalDatabaseClientImpl) DeleteUserConfig(userId uint32) error {
 	return dbUtil.DeleteCertainEntityBasedOnId[dbModel.UserConfigEntity](r.db, userId)
 }
 
-func (r *relationalDatabaseClientImpl) LoadUserRole(userID uint32) sharedUtils.Result[sharedUtils.Optional[string]] {
+func (r *relationalDatabaseClientImpl) LoadUserRole(userID uint32) sharedUtils.Result[string] {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	type result struct {
-		Label string
-	}
-	var res result
-	err := r.db.Table("roles").Select("roles.label").Joins("JOIN users_roles_mapping urm ON urm.role_id = roles.id").Where("urm.user_id = ?", userID).Limit(1).Scan(&res).Error
+	var user dbModel.UserEntity
+	err := r.db.Preload("Role").First(&user, "id = ?", userID).Error
 	if err != nil {
-		return sharedUtils.NewFailureResult[sharedUtils.Optional[string]](err)
+		return sharedUtils.NewFailureResult[string](err)
 	}
-	if res.Label == "" {
-		return sharedUtils.NewSuccessResult(sharedUtils.NewEmptyOptional[string]())
-	}
-	return sharedUtils.NewSuccessResult(sharedUtils.NewOptionalOf(res.Label))
+	return sharedUtils.NewSuccessResult(user.Role.Label)
 }
 
-func (r *relationalDatabaseClientImpl) AssignRoleToUser(userID uint32, roleLabel string) error {
+func (r *relationalDatabaseClientImpl) AssignRoleToUser(userID uint32, roleID uint32) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	var role dbModel.RoleEntity
-	if err := r.db.Where("label = ?", roleLabel).First(&role).Error; err != nil {
-		return err
-	}
-	type mapping struct {
-		UserID uint32
-		RoleID uint32
-	}
-	var existing mapping
-	err := r.db.Table("users_roles_mapping").Where("user_id = ? AND role_id = ?", userID, role.ID).First(&existing).Error
-	if err == nil {
-		return nil
-	}
-	return r.db.Table("users_roles_mapping").Create(&mapping{
-		UserID: userID,
-		RoleID: role.ID,
-	}).Error
+	return r.db.Model(&dbModel.UserEntity{}).Where("id = ?", userID).Update("role_id", roleID).Error
 }
 
 func (r *relationalDatabaseClientImpl) LoadPermissionsForUser(userID uint32) sharedUtils.Result[[]dbModel.PermissionEntity] {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
-	var roles []dbModel.RoleEntity
-
-	err := r.db.
-		Joins("JOIN users_roles_mapping urm ON urm.role_id = roles.id").
-		Where("urm.user_id = ?", userID).
-		Preload("Permissions").
-		Preload("Permissions.OperationTypeAccessPermission").
-		Preload("Permissions.SingleOperationPermission.GraphQLOperation").
-		Find(&roles).Error
-
+	var user dbModel.UserEntity
+	err := r.db.Preload("Role.Permissions").First(&user, "id = ?", userID).Error
 	if err != nil {
 		return sharedUtils.NewFailureResult[[]dbModel.PermissionEntity](err)
 	}
-
-	var permissions []dbModel.PermissionEntity
-	for _, role := range roles {
-		permissions = append(permissions, role.Permissions...)
-	}
-
-	return sharedUtils.NewSuccessResult(permissions)
+	return sharedUtils.NewSuccessResult(user.Role.Permissions)
 }
 
 func (r *relationalDatabaseClientImpl) LoadRoleByLabel(label string) sharedUtils.Result[dbModel.RoleEntity] {
@@ -735,4 +699,70 @@ func (r *relationalDatabaseClientImpl) LoadRoleByLabel(label string) sharedUtils
 		return sharedUtils.NewFailureResult[dbModel.RoleEntity](err)
 	}
 	return sharedUtils.NewSuccessResult(role)
+}
+
+func (r *relationalDatabaseClientImpl) LoadAPIKeyByHash(hash string) sharedUtils.Result[sharedUtils.Optional[dbModel.APIKeyEntity]] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	result := dbUtil.LoadEntityFromDB[dbModel.APIKeyEntity](r.db, dbUtil.Preload("IPRestrictions"), dbUtil.Preload("Role"), dbUtil.Where("key_hash = ?", hash))
+	if result.IsFailure() {
+		err := result.GetError()
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return sharedUtils.NewSuccessResult(sharedUtils.NewEmptyOptional[dbModel.APIKeyEntity]())
+		}
+		return sharedUtils.NewFailureResult[sharedUtils.Optional[dbModel.APIKeyEntity]](err)
+	}
+	return sharedUtils.NewSuccessResult(sharedUtils.NewOptionalOf(result.GetPayload()))
+}
+
+func (r *relationalDatabaseClientImpl) LoadAPIKeyByID(id uint32) sharedUtils.Result[sharedUtils.Optional[dbModel.APIKeyEntity]] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	result := dbUtil.LoadEntityFromDB[dbModel.APIKeyEntity](r.db, dbUtil.Preload("IPRestrictions"), dbUtil.Preload("Role.Permissions"), dbUtil.Where("id = ?", id))
+	if result.IsFailure() {
+		err := result.GetError()
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return sharedUtils.NewSuccessResult(sharedUtils.NewEmptyOptional[dbModel.APIKeyEntity]())
+		}
+		return sharedUtils.NewFailureResult[sharedUtils.Optional[dbModel.APIKeyEntity]](err)
+	}
+	return sharedUtils.NewSuccessResult(sharedUtils.NewOptionalOf(result.GetPayload()))
+}
+
+func (r *relationalDatabaseClientImpl) PersistAPIKey(apiKey dbModel.APIKeyEntity) sharedUtils.Result[uint32] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	err := r.db.Create(&apiKey).Error
+	if err != nil {
+		return sharedUtils.NewFailureResult[uint32](err)
+	}
+	return sharedUtils.NewSuccessResult(apiKey.ID)
+}
+
+func (r *relationalDatabaseClientImpl) LoadAPIKeysForUser(userID uint32) sharedUtils.Result[[]dbModel.APIKeyEntity] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	result := dbUtil.LoadEntitiesFromDB[dbModel.APIKeyEntity](r.db, dbUtil.Preload("IPRestrictions"), dbUtil.Preload("Role"), dbUtil.Where("user_id = ?", userID))
+	if result.IsFailure() {
+		return sharedUtils.NewFailureResult[[]dbModel.APIKeyEntity](result.GetError())
+	}
+	return sharedUtils.NewSuccessResult(result.GetPayload())
+}
+
+func (r *relationalDatabaseClientImpl) UpdateAPIKey(apiKey dbModel.APIKeyEntity) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	updates := map[string]interface{}{
+		"label":      apiKey.Label,
+		"role_id":    apiKey.RoleID,
+		"expires_at": apiKey.ExpiresAt,
+		"updated_at": time.Now(),
+	}
+	return r.db.Model(&dbModel.APIKeyEntity{}).Where("id = ?", apiKey.ID).Updates(updates).Error
+}
+
+func (r *relationalDatabaseClientImpl) DeleteAPIKey(id uint32) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.db.Delete(&dbModel.APIKeyEntity{}, id).Error
 }

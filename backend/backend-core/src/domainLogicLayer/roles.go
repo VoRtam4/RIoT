@@ -6,16 +6,16 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 )
 
-func LoadUserRole(userID uint32) sharedUtils.Result[sharedUtils.Optional[string]] {
-	result := dbClient.GetRelationalDatabaseClientInstance().LoadUserRole(userID)
-	if result.IsFailure() {
-		return sharedUtils.NewFailureResult[sharedUtils.Optional[string]](result.GetError())
-	}
-	return sharedUtils.NewSuccessResult(result.GetPayload())
+func LoadUserRole(userID uint32) sharedUtils.Result[string] {
+	return dbClient.GetRelationalDatabaseClientInstance().LoadUserRole(userID)
 }
 
-func AssignRoleToUser(userID uint32, roleLabel string) error {
-	return dbClient.GetRelationalDatabaseClientInstance().AssignRoleToUser(userID, roleLabel)
+func AssignRoleToUser(userID uint32, roleID uint32) sharedUtils.Result[bool] {
+	err := dbClient.GetRelationalDatabaseClientInstance().AssignRoleToUser(userID, roleID)
+	if err != nil {
+		return sharedUtils.NewFailureResult[bool](err)
+	}
+	return sharedUtils.NewSuccessResult(true)
 }
 
 func LoadPermissionsForUser(userID uint32) sharedUtils.Result[[]dbModel.PermissionEntity] {

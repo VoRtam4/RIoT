@@ -9,8 +9,7 @@ import (
 )
 
 func GetKPIResults(w http.ResponseWriter, r *http.Request) {
-	if !auth.CanAccessOperation(r.Context(), auth.ResourceKPIResults, auth.OperationRead) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	if principal := authorizeOperation(w, r, auth.ResourceKPIResults, auth.OperationRead); principal == nil {
 		return
 	}
 	result := domainLogicLayer.GetKPIFulfillmentCheckResults()

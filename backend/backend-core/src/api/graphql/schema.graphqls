@@ -337,3 +337,42 @@ type Subscription {
   onSDInstanceRegistered: SDInstance!
   onKPIFulfillmentChecked: KPIFulfillmentCheckResultTuple!
 }
+
+# ----- API Keys -----
+
+type APIKey {
+  id: ID!
+  label: String!
+  roleId: ID!
+  role: Role!
+  expiresAt: Date
+  revoked: Boolean!
+  rateLimit: Int
+  lastUsedAt: Date
+}
+
+type Role {
+  id: ID!
+  label: String!
+  permissions: [Permission!]!
+}
+
+type Permission {
+  id: ID!
+  label: String!
+}
+
+input CreateAPIKeyInput {
+  label: String!
+  roleId: ID!
+  expiresAt: Date
+  rateLimit: Int
+}
+
+input UpdateAPIKeyInput {
+  label: String
+  roleId: ID
+  expiresAt: Date
+  revoked: Boolean
+  rateLimit: Int
+}

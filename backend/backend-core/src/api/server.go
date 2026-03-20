@@ -8,6 +8,7 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/graphql"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/rest"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/websocket"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/websocket/connection"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 	"github.com/go-chi/chi/v5"
@@ -30,8 +31,8 @@ func StartServer() {
 
 	rest.SetupRouter(r)
 
-	hub := websocket.NewHub()
-	go hub.StartEventListener()
+	hub := connection.NewHub()
+	go hub.StartEventListener(websocket.EventListener())
 	r.Get("/ws", websocket.ServeWebSocket(hub))
 
 	r.Handle("/graphql", graphql.GetHandler())

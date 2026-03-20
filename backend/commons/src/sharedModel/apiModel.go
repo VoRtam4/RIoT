@@ -1,4 +1,4 @@
-package websocket
+package sharedModel
 
 type MessageType string
 

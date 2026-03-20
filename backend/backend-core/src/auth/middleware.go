@@ -16,20 +16,18 @@ const (
 )
 
 var (
-	jwtAuthenticationMiddlewareEnabled      = sharedUtils.GetFlagEnvironmentVariableValue("JWT_AUTHENTICATION_MIDDLEWARE_ENABLED").GetPayloadOrDefault(false) // TODO: Ensure this variable evaluates to 'true' in production
+	jwtAuthenticationMiddlewareEnabled      = sharedUtils.GetFlagEnvironmentVariableValue("JWT_AUTHENTICATION_MIDDLEWARE_ENABLED").GetPayloadOrDefault(false)
 	sameOriginExpiredSessionJWTRequestGroup singleflight.Group
 )
 
 func JWTAuthenticationMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
 		principal, err := AuthenticatePrincipal(w, r)
 		if err != nil {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-
-		ctx := ContextWithPrincipal(r.Context(), *principal)
+		ctx := ContextWithPrincipal(r.Context(), principal)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -39,7 +37,6 @@ func extractSubjectFromJWT(jwt string) sharedUtils.Result[string] {
 	if err != nil {
 		return sharedUtils.NewFailureResult[string](err)
 	}
-
 	subject, err := sessionJWT.Claims.GetSubject()
 	if err != nil {
 		return sharedUtils.NewFailureResult[string](err)

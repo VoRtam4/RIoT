@@ -12,8 +12,7 @@ import (
 )
 
 func GetSDInstances(w http.ResponseWriter, r *http.Request) {
-	if !auth.CanAccessOperation(r.Context(), auth.ResourceSDInstances, auth.OperationRead) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	if principal := authorizeOperation(w, r, auth.ResourceSDInstances, auth.OperationRead); principal == nil {
 		return
 	}
 	result := domainLogicLayer.GetSDInstances()
@@ -25,8 +24,7 @@ func GetSDInstances(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateSDInstance(w http.ResponseWriter, r *http.Request) {
-	if !auth.CanAccessOperation(r.Context(), auth.ResourceSDInstances, auth.OperationUpdate) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	if principal := authorizeOperation(w, r, auth.ResourceSDInstances, auth.OperationUpdate); principal == nil {
 		return
 	}
 	idParam := chi.URLParam(r, "id")

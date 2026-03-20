@@ -13,8 +13,7 @@ import (
 )
 
 func GetSDInstanceGroups(w http.ResponseWriter, r *http.Request) {
-	if !auth.CanAccessOperation(r.Context(), auth.ResourceSDInstances, auth.OperationRead) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	if principal := authorizeOperation(w, r, auth.ResourceSDInstances, auth.OperationRead); principal == nil {
 		return
 	}
 	result := domainLogicLayer.GetSDInstanceGroups()
@@ -26,8 +25,7 @@ func GetSDInstanceGroups(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetSDInstanceGroup(w http.ResponseWriter, r *http.Request) {
-	if !auth.CanAccessOperation(r.Context(), auth.ResourceSDInstances, auth.OperationRead) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	if principal := authorizeOperation(w, r, auth.ResourceSDInstances, auth.OperationRead); principal == nil {
 		return
 	}
 	id, _ := strconv.ParseUint(chi.URLParam(r, "id"), 10, 32)
@@ -40,8 +38,7 @@ func GetSDInstanceGroup(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateSDInstanceGroup(w http.ResponseWriter, r *http.Request) {
-	if !auth.CanAccessOperation(r.Context(), auth.ResourceSDInstances, auth.OperationUpdate) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	if principal := authorizeOperation(w, r, auth.ResourceSDInstances, auth.OperationCreate); principal == nil {
 		return
 	}
 	var input graphQLModel.SDInstanceGroupInput
@@ -59,8 +56,7 @@ func CreateSDInstanceGroup(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateSDInstanceGroup(w http.ResponseWriter, r *http.Request) {
-	if !auth.CanAccessOperation(r.Context(), auth.ResourceSDInstances, auth.OperationUpdate) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	if principal := authorizeOperation(w, r, auth.ResourceSDInstances, auth.OperationUpdate); principal == nil {
 		return
 	}
 	id, _ := strconv.ParseUint(chi.URLParam(r, "id"), 10, 32)
@@ -78,8 +74,7 @@ func UpdateSDInstanceGroup(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteSDInstanceGroup(w http.ResponseWriter, r *http.Request) {
-	if !auth.CanAccessOperation(r.Context(), auth.ResourceSDInstances, auth.OperationUpdate) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	if principal := authorizeOperation(w, r, auth.ResourceSDInstances, auth.OperationDelete); principal == nil {
 		return
 	}
 	id, _ := strconv.ParseUint(chi.URLParam(r, "id"), 10, 32)

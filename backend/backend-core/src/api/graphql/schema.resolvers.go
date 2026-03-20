@@ -4,21 +4,23 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strconv"
 
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/graphql/gsc"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/events"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dbModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
 )
 
-func authorizeOperation(ctx context.Context, operation string, opType string) (auth.Principal, error) {
+func authorizeOperation(ctx context.Context, operation string, opType string) (*auth.Principal, error) {
 	principal, ok := auth.PrincipalFromContext(ctx)
 	if !ok {
-		return auth.Principal{}, fmt.Errorf("unauthorized")
+		return nil, fmt.Errorf("unauthorized")
 	}
-	if !auth.CanAccessOperation(ctx, operation, opType) {
-		return auth.Principal{}, fmt.Errorf("forbidden")
+	if !auth.CanAccessOperation(principal, operation, opType) {
+		return nil, fmt.Errorf("forbidden")
 	}
 	return principal, nil
 }
@@ -280,6 +282,69 @@ func (r *queryResolver) MyUserConfig(ctx context.Context) (graphQLModel.UserConf
 		return graphQLModel.UserConfig{}, err
 	}
 	return domainLogicLayer.GetUserConfig(principal.UserID).Unwrap()
+}
+
+func (r *queryResolver) ApiKeys(ctx context.Context) ([]dbModel.APIKeyEntity, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceAPIKeys, auth.OperationRead)
+	if err != nil {
+		return nil, err
+	}
+	result := domainLogicLayer.LoadAPIKeysForUser(principal.UserID)
+	if result.IsFailure() {
+		return nil, result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
+func (r *mutationResolver) CreateAPIKey(ctx context.Context, input graphQLModel.CreateAPIKeyInput) (string, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceAPIKeys, auth.OperationCreate)
+	if err != nil {
+		return "", err
+	}
+	roleID, err := strconv.ParseUint(input.RoleID, 10, 32)
+	if err != nil {
+		return "", fmt.Errorf("invalid role id")
+	}
+	result := domainLogicLayer.CreateAPIKey(principal.UserID, uint32(roleID), input.Label, input.ExpiresAt)
+	if result.IsFailure() {
+		return "", result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
+func (r *mutationResolver) UpdateAPIKey(ctx context.Context, id uint32, input graphQLModel.UpdateAPIKeyInput) (bool, error) {
+	_, err := authorizeOperation(ctx, auth.ResourceAPIKeys, auth.OperationUpdate)
+	if err != nil {
+		return false, err
+	}
+	apiKeyResult := domainLogicLayer.LoadAPIKeyByID(id)
+	if apiKeyResult.IsFailure() || apiKeyResult.GetPayload().IsEmpty() {
+		return false, fmt.Errorf("api key not found")
+	}
+	apiKey := apiKeyResult.GetPayload().GetPayload()
+	if input.Label != nil {
+		apiKey.Label = *input.Label
+	}
+	if input.RoleID != nil {
+		roleID, err := strconv.ParseUint(*input.RoleID, 10, 32)
+		if err != nil {
+			return false, err
+		}
+		apiKey.RoleID = uint32(roleID)
+	}
+	if input.ExpiresAt != nil {
+		apiKey.ExpiresAt = input.ExpiresAt
+	}
+	if input.Revoked != nil {
+		apiKey.Revoked = *input.Revoked
+	}
+	if input.RateLimit != nil {
+		apiKey.RateLimit = input.RateLimit
+	}
+	if err := domainLogicLayer.UpdateAPIKey(apiKey); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (r *subscriptionResolver) OnSDInstanceRegistered(ctx context.Context) (<-chan graphQLModel.SDInstance, error) {

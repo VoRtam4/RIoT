@@ -56,16 +56,11 @@ func GetHandler() http.Handler {
 			if err != nil {
 				return ctx, nil, fmt.Errorf("invalid user id")
 			}
-			role := auth.RoleUser
-			if userIDUint64 == 1 {
-				role = auth.RoleAdmin
-			}
 			principal := auth.Principal{
 				Type:   auth.PrincipalUserSession,
 				UserID: uint32(userIDUint64),
-				Role:   role,
 			}
-			return auth.ContextWithPrincipal(ctx, principal), nil, nil
+			return auth.ContextWithPrincipal(ctx, &principal), nil, nil
 		},
 	})
 	graphQLServer.Use(extension.Introspection{})

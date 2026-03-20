@@ -36,6 +36,11 @@ func SetupRouter(r chi.Router) {
 		r.Post("/user-config", handlers.UpdateUserConfig)
 		r.Delete("/user-config", handlers.DeleteUserConfig)
 
+		r.Get("/api-keys", handlers.GetAPIKeys)
+		r.Post("/api-keys", handlers.CreateAPIKey)
+		r.Put("/api-keys/{id}", handlers.UpdateAPIKey)
+		r.Delete("/api-keys/{id}", handlers.DeleteAPIKey)
+
 		r.Get("/subscribe", handlers.EventsStream)
 	})
 }

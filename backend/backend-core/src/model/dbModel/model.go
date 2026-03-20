@@ -144,6 +144,8 @@ type UserEntity struct {
 	Sessions               []UserSessionEntity         `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
 	Invocations            []SDCommandInvocationEntity `gorm:"foreignKey:UserId;constraint:OnDelete:CASCADE"`
 	UserConfig             UserConfigEntity            `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
+	RoleID                 uint32                      `gorm:"column:role_id;not null"`
+	Role                   RoleEntity                  `gorm:"foreignKey:RoleID"`
 	/*
 	   ID        uint           `gorm:"primaryKey"` // Primary key for the user
 	   CreatedAt time.Time      // Timestamp of creation
@@ -196,16 +198,6 @@ type UserConfigEntity struct { // TODO: Consider embedding this inside 'UserEnti
 
 func (UserConfigEntity) TableName() string {
 	return "user_config"
-}
-
-type UsersRolesMappingEntity struct {
-	UserID uint32     `gorm:"column:user_id;primaryKey;not null;index"`
-	RoleID uint32     `gorm:"column:role_id;primaryKey;not null;index"`
-	Role   RoleEntity `gorm:"foreignKey:RoleID;references:ID;constraint:OnDelete:CASCADE"`
-}
-
-func (UsersRolesMappingEntity) TableName() string {
-	return "users_roles_mapping"
 }
 
 type SDCommandEntity struct {
@@ -289,4 +281,34 @@ type SingleOperationPermissionEntity struct {
 	GraphQLOperationID uint32                 `gorm:"column:graphql_operation_id;primaryKey;not null;uniqueIndex:idx_op_effect,priority:1"`
 	GraphQLOperation   GraphQLOperationEntity `gorm:"foreignKey:GraphQLOperationID;references:ID;constraint:OnDelete:CASCADE"`
 	Effect             string                 `gorm:"column:effect;not null;check:effect IN ('allow', 'deny');uniqueIndex:idx_op_effect,priority:2"`
+}
+
+type APIKeyEntity struct {
+	ID             uint32                      `gorm:"column:id;primaryKey;not null"`
+	UserID         uint32                      `gorm:"column:user_id;not null;index"`
+	RoleID         uint32                      `gorm:"column:role_id;not null"`
+	Role           RoleEntity                  `gorm:"foreignKey:RoleID"`
+	KeyHash        string                      `gorm:"column:key_hash;not null;uniqueIndex"`
+	Label          string                      `gorm:"column:label;not null"`
+	RateLimit      *uint32                     `gorm:"column:rate_limit"`
+	ExpiresAt      *time.Time                  `gorm:"column:expires_at"`
+	Revoked        bool                        `gorm:"column:revoked;not null;default:false"`
+	LastUsedAt     *time.Time                  `gorm:"column:last_used_at"`
+	CreatedAt      time.Time                   `gorm:"column:created_at;not null"`
+	UpdatedAt      time.Time                   `gorm:"column:updated_at;not null"`
+	IPRestrictions []APIKeyIPRestrictionEntity `gorm:"foreignKey:APIKeyID;constraint:OnDelete:CASCADE"`
+}
+
+func (APIKeyEntity) TableName() string {
+	return "api_keys"
+}
+
+type APIKeyIPRestrictionEntity struct {
+	ID       uint32 `gorm:"column:id;primaryKey"`
+	APIKeyID uint32 `gorm:"column:api_key_id;not null;index"`
+	CIDR     string `gorm:"column:cidr;not null"`
+}
+
+func (APIKeyIPRestrictionEntity) TableName() string {
+	return "api_key_ip_restrictions"
 }

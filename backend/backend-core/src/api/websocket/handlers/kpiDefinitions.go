@@ -3,52 +3,43 @@ package handlers
 import (
 	"encoding/json"
 
-	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/websocket"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/websocket/connection"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
+	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedModel"
 )
 
-func GetKPIDefinitions(c *websocket.Client, msg websocket.WebSocketMessage) {
-	if !auth.CanAccessOperation(c.Ctx, auth.ResourceKPIDefinitions, auth.OperationRead) {
-		c.SafeSend(websocket.WebSocketMessage{
-			Type:  websocket.MessageResponse,
-			ID:    msg.ID,
-			Error: "forbidden",
-		})
+func GetKPIDefinitions(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	if principal := authorizeOperation(c, msg, auth.ResourceKPIDefinitions, auth.OperationRead); principal == nil {
 		return
 	}
 	result := domainLogicLayer.GetKPIDefinitions()
 	if result.IsFailure() {
-		c.SafeSend(websocket.WebSocketMessage{
-			Type:  websocket.MessageResponse,
+		c.SafeSend(sharedModel.WebSocketMessage{
+			Type:  sharedModel.MessageResponse,
 			ID:    msg.ID,
 			Error: result.GetError().Error(),
 		})
 		return
 	}
-	c.SafeSend(websocket.WebSocketMessage{
-		Type:    websocket.MessageResponse,
+	c.SafeSend(sharedModel.WebSocketMessage{
+		Type:    sharedModel.MessageResponse,
 		ID:      msg.ID,
 		Success: true,
 		Payload: result.GetPayload(),
 	})
 }
 
-func CreateKPIDefinition(c *websocket.Client, msg websocket.WebSocketMessage) {
-	if !auth.CanAccessOperation(c.Ctx, auth.ResourceKPIDefinitions, auth.OperationCreate) {
-		c.SafeSend(websocket.WebSocketMessage{
-			Type:  websocket.MessageResponse,
-			ID:    msg.ID,
-			Error: "forbidden",
-		})
+func CreateKPIDefinition(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	if principal := authorizeOperation(c, msg, auth.ResourceKPIDefinitions, auth.OperationCreate); principal == nil {
 		return
 	}
 	bytes, _ := json.Marshal(msg.Payload)
 	var input graphQLModel.KPIDefinitionInput
 	if err := json.Unmarshal(bytes, &input); err != nil {
-		c.SafeSend(websocket.WebSocketMessage{
-			Type:  websocket.MessageResponse,
+		c.SafeSend(sharedModel.WebSocketMessage{
+			Type:  sharedModel.MessageResponse,
 			ID:    msg.ID,
 			Error: "invalid payload",
 		})
@@ -56,15 +47,15 @@ func CreateKPIDefinition(c *websocket.Client, msg websocket.WebSocketMessage) {
 	}
 	result := domainLogicLayer.CreateKPIDefinition(input)
 	if result.IsFailure() {
-		c.SafeSend(websocket.WebSocketMessage{
-			Type:  websocket.MessageResponse,
+		c.SafeSend(sharedModel.WebSocketMessage{
+			Type:  sharedModel.MessageResponse,
 			ID:    msg.ID,
 			Error: result.GetError().Error(),
 		})
 		return
 	}
-	c.SafeSend(websocket.WebSocketMessage{
-		Type:    websocket.MessageResponse,
+	c.SafeSend(sharedModel.WebSocketMessage{
+		Type:    sharedModel.MessageResponse,
 		ID:      msg.ID,
 		Success: true,
 		Payload: result.GetPayload(),

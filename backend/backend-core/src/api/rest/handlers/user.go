@@ -10,13 +10,8 @@ import (
 )
 
 func GetUserConfig(w http.ResponseWriter, r *http.Request) {
-	principal, ok := auth.PrincipalFromContext(r.Context())
-	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-	if !auth.CanAccessOperation(r.Context(), auth.ResourceUserConfig, auth.OperationRead) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	var principal *auth.Principal
+	if principal = authorizeOperation(w, r, auth.ResourceUserConfig, auth.OperationRead); principal == nil {
 		return
 	}
 	result := domainLogicLayer.GetUserConfig(principal.UserID)
@@ -28,13 +23,8 @@ func GetUserConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateUserConfig(w http.ResponseWriter, r *http.Request) {
-	principal, ok := auth.PrincipalFromContext(r.Context())
-	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-	if !auth.CanAccessOperation(r.Context(), auth.ResourceUserConfig, auth.OperationUpdate) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	var principal *auth.Principal
+	if principal = authorizeOperation(w, r, auth.ResourceUserConfig, auth.OperationUpdate); principal == nil {
 		return
 	}
 	var input graphQLModel.UserConfigInput
@@ -51,13 +41,8 @@ func UpdateUserConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteUserConfig(w http.ResponseWriter, r *http.Request) {
-	principal, ok := auth.PrincipalFromContext(r.Context())
-	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-	if !auth.CanAccessOperation(r.Context(), auth.ResourceUserConfig, auth.OperationUpdate) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	var principal *auth.Principal
+	if principal = authorizeOperation(w, r, auth.ResourceUserConfig, auth.OperationDelete); principal == nil {
 		return
 	}
 	err := domainLogicLayer.DeleteUserConfig(principal.UserID)

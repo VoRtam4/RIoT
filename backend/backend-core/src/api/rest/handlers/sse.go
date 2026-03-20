@@ -11,8 +11,7 @@ import (
 )
 
 func EventsStream(w http.ResponseWriter, r *http.Request) {
-	if !auth.CanAccessOperation(r.Context(), auth.ResourceEvents, auth.OperationSubscribe) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	if principal := authorizeOperation(w, r, auth.ResourceEvents, auth.OperationSubscribe); principal == nil {
 		return
 	}
 	w.Header().Set("Content-Type", "text/event-stream")
