@@ -15,6 +15,7 @@ func ToDBModelEntitySDType(sdType dllModel.SDType) dbModel.SDTypeEntity {
 				ID:         sdParameter.ID.GetPayloadOrDefault(0),
 				Denotation: sdParameter.Denotation,
 				Type:       string(sdParameter.Type),
+				Role:       string(sdParameter.Role),
 			}
 		}),
 	}

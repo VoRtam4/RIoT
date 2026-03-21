@@ -6,15 +6,17 @@ type TimeSeriesRawRecord struct {
 	EventTime           time.Time              `json:"eventTime"`
 	SDInstanceUID       string                 `json:"sdInstanceUID"`
 	SDTypeSpecification string                 `json:"sdTypeSpecification"`
-	Parameters          map[string]interface{} `json:"parameters"`
+	Fields              map[string]interface{} `json:"fields"`
+	Tags                map[string]string      `json:"tags"`
 }
 
 type TimeSeriesKPIResultRecord struct {
-	EventTime           time.Time `json:"eventTime"`
-	SDInstanceUID       string    `json:"sdInstanceUID"`
-	SDTypeSpecification string    `json:"sdTypeSpecification"`
-	KPIDefinitionID     uint32    `json:"kpiDefinitionID"`
-	Fulfilled           bool      `json:"fulfilled"`
+	EventTime           time.Time         `json:"eventTime"`
+	SDInstanceUID       string            `json:"sdInstanceUID"`
+	SDTypeSpecification string            `json:"sdTypeSpecification"`
+	KPIDefinitionID     uint32            `json:"kpiDefinitionID"`
+	Fulfilled           bool              `json:"fulfilled"`
+	Tags                map[string]string `json:"tags"`
 }
 
 type TimeSeriesType string
@@ -23,6 +25,19 @@ const (
 	TimeSeriesTypeRaw       TimeSeriesType = "RAW"
 	TimeSeriesTypeKPIResult TimeSeriesType = "KPI"
 )
+
+type TimeSeriesReprocessReadRequest struct {
+	SDTypeSpecification string    `json:"sdTypeSpecification"`
+	SDInstanceUIDs      []string  `json:"sdInstanceUIDs,omitempty"`
+	To                  time.Time `json:"to"`
+	Batch               int       `json:"batch"`
+}
+
+type TimeSeriesReprocessReadResponse struct {
+	Data    []TimeSeriesDataPoint `json:"data"`
+	HasMore bool                  `json:"hasMore"`
+	Error   string                `json:"error,omitempty"`
+}
 
 type TimeSeriesReadRequest struct {
 	Type                TimeSeriesType `json:"type"`
@@ -36,6 +51,13 @@ type TimeSeriesReadRequest struct {
 	Limit               *int           `json:"limit,omitempty"`
 	SortDesc            *bool          `json:"sortDesc,omitempty"`
 	Batch               *int           `json:"batch,omitempty"`
+}
+
+type TimeSeriesReprocessRequest struct {
+	SDTypeSpecification string    `json:"sdTypeSpecification"`
+	SDInstanceUID       *string   `json:"sdInstanceUID,omitempty"`
+	To                  time.Time `json:"to"`
+	Batch               int       `json:"batch"`
 }
 
 type TimeSeriesDataPoint struct {

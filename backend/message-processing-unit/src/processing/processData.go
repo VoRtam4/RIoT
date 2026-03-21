@@ -18,9 +18,9 @@ var (
 	kpiDefinitionsBySDTypeDenotationMap      map[string][]sharedModel.KPIDefinition = make(map[string][]sharedModel.KPIDefinition)
 	kpiDefinitionsBySDTypeDenotationMapMutex sync.RWMutex
 	unitUUID                                 string
-	lastRaw                                  sync.Map
-	lastKPI                                  sync.Map
 	limit                                    = 500
+	sdTypeDefinitions                        = map[string]map[string]sharedModel.SDParameter{}
+	sdTypeDefinitionsMutex                   sync.RWMutex
 )
 
 func InitializeProcessing() {
@@ -43,20 +43,37 @@ func DenotationMapUpdates(rabbitMQClient rabbitmq.Client) {
 	}
 }
 
+func UpdateSDType(messages []sharedModel.SDTypeRegistrationRequestISCMessage) {
+	log.Printf("[MPU][SDTYPE] Received SDType update | count=%d", len(messages))
+	newMap := make(map[string]map[string]sharedModel.SDParameter)
+	for _, msg := range messages {
+		paramMap := make(map[string]sharedModel.SDParameter)
+		for _, p := range msg.Parameters {
+			paramMap[p.Denotation] = p
+		}
+		newMap[msg.SDTypeSpecification] = paramMap
+	}
+	sdTypeDefinitionsMutex.Lock()
+	sdTypeDefinitions = newMap
+	sdTypeDefinitionsMutex.Unlock()
+	log.Printf("[MPU][SDTYPE] SDType cache updated | types=%d", len(newMap))
+}
+
 func ProcessRaw(rabbitMQClient rabbitmq.Client, messagePayload sharedModel.KPIFulfillmentCheckRequestISCMessage, params map[string]interface{}, eventTime time.Time) bool {
 	log.Printf("[MPU][RAW] Processing raw data | uid=%s type=%s time=%v params=%v", messagePayload.SDInstanceUID, messagePayload.SDTypeSpecification, eventTime, params)
 	uid := messagePayload.SDInstanceUID
 	lastSnapshotRaw, exists := lastRaw.Load(uid)
-	changed := false
-	var lastSnapshot map[string]interface{}
+	var lastSnapshot sharedModel.RawState
 	if exists {
-		lastSnapshot = lastSnapshotRaw.(map[string]interface{})
+		lastSnapshot = lastSnapshotRaw.(sharedModel.RawState)
 	} else {
-		lastSnapshot = map[string]interface{}{}
-		changed = true
+		lastSnapshot = sharedModel.RawState{
+			Values: map[string]interface{}{},
+		}
 	}
+	changed := false
 	for k, v := range params {
-		oldVal, ok := lastSnapshot[k]
+		oldVal, ok := lastSnapshot.Values[k]
 		if !ok {
 			changed = true
 			break
@@ -67,33 +84,55 @@ func ProcessRaw(rabbitMQClient rabbitmq.Client, messagePayload sharedModel.KPIFu
 		}
 	}
 	if !changed {
-		for k := range lastSnapshot {
+		for k := range lastSnapshot.Values {
 			if _, ok := params[k]; !ok {
 				changed = true
 				break
 			}
 		}
 	}
+	if exists {
+		lastSnapshot.SynchronizedAt = time.Now()
+		lastRaw.Store(uid, lastSnapshot)
+	}
+	newValues := make(map[string]interface{}, len(params))
+	for k, v := range params {
+		newValues[k] = v
+	}
+	for k := range lastSnapshot.Values {
+		if _, ok := params[k]; !ok {
+			newValues[k] = nil
+		}
+	}
+	fields, tags := splitParamsBySDType(messagePayload.SDTypeSpecification, newValues)
+	if exists && eventTime.Before(lastSnapshot.EventTime) {
+		log.Printf("[MPU][RAW] Older event -> storing ONLY TS | uid=%s", uid)
+		storeRaw(rabbitMQClient, []sharedModel.TimeSeriesRawRecord{{
+			EventTime:           eventTime,
+			SDInstanceUID:       uid,
+			SDTypeSpecification: messagePayload.SDTypeSpecification,
+			Fields:              fields,
+			Tags:                tags,
+		}})
+		return true
+	}
 	if !changed {
 		log.Printf("[MPU][RAW] No change detected -> skipping RAW write | uid=%s", uid)
 		return false
 	}
-	newSnapshot := make(map[string]interface{})
-	for k, v := range params {
-		newSnapshot[k] = v
-	}
-	for k := range lastSnapshot {
-		if _, ok := params[k]; !ok {
-			newSnapshot[k] = nil
-		}
+	newSnapshot := sharedModel.RawState{
+		Values:         newValues,
+		EventTime:      eventTime,
+		SynchronizedAt: time.Now(),
 	}
 	lastRaw.Store(uid, newSnapshot)
-	log.Printf("[MPU][RAW] Change detected -> storing RAW snapshot | uid=%s snapshot=%v", uid, newSnapshot)
+	log.Printf("[MPU][RAW] Change detected -> storing RAW snapshot | uid=%s snapshot=%v", uid, newValues)
 	storeRaw(rabbitMQClient, []sharedModel.TimeSeriesRawRecord{{
 		EventTime:           eventTime,
 		SDInstanceUID:       uid,
 		SDTypeSpecification: messagePayload.SDTypeSpecification,
-		Parameters:          newSnapshot,
+		Fields:              fields,
+		Tags:                tags,
 	}})
 	return true
 }
@@ -107,6 +146,7 @@ func ProcessKPI(rabbitMQClient rabbitmq.Client, messagePayload sharedModel.KPIFu
 	sdInstanceUID := messagePayload.SDInstanceUID
 	results := sharedUtils.EmptySlice[sharedModel.KPIFulfillmentCheckResultISCMessage]()
 	tsRecords := sharedUtils.EmptySlice[sharedModel.TimeSeriesKPIResultRecord]()
+	_, tags := splitParamsBySDType(messagePayload.SDTypeSpecification, params)
 	var paramAny any = params
 	for _, kpiDefinition := range kpiDefinitions {
 		log.Printf("[MPU][KPI] Evaluating KPI | id=%v uid=%s", kpiDefinition.ID, sdInstanceUID)
@@ -139,13 +179,16 @@ func ProcessKPI(rabbitMQClient rabbitmq.Client, messagePayload sharedModel.KPIFu
 		if exists {
 			state := last.(sharedModel.KPIState)
 			if !eventTime.Before(state.EventTime) && state.Value == value {
+				state.SynchronizedAt = time.Now()
+				lastKPI.Store(key, state)
 				log.Printf("[MPU][KPI] KPI unchanged -> skipping store | kpiID=%d uid=%s", kpiID, sdInstanceUID)
 				continue
 			}
 		}
 		lastKPI.Store(key, sharedModel.KPIState{
-			Value:     value,
-			EventTime: eventTime,
+			Value:          value,
+			EventTime:      eventTime,
+			SynchronizedAt: time.Now(),
 		})
 		results = append(results, sharedModel.KPIFulfillmentCheckResultISCMessage{
 			EventTime:       eventTime,
@@ -154,10 +197,12 @@ func ProcessKPI(rabbitMQClient rabbitmq.Client, messagePayload sharedModel.KPIFu
 			Fulfilled:       value,
 		})
 		tsRecords = append(tsRecords, sharedModel.TimeSeriesKPIResultRecord{
-			EventTime:       eventTime,
-			SDInstanceUID:   sdInstanceUID,
-			KPIDefinitionID: kpiID,
-			Fulfilled:       value,
+			EventTime:           eventTime,
+			SDInstanceUID:       sdInstanceUID,
+			SDTypeSpecification: messagePayload.SDTypeSpecification,
+			KPIDefinitionID:     kpiID,
+			Fulfilled:           value,
+			Tags:                tags,
 		})
 	}
 	log.Printf("[MPU][KPI] Storing KPI results to TS | count=%d", len(tsRecords))
@@ -168,7 +213,7 @@ func ProcessKPI(rabbitMQClient rabbitmq.Client, messagePayload sharedModel.KPIFu
 }
 
 func ReprocessKPI(req sharedModel.KPIReprocessRequestISCMessage) error {
-	log.Printf("[MPU][REPROCESS] Starting KPI reprocess | kpiID=%d type=%s until=%v", req.KPIDefinitionID, req.SDTypeSpecification, req.From)
+	log.Printf("[MPU][REPROCESS] Starting KPI reprocess | kpiID=%d type=%s until=%v", req.KPIDefinitionID, req.SDTypeSpecification, req.To)
 	client := rabbitmq.NewClient()
 	defer client.Dispose()
 	kpiDefinitionsBySDTypeDenotationMapMutex.RLock()
@@ -185,28 +230,28 @@ func ReprocessKPI(req sharedModel.KPIReprocessRequestISCMessage) error {
 		return fmt.Errorf("KPI definition not found")
 	}
 	log.Printf("[MPU][REPROCESS] KPI definition located | id=%d", req.KPIDefinitionID)
-	readReq := sharedModel.TimeSeriesReadRequest{
-		Type:                sharedModel.TimeSeriesTypeRaw,
-		SDTypeSpecification: &req.SDTypeSpecification,
-		To:                  &req.From,
-		Batch:               &limit,
+	readReq := sharedModel.TimeSeriesReprocessReadRequest{
+		SDTypeSpecification: req.SDTypeSpecification,
+		SDInstanceUIDs:      req.SDInstanceUIDs,
+		To:                  req.To,
+		Batch:               limit,
 	}
 	jsonReq := sharedUtils.SerializeToJSON(readReq)
 	if jsonReq.IsFailure() {
 		return jsonReq.GetError()
 	}
 	correlationID := uuid.New().String()
-	err := client.PublishJSONMessageRPC(sharedUtils.NewEmptyOptional[string](), sharedUtils.NewOptionalOf(sharedConstants.TimeSeriesReadRequestQueueName), jsonReq.GetPayload(), correlationID, sharedUtils.NewOptionalOf(sharedConstants.TimeSeriesReadResponseQueueName))
+	err := client.PublishJSONMessageRPC(sharedUtils.NewEmptyOptional[string](), sharedUtils.NewOptionalOf(sharedConstants.TimeSeriesReprocessReadRequestQueueName), jsonReq.GetPayload(), correlationID, sharedUtils.NewOptionalOf(sharedConstants.TimeSeriesReprocessReadResponseQueueName))
 	if err != nil {
 		return err
 	}
 	instanceState := map[string]sharedModel.KPIState{}
 	handler := createReprocessHandler(client, req, targetKPI, instanceState)
-	return rabbitmq.ConsumeJSONMessagesWithAccessToDelivery[sharedModel.TimeSeriesReadResponse](client, sharedConstants.TimeSeriesReadResponseQueueName, correlationID, handler)
+	return rabbitmq.ConsumeJSONMessagesWithAccessToDelivery[sharedModel.TimeSeriesReprocessReadResponse](client, sharedConstants.TimeSeriesReprocessReadResponseQueueName, correlationID, handler)
 }
 
-func createReprocessHandler(client rabbitmq.Client, req sharedModel.KPIReprocessRequestISCMessage, targetKPI *sharedModel.KPIDefinition, instanceState map[string]sharedModel.KPIState) func(resp sharedModel.TimeSeriesReadResponse, delivery amqp.Delivery) error {
-	return func(resp sharedModel.TimeSeriesReadResponse, delivery amqp.Delivery) error {
+func createReprocessHandler(client rabbitmq.Client, req sharedModel.KPIReprocessRequestISCMessage, targetKPI *sharedModel.KPIDefinition, instanceState map[string]sharedModel.KPIState) func(resp sharedModel.TimeSeriesReprocessReadResponse, delivery amqp.Delivery) error {
+	return func(resp sharedModel.TimeSeriesReprocessReadResponse, delivery amqp.Delivery) error {
 		log.Printf("[MPU][REPROCESS] Batch received | points=%d hasMore=%v", len(resp.Data), resp.HasMore)
 		if resp.Error != "" {
 			return fmt.Errorf(resp.Error)
@@ -222,14 +267,26 @@ func createReprocessHandler(client rabbitmq.Client, req sharedModel.KPIReprocess
 				continue
 			}
 			instanceState[result.SDInstanceUID] = sharedModel.KPIState{
-				Value:     result.Fulfilled,
-				EventTime: result.EventTime,
+				Value:          result.Fulfilled,
+				EventTime:      result.EventTime,
+				SynchronizedAt: time.Now(),
+			}
+			tags := make(map[string]string)
+			for k, v := range point.Tags {
+				switch k {
+				case "sdInstanceUID", "sdType", "kpiDefinitionID":
+					continue
+				default:
+					tags[k] = v
+				}
 			}
 			tsBatch = append(tsBatch, sharedModel.TimeSeriesKPIResultRecord{
-				EventTime:       result.EventTime,
-				SDInstanceUID:   result.SDInstanceUID,
-				KPIDefinitionID: result.KPIDefinitionID,
-				Fulfilled:       result.Fulfilled,
+				EventTime:           result.EventTime,
+				SDInstanceUID:       result.SDInstanceUID,
+				SDTypeSpecification: req.SDTypeSpecification,
+				KPIDefinitionID:     result.KPIDefinitionID,
+				Fulfilled:           result.Fulfilled,
+				Tags:                tags,
 			})
 		}
 		if len(tsBatch) > 0 {
@@ -265,7 +322,7 @@ func evaluateReprocessPoint(point sharedModel.TimeSeriesDataPoint, kpiID uint32,
 			return sharedModel.KPIFulfillmentCheckResultISCMessage{}, false
 		}
 	}
-	var paramAny any = point.Data
+	var paramAny any = mergeTagsAndFields(point)
 	result := CheckKPIFulfillment(*targetKPI, &paramAny)
 	if result.IsFailure() {
 		log.Printf("[MPU][REPROCESS] KPI evaluation failed: %v", result.GetError())
@@ -290,7 +347,7 @@ func finalizeReprocess(client rabbitmq.Client, req sharedModel.KPIReprocessReque
 		last, exists := lastKPI.Load(key)
 		if exists {
 			lastState := last.(sharedModel.KPIState)
-			if !lastState.EventTime.Before(req.From) {
+			if !lastState.EventTime.Before(req.To) {
 				continue
 			}
 		}
@@ -356,4 +413,37 @@ func storeKPI(client rabbitmq.Client, results []sharedModel.TimeSeriesKPIResultR
 			log.Printf("[MPU][KPI] Failed storing KPI record: %s", err)
 		}
 	}
+}
+
+func splitParamsBySDType(sdType string, params map[string]interface{}) (map[string]interface{}, map[string]string) {
+	sdTypeDefinitionsMutex.RLock()
+	definition := sdTypeDefinitions[sdType]
+	sdTypeDefinitionsMutex.RUnlock()
+	fields := make(map[string]interface{})
+	tags := make(map[string]string)
+	for k, v := range params {
+		role := definition[k].Role
+		if role == "TAG" {
+			tags[k] = fmt.Sprint(v)
+			continue
+		}
+		fields[k] = v
+	}
+	return fields, tags
+}
+
+func mergeTagsAndFields(point sharedModel.TimeSeriesDataPoint) map[string]interface{} {
+	params := make(map[string]interface{})
+	for k, v := range point.Data {
+		params[k] = v
+	}
+	for k, v := range point.Tags {
+		switch k {
+		case "sdInstanceUID", "sdType", "kpiDefinitionID":
+			continue
+		default:
+			params[k] = v
+		}
+	}
+	return params
 }

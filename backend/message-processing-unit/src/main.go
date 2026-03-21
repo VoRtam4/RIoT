@@ -50,10 +50,7 @@ func checkForKPIFulfilmentCheckRequests() {
 func checkForKPIReprocessRequests() {
 	rabbitMQClient := rabbitmq.NewClient()
 	defer rabbitMQClient.Dispose()
-
-	err := rabbitmq.ConsumeJSONMessages[sharedModel.KPIReprocessRequestISCMessage](
-		rabbitMQClient,
-		sharedConstants.KPIReprocessRequestQueueName,
+	err := rabbitmq.ConsumeJSONMessages[sharedModel.KPIReprocessRequestISCMessage](rabbitMQClient, sharedConstants.KPIReprocessRequestQueueName,
 		func(req sharedModel.KPIReprocessRequestISCMessage) error {
 			log.Printf("Starting KPI reprocess for KPI definition %d", req.KPIDefinitionID)
 			return processing.ReprocessKPI(req)
@@ -78,6 +75,20 @@ func checkForKPIDefinitionsBySDTypeDenotationMapUpdates() {
 	processing.DenotationMapUpdates(rabbitMQClient)
 }
 
+func checkForSDTypeUpdates() {
+	rabbitMQClient := rabbitmq.NewClient()
+	defer rabbitMQClient.Dispose()
+	err := rabbitmq.ConsumeJSONMessages[[]sharedModel.SDTypeRegistrationRequestISCMessage](rabbitMQClient, sharedConstants.SetOfSDTypesUpdatesQueueName,
+		func(messages []sharedModel.SDTypeRegistrationRequestISCMessage) error {
+			processing.UpdateSDType(messages)
+			return nil
+		},
+	)
+	if err != nil {
+		log.Printf("[MPU][SDTYPE] Failed consuming SDType updates: %s", err.Error())
+	}
+}
+
 func main() {
 	log.SetOutput(os.Stderr)
 	log.Println("Waiting for dependencies...")
@@ -88,5 +99,6 @@ func main() {
 	log.Println("Dependencies should be up and running...")
 	processing.InitializeProcessing()
 	sharedUtils.StartLoggingProfilingInformationPeriodically(time.Minute)
-	sharedUtils.WaitForAll(checkForKPIDefinitionsBySDTypeDenotationMapUpdates, checkForKPIFulfilmentCheckRequests, checkForKPIReprocessRequests)
+	sharedUtils.WaitForAll(checkForKPIDefinitionsBySDTypeDenotationMapUpdates, checkForKPIFulfilmentCheckRequests, checkForKPIReprocessRequests, checkForSDTypeUpdates)
+	processing.StartCacheCleanup(1*time.Hour, 7*24*time.Hour)
 }

@@ -27,6 +27,15 @@ func ToDLLModelSDType(sdTypeInput graphQLModel.SDTypeInput) dllModel.SDType {
 					}
 					panic(fmt.Errorf("unpexted model mapping failure – shouldn't happen"))
 				}(sdParameterInput.Type),
+				Role: func(sdParameterRole graphQLModel.SDParameterRole) dllModel.SDParameterRole {
+					switch sdParameterRole {
+					case graphQLModel.SDParameterRoleTag:
+						return dllModel.SDParameterRoleTag
+					case graphQLModel.SDParameterRoleField:
+						return dllModel.SDParameterRoleField
+					}
+					panic(fmt.Errorf("unpexted model mapping failure – shouldn't happen"))
+				}(sdParameterInput.Role),
 			}
 		}),
 	}

@@ -13,6 +13,8 @@ const (
 	TimeSeriesKPIResultQueueName                          = "time-series-kpi-results"
 	TimeSeriesReadRequestQueueName                        = "time-series-read-request"
 	TimeSeriesReadResponseQueueName                       = "time-series-read-response"
+	TimeSeriesReprocessReadRequestQueueName               = "time-series-reprocess-read-request"
+	TimeSeriesReprocessReadResponseQueueName              = "time-series-reprocess-read-response"
 	KPIReprocessRequestQueueName                          = "kpi-reprocess-requests"
 	TimeSeriesDeleteRequestQueueName                      = "time-series-delete-requests"
 )

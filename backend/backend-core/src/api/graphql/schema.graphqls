@@ -6,10 +6,16 @@ enum SDParameterType {
   BOOLEAN
 }
 
+enum SDParameterRole {
+  FIELD
+  TAG
+}
+
 type SDParameter {
   id: ID!
   denotation: String!
   type: SDParameterType!
+  role: SDParameterRole! 
 }
 
 type SDType {
@@ -21,6 +27,7 @@ type SDType {
 input SDParameterInput {
   denotation: String!
   type: SDParameterType!
+  role: SDParameterRole!
 }
 
 input SDTypeInput {

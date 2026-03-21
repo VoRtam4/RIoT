@@ -73,6 +73,7 @@ type SDParameterEntity struct {
 	SDTypeID   uint32 `gorm:"column:sd_type_id;not null"`
 	Denotation string `gorm:"column:denotation;not null"`
 	Type       string `gorm:"column:type;not null"`
+	Role       string `gorm:"column:role;not null"`
 }
 
 func (SDParameterEntity) TableName() string {

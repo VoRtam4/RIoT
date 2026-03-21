@@ -27,6 +27,15 @@ func ToDLLModelSDType(sdTypeEntity dbModel.SDTypeEntity) dllModel.SDType {
 					}
 					panic(fmt.Errorf("unpexted model mapping failure – shouldn't happen"))
 				}(sdParameterEntity.Type),
+				Role: func(sdParameterRole string) dllModel.SDParameterRole {
+					switch sdParameterRole {
+					case "tag":
+						return dllModel.SDParameterRoleTag
+					case "field":
+						return dllModel.SDParameterRoleField
+					}
+					panic(fmt.Errorf("unpexted model mapping failure – shouldn't happen"))
+				}(sdParameterEntity.Role),
 			}
 		}),
 	}

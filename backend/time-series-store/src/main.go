@@ -54,6 +54,10 @@ func main() {
 			log.Println(err.Error())
 		}
 	}, func() {
+		if err := consumeReprocessReadRequests(rabbitMQClient, influx); err != nil {
+			log.Println(err.Error())
+		}
+	}, func() {
 		if err := consumeDeleteRequests(rabbitMQClient, influx); err != nil {
 			log.Println(err.Error())
 		}
@@ -104,6 +108,29 @@ func consumeReadRequests(rabbitMQClient rabbitmq.Client, influx internal.Influx2
 			if err != nil {
 				log.Printf("Error publishing RPC response: %s", err)
 				return err
+			}
+			return nil
+		},
+	)
+}
+
+func consumeReprocessReadRequests(rabbitMQClient rabbitmq.Client, influx internal.Influx2Client) error {
+	return rabbitmq.ConsumeJSONMessagesWithAccessToDelivery[sharedModel.TimeSeriesReprocessReadRequest](rabbitMQClient, sharedConstants.TimeSeriesReprocessReadRequestQueueName, "",
+		func(req sharedModel.TimeSeriesReprocessReadRequest, delivery amqp.Delivery) error {
+			err := influx.StreamReprocess(req, func(points []sharedModel.TimeSeriesDataPoint, hasMore bool) error {
+				resp := sharedModel.TimeSeriesReprocessReadResponse{
+					Data:    points,
+					HasMore: hasMore,
+				}
+				jsonData, _ := json.Marshal(resp)
+				return rabbitMQClient.PublishJSONMessageRPC(sharedUtils.NewEmptyOptional[string](), sharedUtils.NewOptionalOf(delivery.ReplyTo), jsonData, delivery.CorrelationId, sharedUtils.NewEmptyOptional[string]())
+			})
+			if err != nil {
+				resp := sharedModel.TimeSeriesReprocessReadResponse{
+					Error: err.Error(),
+				}
+				jsonData, _ := json.Marshal(resp)
+				_ = rabbitMQClient.PublishJSONMessageRPC(sharedUtils.NewEmptyOptional[string](), sharedUtils.NewOptionalOf(delivery.ReplyTo), jsonData, delivery.CorrelationId, sharedUtils.NewEmptyOptional[string]())
 			}
 			return nil
 		},

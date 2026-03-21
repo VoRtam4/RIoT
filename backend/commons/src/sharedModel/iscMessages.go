@@ -24,7 +24,7 @@ type SDInstanceRegistrationRequestISCMessage struct {
 	SDTypeSpecification string    `json:"sdTypeSpecification"`
 }
 
-type SDTypeConfigurationUpdateISCMessage []string
+type SDTypeConfigurationUpdateISCMessage []SDTypeRegistrationRequestISCMessage
 
 type SDInstanceInfo struct {
 	SDInstanceUID   string `json:"sdInstanceUID"`
@@ -45,12 +45,14 @@ type SDTypeRegistrationRequestISCMessage struct {
 type SDParameter struct {
 	Denotation string `json:"denotation"`
 	Type       string `json:"type"`
+	Role       string `json:"role"`
 }
 
 type KPIReprocessRequestISCMessage struct {
 	KPIDefinitionID     uint32    `json:"kpiDefinitionID"`
 	SDTypeSpecification string    `json:"sdTypeSpecification"`
-	From                time.Time `json:"from"`
+	SDInstanceUIDs      []string  `json:"sdInstanceUIDs,omitempty"`
+	To                  time.Time `json:"to"`
 }
 
 type KPIDeleteResultsRequestISCMessage struct {

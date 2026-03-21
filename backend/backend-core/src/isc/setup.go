@@ -25,6 +25,8 @@ func SetupRabbitMQInfrastructureForISC(rabbitMQClient rabbitmq.Client) {
 		sharedConstants.TimeSeriesKPIResultQueueName,
 		sharedConstants.TimeSeriesReadRequestQueueName,
 		sharedConstants.TimeSeriesReadResponseQueueName,
+		sharedConstants.TimeSeriesReprocessReadRequestQueueName,
+		sharedConstants.TimeSeriesReprocessReadResponseQueueName,
 		sharedConstants.KPIReprocessRequestQueueName,
 		sharedConstants.TimeSeriesDeleteRequestQueueName,
 	)

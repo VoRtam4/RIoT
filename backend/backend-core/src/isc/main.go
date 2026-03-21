@@ -30,34 +30,23 @@ func ProcessIncomingMessageProcessingUnitConnectionNotifications() {
 func ProcessIncomingSDInstanceRegistrationRequests() {
 	rabbitMQClient := rabbitmq.NewClient()
 	defer rabbitMQClient.Dispose()
-	consumeSDInstanceRegistrationRequestJSONMessages(func(sdInstanceRegistrationRequestISCMessage sharedModel.SDInstanceRegistrationRequestISCMessage) error {
-		newSDInstanceUID := sdInstanceRegistrationRequestISCMessage.SDInstanceUID
-		newSDInstanceSDTypeSpecification := sdInstanceRegistrationRequestISCMessage.SDTypeSpecification
-		newSDInstancePersistResult := dbClient.GetRelationalDatabaseClientInstance().PersistNewSDInstance(newSDInstanceUID, newSDInstanceSDTypeSpecification)
-		if newSDInstancePersistResult.IsSuccess() {
-			events.GetEventBus().Publish(events.SDInstanceRegisteredEventType, dll2gql.ToGraphQLModelSDInstance(newSDInstancePersistResult.GetPayload()))
-			eventTime := sdInstanceRegistrationRequestISCMessage.EventTime
-			if eventTime.IsZero() {
-				eventTime = time.Now().UTC()
-			}
-			rawRecord := sharedModel.TimeSeriesRawRecord{
-				EventTime:           eventTime,
-				SDInstanceUID:       newSDInstanceUID,
-				SDTypeSpecification: newSDInstanceSDTypeSpecification,
-				Parameters:          map[string]interface{}{},
-			}
-			jsonResult := sharedUtils.SerializeToJSON(rawRecord)
-			if jsonResult.IsSuccess() {
-				_ = rabbitMQClient.PublishJSONMessage(
-					sharedUtils.NewEmptyOptional[string](),
-					sharedUtils.NewOptionalOf(sharedConstants.TimeSeriesRawDataQueueName),
-					jsonResult.GetPayload(),
-				)
-			}
-		} else if newSDInstancePersistError := newSDInstancePersistResult.GetError(); !errors.Is(newSDInstancePersistError, dbClient.ErrOperationWouldLeadToForeignKeyIntegrityBreach) {
-			return fmt.Errorf("failed to persist a new SD instance with UID = %s and SD type specification = %s: %w", newSDInstanceUID, newSDInstanceSDTypeSpecification, newSDInstancePersistError)
+	consumeSDInstanceRegistrationRequestJSONMessages(func(msg sharedModel.SDInstanceRegistrationRequestISCMessage) error {
+		uid := msg.SDInstanceUID
+		sdType := msg.SDTypeSpecification
+		log.Printf("[SDINSTANCE] Processing registration | uid=%s type=%s", uid, sdType)
+		result := dbClient.GetRelationalDatabaseClientInstance().PersistNewSDInstance(uid, sdType)
+		if result.IsSuccess() {
+			instance := result.GetPayload()
+			events.GetEventBus().Publish(events.SDInstanceRegisteredEventType, dll2gql.ToGraphQLModelSDInstance(instance))
+			log.Printf("[SDINSTANCE] Registered successfully | uid=%s type=%s", uid, sdType)
+			return nil
 		}
-		return nil
+		err := result.GetError()
+		if errors.Is(err, dbClient.ErrOperationWouldLeadToForeignKeyIntegrityBreach) {
+			log.Printf("[SDINSTANCE] FK constraint skip | uid=%s type=%s", uid, sdType)
+			return nil
+		}
+		return fmt.Errorf("failed to persist SD instance (uid=%s type=%s): %w", uid, sdType, err)
 	}, rabbitMQClient)
 }
 
@@ -98,9 +87,7 @@ func ProcessIncomingKPIFulfillmentCheckResults() {
 func ProcessIncomingSDTypeRegistrationRequests() {
 	rabbitMQClient := rabbitmq.NewClient()
 	defer rabbitMQClient.Dispose()
-	rabbitmq.ConsumeJSONMessages[sharedModel.SDTypeRegistrationRequestISCMessage](
-		rabbitMQClient,
-		sharedConstants.SDTypeRegistrationRequestsQueueName,
+	rabbitmq.ConsumeJSONMessages[sharedModel.SDTypeRegistrationRequestISCMessage](rabbitMQClient, sharedConstants.SDTypeRegistrationRequestsQueueName,
 		func(message sharedModel.SDTypeRegistrationRequestISCMessage) error {
 			params := make([]dllModel.SDParameter, 0)
 			for _, p := range message.Parameters {
@@ -115,9 +102,19 @@ func ProcessIncomingSDTypeRegistrationRequests() {
 				default:
 					return fmt.Errorf("unknown parameter type: %s", p.Type)
 				}
+				var paramRole dllModel.SDParameterRole
+				switch strings.ToUpper(p.Role) {
+				case "FIELD":
+					paramRole = dllModel.SDParameterRoleField
+				case "TAG":
+					paramRole = dllModel.SDParameterRoleTag
+				default:
+					return fmt.Errorf("unknown parameter role: %s", p.Role)
+				}
 				params = append(params, dllModel.SDParameter{
 					Denotation: p.Denotation,
 					Type:       paramType,
+					Role:       paramRole,
 				})
 			}
 			sdType := dllModel.SDType{
@@ -128,7 +125,8 @@ func ProcessIncomingSDTypeRegistrationRequests() {
 			if result.IsFailure() {
 				return result.GetError()
 			}
-			log.Printf("SDType %s registrován.", message.SDTypeSpecification)
+			EnqueueMessageRepresentingCurrentSDTypeConfiguration(rabbitMQClient)
+			log.Printf("SDType %s registrován (params=%d).", message.SDTypeSpecification, len(params))
 			return nil
 		},
 	)
@@ -140,15 +138,28 @@ func EnqueueMessageRepresentingCurrentSDTypeConfiguration(rabbitMQClient rabbitm
 		if sdTypesLoadResult.IsFailure() {
 			return sdTypesLoadResult.GetError()
 		}
-		sdTypeDenotations := sharedUtils.Map[dllModel.SDType, string](sdTypesLoadResult.GetPayload(), func(sdType dllModel.SDType) string {
-			return sdType.Denotation
-		})
-		sdTypeDenotationsJSONSerializationResult := sharedUtils.SerializeToJSON(sdTypeDenotations)
-		if sdTypeDenotationsJSONSerializationResult.IsFailure() {
-			return sdTypeDenotationsJSONSerializationResult.GetError()
+		sdTypes := sdTypesLoadResult.GetPayload()
+		messages := make([]sharedModel.SDTypeRegistrationRequestISCMessage, 0)
+		for _, sdType := range sdTypes {
+			params := make([]sharedModel.SDParameter, 0)
+			for _, p := range sdType.Parameters {
+				params = append(params, sharedModel.SDParameter{
+					Denotation: p.Denotation,
+					Type:       string(p.Type),
+					Role:       string(p.Role),
+				})
+			}
+			messages = append(messages, sharedModel.SDTypeRegistrationRequestISCMessage{
+				SDTypeSpecification: sdType.Denotation,
+				Parameters:          params,
+			})
 		}
-		return rabbitMQClient.PublishJSONMessage(sharedUtils.NewEmptyOptional[string](), sharedUtils.NewOptionalOf(sharedConstants.SetOfSDTypesUpdatesQueueName), sdTypeDenotationsJSONSerializationResult.GetPayload())
-	}(), "[ISC] Failed to enqueue RabbitMQ messages representing current SD type configuration")
+		jsonResult := sharedUtils.SerializeToJSON(messages)
+		if jsonResult.IsFailure() {
+			return jsonResult.GetError()
+		}
+		return rabbitMQClient.PublishJSONMessage(sharedUtils.NewEmptyOptional[string](), sharedUtils.NewOptionalOf(sharedConstants.SetOfSDTypesUpdatesQueueName), jsonResult.GetPayload())
+	}(), "[ISC] Failed to enqueue SDType configuration")
 }
 
 func EnqueueMessageRepresentingCurrentSDInstanceConfiguration(rabbitMQClient rabbitmq.Client) {
@@ -201,11 +212,15 @@ func EnqueueMessagesRepresentingCurrentSystemConfiguration(rabbitMQClient rabbit
 }
 
 func EnqueueKPIReprocessRequest(rabbitMQClient rabbitmq.Client, kpiDefinition sharedModel.KPIDefinition, fromTime time.Time) error {
-	jsonResult := sharedUtils.SerializeToJSON(sharedModel.KPIReprocessRequestISCMessage{
+	req := sharedModel.KPIReprocessRequestISCMessage{
 		KPIDefinitionID:     sharedUtils.NewOptionalFromPointer(kpiDefinition.ID).GetPayload(),
 		SDTypeSpecification: kpiDefinition.SDTypeSpecification,
-		From:                fromTime,
-	})
+		To:                  fromTime,
+	}
+	if kpiDefinition.SDInstanceMode == sharedModel.SELECTED {
+		req.SDInstanceUIDs = kpiDefinition.SelectedSDInstanceUIDs
+	}
+	jsonResult := sharedUtils.SerializeToJSON(req)
 	if jsonResult.IsFailure() {
 		return jsonResult.GetError()
 	}

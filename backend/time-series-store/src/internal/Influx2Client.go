@@ -44,53 +44,35 @@ func NewInflux2Client(endpoint string, token string, organization string, bucket
 }
 
 func (c Influx2Client) WriteRaw(record sharedModel.TimeSeriesRawRecord) {
-	log.Printf("[TS][RAW] Received raw record | uid=%s type=%s time=%v params=%v",
-		record.SDInstanceUID,
-		record.SDTypeSpecification,
-		record.EventTime,
-		record.Parameters,
-	)
-
+	log.Printf("[TS][RAW] Received raw record | uid=%s type=%s time=%v fields=%v tags=%v", record.SDInstanceUID, record.SDTypeSpecification, record.EventTime, record.Fields, record.Tags)
 	if record.EventTime.IsZero() {
 		record.EventTime = time.Now().UTC()
 	}
-
 	tags := map[string]string{
 		"sdInstanceUID": record.SDInstanceUID,
 		"sdType":        record.SDTypeSpecification,
 	}
-
-	fields := make(map[string]interface{})
-	if record.Parameters != nil {
-		for k, v := range record.Parameters {
-			if v == nil {
-				continue
-			}
-			if k == "uuid" {
-				fields["uuid"] = fmt.Sprint(v)
-				continue
-			}
-			fields[k] = v
-		}
+	for k, v := range record.Tags {
+		tags[k] = v
 	}
-
+	fields := make(map[string]interface{})
+	for k, v := range record.Fields {
+		if v == nil {
+			continue
+		}
+		fields[k] = v
+	}
 	if len(fields) == 0 {
 		log.Printf("[TS][RAW] Skip write: no fields | uid=%s", record.SDInstanceUID)
 		return
 	}
-
-	log.Printf("[TS][RAW] Writing point | tags=%v fields=%v", tags, fields)
-
 	point := influxdb2.NewPoint(measurementRaw, tags, fields, record.EventTime.UTC())
-
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
 	if err := c.writeApi.WritePoint(ctx, point); err != nil {
 		log.Printf("[TS][RAW] WriteRaw failed: %v", err)
 		return
 	}
-
 	log.Printf("[TS][RAW] Write successful | uid=%s", record.SDInstanceUID)
 }
 
@@ -109,7 +91,9 @@ func (c Influx2Client) WriteKPI(record sharedModel.TimeSeriesKPIResultRecord) {
 	if record.SDTypeSpecification != "" {
 		tags["sdType"] = record.SDTypeSpecification
 	}
-	log.Printf("[TS][KPI] Writing KPI point | tags=%v fields=%v", tags, fields)
+	for k, v := range record.Tags {
+		tags[k] = v
+	}
 	point := influxdb2.NewPoint(measurementKPI, tags, fields, record.EventTime.UTC())
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -143,6 +127,86 @@ func (c Influx2Client) StreamQueryBatches(req sharedModel.TimeSeriesReadRequest,
 	}
 	batchSize := resolveBatchSize(req)
 	return c.streamPointsNoBoundary(req, batchSize, onBatch)
+}
+
+func (c Influx2Client) StreamReprocess(req sharedModel.TimeSeriesReprocessReadRequest, onBatch func([]sharedModel.TimeSeriesDataPoint, bool) error) error {
+	flux := fmt.Sprintf(`
+from(bucket: "%s")
+|> range(start: 0, stop: %s)
+|> filter(fn: (r) => r["_measurement"] == "%s")
+|> filter(fn: (r) => r["sdType"] == "%s")
+|> sort(columns:["_time"])
+`, c.bucket, req.To.UTC().Format(time.RFC3339Nano), measurementRaw, req.SDTypeSpecification)
+	if len(req.SDInstanceUIDs) > 0 {
+		flux += fmt.Sprintf(`
+|> filter(fn: (r) => contains(value: r["sdInstanceUID"], set: %v))
+`, req.SDInstanceUIDs)
+	}
+	return c.streamPointsRawFlux(flux, req.Batch, onBatch)
+}
+
+func (c Influx2Client) streamPointsRawFlux(fluxQuery string, batchSize int, onBatch func([]sharedModel.TimeSeriesDataPoint, bool) error) error {
+	result, err := c.queryApi.Query(context.Background(), fluxQuery)
+	if err != nil {
+		return err
+	}
+	pointsBatch := make([]sharedModel.TimeSeriesDataPoint, 0)
+	var current *sharedModel.TimeSeriesDataPoint
+	currentKey := ""
+	flushBatch := func(hasMore bool) error {
+		if len(pointsBatch) == 0 {
+			return nil
+		}
+		if err := onBatch(pointsBatch, hasMore); err != nil {
+			return err
+		}
+		pointsBatch = make([]sharedModel.TimeSeriesDataPoint, 0)
+		return nil
+	}
+	flushCurrent := func() error {
+		if current == nil {
+			return nil
+		}
+		pointsBatch = append(pointsBatch, *current)
+		current = nil
+		if batchSize > 0 && len(pointsBatch) >= batchSize {
+			return flushBatch(true)
+		}
+		return nil
+	}
+	for result.Next() {
+		values := result.Record().Values()
+		t, ok := values["_time"].(time.Time)
+		if !ok {
+			continue
+		}
+		key := fmt.Sprintf("%d|%v", t.UnixNano(), values["sdInstanceUID"])
+		if current == nil || key != currentKey {
+			if err := flushCurrent(); err != nil {
+				return err
+			}
+			current = &sharedModel.TimeSeriesDataPoint{
+				Time: t.UTC(),
+				Tags: map[string]string{},
+				Data: map[string]interface{}{},
+			}
+			copyTagIfPresent(values, current.Tags, "sdInstanceUID")
+			copyTagIfPresent(values, current.Tags, "sdType")
+			currentKey = key
+		}
+		field, _ := values["_field"].(string)
+		value := values["_value"]
+		if field != "" && value != nil {
+			current.Data[field] = value
+		}
+	}
+	if result.Err() != nil {
+		return result.Err()
+	}
+	if err := flushCurrent(); err != nil {
+		return err
+	}
+	return flushBatch(false)
 }
 
 func (c Influx2Client) collectPoints(req sharedModel.TimeSeriesReadRequest) ([]sharedModel.TimeSeriesDataPoint, error) {
