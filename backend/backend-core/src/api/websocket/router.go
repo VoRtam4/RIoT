@@ -2,8 +2,8 @@ package websocket
 
 import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/websocket/connection"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/websocket/handlers"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
-	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/websocket/handlers"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedModel"
 )
 
@@ -31,6 +31,7 @@ var requestHandlers = map[string]RequestHandler{
 	"update_user_config":       handlers.UpdateUserConfig,
 	"delete_user_config":       handlers.DeleteUserConfig,
 	"get_api_keys":             handlers.GetAPIKeys,
+	"get_api_key":              handlers.GetAPIKey,
 	"create_api_key":           handlers.CreateAPIKey,
 	"update_api_key":           handlers.UpdateAPIKey,
 	"delete_api_key":           handlers.DeleteAPIKey,
@@ -40,13 +41,13 @@ func RouteMessage() func(h *connection.Hub, c *connection.Client, msg sharedMode
 	return func(h *connection.Hub, c *connection.Client, msg sharedModel.WebSocketMessage) {
 		switch msg.Type {
 		case sharedModel.MessageSubscribe:
-			if principle := handlers.authorizeOperation(c, msg, auth.ResourceEvents, auth.OperationSubscribe); principle == nil {
+			if principle := handlers.AuthorizeOperation(c, msg, auth.ResourceEvents, auth.OperationSubscribe); principle == nil {
 				return
 			}
 			c.Subscriptions[msg.Topic] = true
 
 		case sharedModel.MessageUnsubscribe:
-			if principle := handlers.authorizeOperation(c, msg, auth.ResourceEvents, auth.OperationSubscribe); principle == nil {
+			if principle := handlers.AuthorizeOperation(c, msg, auth.ResourceEvents, auth.OperationSubscribe); principle == nil {
 				return
 			}
 			delete(c.Subscriptions, msg.Topic)

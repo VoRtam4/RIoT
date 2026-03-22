@@ -128,18 +128,18 @@ func setRole(userID uint32, email string) error {
 	roleResult := domainLogicLayer.LoadUserRole(userID)
 	if roleResult.IsFailure() {
 		if AdminRoleID == 0 {
-			adminRoleResult := domainLogicLayer.LoadRoleByLabel("Admin")
+			adminRoleResult := domainLogicLayer.LoadRolesByLabels([]string{"Admin"})
 			if adminRoleResult.IsFailure() {
 				return fmt.Errorf("failed to load 'Admin' role from the database: %w", adminRoleResult.GetError())
 			}
-			AdminRoleID = adminRoleResult.GetPayload().ID
+			AdminRoleID = adminRoleResult.GetPayload()[0].ID
 		}
 		if UserRoleID == 0 {
-			userRoleResult := domainLogicLayer.LoadRoleByLabel("User")
+			userRoleResult := domainLogicLayer.LoadRolesByLabels([]string{"User"})
 			if userRoleResult.IsFailure() {
 				return fmt.Errorf("failed to load 'User' role from the database: %w", userRoleResult.GetError())
 			}
-			UserRoleID = userRoleResult.GetPayload().ID
+			UserRoleID = userRoleResult.GetPayload()[0].ID
 		}
 		if email == rootAdminEmail {
 			domainLogicLayer.AssignRoleToUser(userID, AdminRoleID)

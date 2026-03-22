@@ -3,9 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
-
-	"github.com/go-chi/chi/v5"
 
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
@@ -28,8 +25,11 @@ func GetSDInstanceGroup(w http.ResponseWriter, r *http.Request) {
 	if principal := authorizeOperation(w, r, auth.ResourceSDInstances, auth.OperationRead); principal == nil {
 		return
 	}
-	id, _ := strconv.ParseUint(chi.URLParam(r, "id"), 10, 32)
-	result := domainLogicLayer.GetSDInstanceGroup(uint32(id))
+	id, ok := parseID(w, r)
+	if !ok {
+		return
+	}
+	result := domainLogicLayer.GetSDInstanceGroup(id)
 	if result.IsFailure() {
 		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
 		return
@@ -59,13 +59,16 @@ func UpdateSDInstanceGroup(w http.ResponseWriter, r *http.Request) {
 	if principal := authorizeOperation(w, r, auth.ResourceSDInstances, auth.OperationUpdate); principal == nil {
 		return
 	}
-	id, _ := strconv.ParseUint(chi.URLParam(r, "id"), 10, 32)
+	id, ok := parseID(w, r)
+	if !ok {
+		return
+	}
 	var input graphQLModel.SDInstanceGroupInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	result := domainLogicLayer.UpdateSDInstanceGroup(uint32(id), input)
+	result := domainLogicLayer.UpdateSDInstanceGroup(id, input)
 	if result.IsFailure() {
 		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
 		return
@@ -77,8 +80,11 @@ func DeleteSDInstanceGroup(w http.ResponseWriter, r *http.Request) {
 	if principal := authorizeOperation(w, r, auth.ResourceSDInstances, auth.OperationDelete); principal == nil {
 		return
 	}
-	id, _ := strconv.ParseUint(chi.URLParam(r, "id"), 10, 32)
-	err := domainLogicLayer.DeleteSDInstanceGroup(uint32(id))
+	id, ok := parseID(w, r)
+	if !ok {
+		return
+	}
+	err := domainLogicLayer.DeleteSDInstanceGroup(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

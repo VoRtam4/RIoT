@@ -308,6 +308,17 @@ input UserConfigInput {
   config: JSON!
 }
 
+type Role {
+  id: ID!
+  label: String!
+  permissions: [String!]
+}
+
+input AssignRoleInput {
+	userID: ID!
+	roleID: ID!
+}
+
 # ----- Queries, mutations and subscriptions -----
 
 type Query {
@@ -350,36 +361,19 @@ type Subscription {
 type APIKey {
   id: ID!
   label: String!
-  roleId: ID!
-  role: Role!
   expiresAt: Date
   revoked: Boolean!
-  rateLimit: Int
+  rateLimit: ID
   lastUsedAt: Date
+  permissions: [String!]!
+  ipRestrictions: [String!]!
 }
 
-type Role {
-  id: ID!
-  label: String!
-  permissions: [Permission!]!
-}
-
-type Permission {
-  id: ID!
-  label: String!
-}
-
-input CreateAPIKeyInput {
-  label: String!
-  roleId: ID!
-  expiresAt: Date
-  rateLimit: Int
-}
-
-input UpdateAPIKeyInput {
+input APIKeyInput {
   label: String
-  roleId: ID
   expiresAt: Date
   revoked: Boolean
-  rateLimit: Int
+  rateLimit: ID
+  permissions: [String!]
+  ipRestrictions: [String!]
 }

@@ -22,6 +22,31 @@ type KPINode interface {
 	GetNodeType() KPINodeType
 }
 
+type APIKey struct {
+	ID             uint32   `json:"id"`
+	Label          string   `json:"label"`
+	ExpiresAt      *string  `json:"expiresAt,omitempty"`
+	Revoked        bool     `json:"revoked"`
+	RateLimit      *uint32  `json:"rateLimit,omitempty"`
+	LastUsedAt     *string  `json:"lastUsedAt,omitempty"`
+	Permissions    []string `json:"permissions"`
+	IPRestrictions []string `json:"ipRestrictions"`
+}
+
+type APIKeyInput struct {
+	Label          *string  `json:"label,omitempty"`
+	ExpiresAt      *string  `json:"expiresAt,omitempty"`
+	Revoked        *bool    `json:"revoked,omitempty"`
+	RateLimit      *uint32  `json:"rateLimit,omitempty"`
+	Permissions    []string `json:"permissions,omitempty"`
+	IPRestrictions []string `json:"ipRestrictions,omitempty"`
+}
+
+type AssignRoleInput struct {
+	UserID uint32 `json:"userID"`
+	RoleID uint32 `json:"roleID"`
+}
+
 type BooleanEQAtomKPINode struct {
 	ID                       uint32      `json:"id"`
 	ParentNodeID             *uint32     `json:"parentNodeID,omitempty"`
@@ -221,6 +246,12 @@ type OutputData struct {
 type Query struct {
 }
 
+type Role struct {
+	ID          uint32   `json:"id"`
+	Label       string   `json:"label"`
+	Permissions []string `json:"permissions,omitempty"`
+}
+
 type SDInstance struct {
 	ID              uint32 `json:"id"`
 	UID             string `json:"uid"`
@@ -249,11 +280,13 @@ type SDParameter struct {
 	ID         uint32          `json:"id"`
 	Denotation string          `json:"denotation"`
 	Type       SDParameterType `json:"type"`
+	Role       SDParameterRole `json:"role"`
 }
 
 type SDParameterInput struct {
 	Denotation string          `json:"denotation"`
 	Type       SDParameterType `json:"type"`
+	Role       SDParameterRole `json:"role"`
 }
 
 type SDType struct {
@@ -465,6 +498,47 @@ func (e *SDInstanceMode) UnmarshalGQL(v any) error {
 }
 
 func (e SDInstanceMode) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type SDParameterRole string
+
+const (
+	SDParameterRoleField SDParameterRole = "FIELD"
+	SDParameterRoleTag   SDParameterRole = "TAG"
+)
+
+var AllSDParameterRole = []SDParameterRole{
+	SDParameterRoleField,
+	SDParameterRoleTag,
+}
+
+func (e SDParameterRole) IsValid() bool {
+	switch e {
+	case SDParameterRoleField, SDParameterRoleTag:
+		return true
+	}
+	return false
+}
+
+func (e SDParameterRole) String() string {
+	return string(e)
+}
+
+func (e *SDParameterRole) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = SDParameterRole(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid SDParameterRole", str)
+	}
+	return nil
+}
+
+func (e SDParameterRole) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

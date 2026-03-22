@@ -3,12 +3,10 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
-	"github.com/go-chi/chi/v5"
 )
 
 func GetSDTypes(w http.ResponseWriter, r *http.Request) {
@@ -27,13 +25,11 @@ func GetSDType(w http.ResponseWriter, r *http.Request) {
 	if principal := authorizeOperation(w, r, auth.ResourceSDTypes, auth.OperationRead); principal == nil {
 		return
 	}
-	idParam := chi.URLParam(r, "id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		http.Error(w, "invalid id", http.StatusBadRequest)
+	id, ok := parseID(w, r)
+	if !ok {
 		return
 	}
-	result := domainLogicLayer.GetSDType(uint32(id))
+	result := domainLogicLayer.GetSDType(id)
 	if result.IsFailure() {
 		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
 		return
@@ -64,13 +60,11 @@ func DeleteSDType(w http.ResponseWriter, r *http.Request) {
 	if principal := authorizeOperation(w, r, auth.ResourceSDTypes, auth.OperationDelete); principal == nil {
 		return
 	}
-	idParam := chi.URLParam(r, "id")
-	id, err := strconv.ParseUint(idParam, 10, 32)
-	if err != nil {
-		http.Error(w, "invalid id", http.StatusBadRequest)
+	id, ok := parseID(w, r)
+	if !ok {
 		return
 	}
-	err = domainLogicLayer.DeleteSDType(uint32(id))
+	err := domainLogicLayer.DeleteSDType(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

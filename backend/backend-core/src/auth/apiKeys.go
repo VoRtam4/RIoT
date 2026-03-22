@@ -4,31 +4,22 @@ import (
 	"net"
 	"net/http"
 	"strings"
-
-	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dbModel"
-	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 )
 
 func extractAPIKey(r *http.Request) string {
 	return strings.TrimSpace(r.Header.Get("X-API-Key"))
 }
 
-func hashAPIKey(key string) string {
-	return sharedUtils.GenerateHexHash(key)
-}
-
-func isIPAllowed(ip string, restrictions []dbModel.APIKeyIPRestrictionEntity) bool {
+func isIPAllowed(ip string, restrictions []string) bool {
 	if len(restrictions) == 0 {
 		return true
 	}
-
 	parsedIP := net.ParseIP(strings.TrimSpace(ip))
 	if parsedIP == nil {
 		return false
 	}
-
 	for _, restriction := range restrictions {
-		_, cidrNet, err := net.ParseCIDR(strings.TrimSpace(restriction.CIDR))
+		_, cidrNet, err := net.ParseCIDR(restriction)
 		if err != nil {
 			continue
 		}
@@ -36,7 +27,6 @@ func isIPAllowed(ip string, restrictions []dbModel.APIKeyIPRestrictionEntity) bo
 			return true
 		}
 	}
-
 	return false
 }
 

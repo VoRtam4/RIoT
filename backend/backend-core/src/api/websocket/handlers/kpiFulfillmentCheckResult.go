@@ -8,22 +8,15 @@ import (
 )
 
 func GetKPIResults(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	if principal := authorizeOperation(c, msg, auth.ResourceKPIResults, auth.OperationRead); principal == nil {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceKPIResults, auth.OperationRead); principal == nil {
 		return
 	}
+
 	result := domainLogicLayer.GetKPIFulfillmentCheckResults()
 	if result.IsFailure() {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: result.GetError().Error(),
-		})
+		sendError(c, msg.ID, result.GetError().Error())
 		return
 	}
-	c.SafeSend(sharedModel.WebSocketMessage{
-		Type:    sharedModel.MessageResponse,
-		ID:      msg.ID,
-		Success: true,
-		Payload: result.GetPayload(),
-	})
+
+	sendSuccess(c, msg.ID, result.GetPayload())
 }

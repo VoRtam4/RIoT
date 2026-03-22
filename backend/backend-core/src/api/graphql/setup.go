@@ -66,3 +66,14 @@ func GetHandler() http.Handler {
 	graphQLServer.Use(extension.Introspection{})
 	return auth.JWTAuthenticationMiddleware(graphQLServer)
 }
+
+func authorizeOperation(ctx context.Context, operation string, opType string) (*auth.Principal, error) {
+	principal, ok := auth.PrincipalFromContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized")
+	}
+	if !auth.CanAccessOperation(principal, operation, opType) {
+		return nil, fmt.Errorf("forbidden")
+	}
+	return principal, nil
+}

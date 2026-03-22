@@ -1,49 +1,110 @@
 package domainLogicLayer
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/db/dbClient"
-	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dbModel"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dllModel"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/modelMapping/dll2gql"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/modelMapping/gql2dll"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 )
 
-func LoadAPIKeyByHash(hash string) sharedUtils.Result[sharedUtils.Optional[dbModel.APIKeyEntity]] {
-	return dbClient.GetRelationalDatabaseClientInstance().LoadAPIKeyByHash(hash)
+func LoadAPIKeyByHash(hash string) sharedUtils.Result[sharedUtils.Optional[dllModel.APIKey]] {
+	result := dbClient.GetRelationalDatabaseClientInstance().LoadAPIKeyByHash(hash)
+	if result.IsFailure() {
+		return sharedUtils.NewFailureResult[sharedUtils.Optional[dllModel.APIKey]](
+			result.GetError(),
+		)
+	}
+	apiKeyOpt := result.GetPayload()
+	if apiKeyOpt.IsEmpty() {
+		return sharedUtils.NewSuccessResult(
+			sharedUtils.NewEmptyOptional[dllModel.APIKey](),
+		)
+	}
+	apiKey := apiKeyOpt.GetPayload()
+	if apiKey.Revoked {
+		return sharedUtils.NewFailureResult[sharedUtils.Optional[dllModel.APIKey]](
+			fmt.Errorf("api key revoked"),
+		)
+	}
+	if apiKey.ExpiresAt != nil && apiKey.ExpiresAt.Before(time.Now()) {
+		return sharedUtils.NewFailureResult[sharedUtils.Optional[dllModel.APIKey]](fmt.Errorf("api key expired"))
+	}
+	return sharedUtils.NewSuccessResult(sharedUtils.NewOptionalOf(apiKey))
 }
 
-func LoadAPIKeyByID(id uint32) sharedUtils.Result[sharedUtils.Optional[dbModel.APIKeyEntity]] {
-	return dbClient.GetRelationalDatabaseClientInstance().LoadAPIKeyByID(id)
+func LoadAPIKeyByID(userID uint32, id uint32) sharedUtils.Result[graphQLModel.APIKey] {
+	result := dbClient.GetRelationalDatabaseClientInstance().LoadAPIKeyByID(userID)
+	if result.IsFailure() {
+		return sharedUtils.NewFailureResult[graphQLModel.APIKey](result.GetError())
+	}
+	if result.GetPayload().IsEmpty() {
+		return sharedUtils.NewFailureResult[graphQLModel.APIKey](fmt.Errorf("not found"))
+	}
+	r := result.GetPayload().GetPayload()
+	if userID != *r.UserID {
+		return sharedUtils.NewFailureResult[graphQLModel.APIKey](fmt.Errorf("not found"))
+	}
+	return sharedUtils.NewSuccessResult(dll2gql.ToGraphQLModelAPIKey(r))
 }
 
-func CreateAPIKey(userID uint32, roleID uint32, label string, expiresAt *time.Time) sharedUtils.Result[string] {
+func LoadAPIKeysForUser(userID uint32) sharedUtils.Result[[]graphQLModel.APIKey] {
+	result := dbClient.GetRelationalDatabaseClientInstance().LoadAPIKeysForUser(userID)
+	if result.IsFailure() {
+		return sharedUtils.NewFailureResult[[]graphQLModel.APIKey](result.GetError())
+	}
+	return sharedUtils.NewSuccessResult(
+		sharedUtils.Map(result.GetPayload(), func(k dllModel.APIKey) graphQLModel.APIKey {
+			return dll2gql.ToGraphQLModelAPIKey(k)
+		}),
+	)
+}
+
+func CreateAPIKey(userID uint32, input graphQLModel.APIKeyInput) sharedUtils.Result[string] {
 	rawKey := sharedUtils.GenerateRandomAlphanumericString(32)
 	hash := sharedUtils.GenerateHexHash(rawKey)
-	apiKey := dbModel.APIKeyEntity{
-		UserID:    userID,
-		RoleID:    roleID,
-		KeyHash:   hash,
-		Label:     label,
-		ExpiresAt: expiresAt,
-		Revoked:   false,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	result := dbClient.GetRelationalDatabaseClientInstance().PersistAPIKey(apiKey)
+	k := gql2dll.ToDLLModelAPIKey(input)
+	k.KeyHash = &hash
+	k.Revoked = false
+	result := dbClient.GetRelationalDatabaseClientInstance().CreateAPIKey(userID, k)
 	if result.IsFailure() {
 		return sharedUtils.NewFailureResult[string](result.GetError())
 	}
 	return sharedUtils.NewSuccessResult(rawKey)
 }
 
-func LoadAPIKeysForUser(userID uint32) sharedUtils.Result[[]dbModel.APIKeyEntity] {
-	return dbClient.GetRelationalDatabaseClientInstance().LoadAPIKeysForUser(userID)
+func UpdateAPIKeyForUser(userID uint32, id uint32, input graphQLModel.APIKeyInput) error {
+	db := dbClient.GetRelationalDatabaseClientInstance()
+	load := db.LoadAPIKeyByID(id)
+	if load.IsFailure() {
+		return load.GetError()
+	}
+	k := load.GetPayload().GetPayload()
+	if userID != *k.UserID {
+		return fmt.Errorf("not found")
+	}
+	updated := gql2dll.ApplyAPIKeyUpdate(k, input)
+	updated.ID = sharedUtils.NewOptionalOf(id)
+	result := db.UpdateAPIKey(updated)
+	if result.IsFailure() {
+		return result.GetError()
+	}
+	return nil
 }
 
-func UpdateAPIKey(apiKey dbModel.APIKeyEntity) error {
-	return dbClient.GetRelationalDatabaseClientInstance().UpdateAPIKey(apiKey)
-}
-
-func DeleteAPIKey(id uint32) error {
-	return dbClient.GetRelationalDatabaseClientInstance().DeleteAPIKey(id)
+func DeleteAPIKeyForUser(userID uint32, id uint32) error {
+	db := dbClient.GetRelationalDatabaseClientInstance()
+	load := db.LoadAPIKeyByID(id)
+	if load.IsFailure() {
+		return load.GetError()
+	}
+	k := load.GetPayload().GetPayload()
+	if userID != *k.UserID {
+		return fmt.Errorf("not found")
+	}
+	return db.DeleteAPIKey(id)
 }

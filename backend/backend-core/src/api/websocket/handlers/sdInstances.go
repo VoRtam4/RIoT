@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
-
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/websocket/connection"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
@@ -11,63 +9,54 @@ import (
 )
 
 func GetSDInstances(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	if principal := authorizeOperation(c, msg, auth.ResourceSDInstances, auth.OperationRead); principal == nil {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceSDInstances, auth.OperationRead); principal == nil {
 		return
 	}
+
 	result := domainLogicLayer.GetSDInstances()
 	if result.IsFailure() {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: result.GetError().Error(),
-		})
+		sendError(c, msg.ID, result.GetError().Error())
 		return
 	}
-	c.SafeSend(sharedModel.WebSocketMessage{
-		Type:    sharedModel.MessageResponse,
-		ID:      msg.ID,
-		Success: true,
-		Payload: result.GetPayload(),
-	})
+
+	sendSuccess(c, msg.ID, result.GetPayload())
 }
 
 func UpdateSDInstance(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	if principal := authorizeOperation(c, msg, auth.ResourceSDInstances, auth.OperationUpdate); principal == nil {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceSDInstances, auth.OperationUpdate); principal == nil {
 		return
 	}
-	payload := msg.Payload.(map[string]any)
-	idFloat, ok := payload["id"].(float64)
+
+	payload, ok := msg.Payload.(map[string]any)
 	if !ok {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: "invalid id",
-		})
+		sendError(c, msg.ID, "invalid payload")
 		return
 	}
-	bytes, _ := json.Marshal(payload["input"])
-	var input graphQLModel.SDInstanceUpdateInput
-	if err := json.Unmarshal(bytes, &input); err != nil {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: "invalid payload",
-		})
+
+	id, ok := parseID(payload)
+	if !ok {
+		sendError(c, msg.ID, "invalid id")
 		return
 	}
-	result := domainLogicLayer.UpdateSDInstance(uint32(idFloat), input)
+
+	inputRaw, ok := payload["input"]
+	if !ok {
+		sendError(c, msg.ID, "missing input")
+		return
+	}
+
+	inputMsg := sharedModel.WebSocketMessage{Payload: inputRaw}
+	input, err := parsePayload[graphQLModel.SDInstanceUpdateInput](inputMsg)
+	if err != nil {
+		sendError(c, msg.ID, "invalid input")
+		return
+	}
+
+	result := domainLogicLayer.UpdateSDInstance(id, input)
 	if result.IsFailure() {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: result.GetError().Error(),
-		})
+		sendError(c, msg.ID, result.GetError().Error())
 		return
 	}
-	c.SafeSend(sharedModel.WebSocketMessage{
-		Type:    sharedModel.MessageResponse,
-		ID:      msg.ID,
-		Success: true,
-		Payload: result.GetPayload(),
-	})
+
+	sendSuccess(c, msg.ID, result.GetPayload())
 }

@@ -147,6 +147,8 @@ type UserEntity struct {
 	UserConfig             UserConfigEntity            `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
 	RoleID                 uint32                      `gorm:"column:role_id;not null"`
 	Role                   RoleEntity                  `gorm:"foreignKey:RoleID"`
+	CreatedAt              time.Time                   `gorm:"foreignKey:createdAt"`
+	UpdatedAt              time.Time                   `gorm:"foreignKey:updatedAt"`
 	/*
 	   ID        uint           `gorm:"primaryKey"` // Primary key for the user
 	   CreatedAt time.Time      // Timestamp of creation

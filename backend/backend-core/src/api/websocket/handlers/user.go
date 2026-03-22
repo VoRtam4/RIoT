@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
-
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/websocket/connection"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
@@ -11,71 +9,51 @@ import (
 )
 
 func GetUserConfig(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	var principal *auth.Principal
-	if principal = authorizeOperation(c, msg, auth.ResourceUserConfig, auth.OperationRead); principal == nil {
+	principal := AuthorizeOperation(c, msg, auth.ResourceUserConfig, auth.OperationRead)
+	if principal == nil {
 		return
 	}
-	userID := principal.UserID
-	result := domainLogicLayer.GetUserConfig(userID)
+
+	result := domainLogicLayer.GetUserConfig(principal.UserID)
 	if result.IsFailure() {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: result.GetError().Error(),
-		})
+		sendError(c, msg.ID, result.GetError().Error())
 		return
 	}
-	c.SafeSend(sharedModel.WebSocketMessage{
-		Type:    sharedModel.MessageResponse,
-		ID:      msg.ID,
-		Success: true,
-		Payload: result.GetPayload(),
-	})
+
+	sendSuccess(c, msg.ID, result.GetPayload())
 }
 
 func UpdateUserConfig(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	var principal *auth.Principal
-	if principal = authorizeOperation(c, msg, auth.ResourceUserConfig, auth.OperationUpdate); principal == nil {
+	principal := AuthorizeOperation(c, msg, auth.ResourceUserConfig, auth.OperationUpdate)
+	if principal == nil {
 		return
 	}
-	userID := principal.UserID
-	bytes, _ := json.Marshal(msg.Payload)
-	var input graphQLModel.UserConfigInput
-	json.Unmarshal(bytes, &input)
-	result := domainLogicLayer.UpdateUserConfig(userID, input)
+
+	input, err := parsePayload[graphQLModel.UserConfigInput](msg)
+	if err != nil {
+		sendError(c, msg.ID, "invalid payload")
+		return
+	}
+
+	result := domainLogicLayer.UpdateUserConfig(principal.UserID, input)
 	if result.IsFailure() {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: result.GetError().Error(),
-		})
+		sendError(c, msg.ID, result.GetError().Error())
 		return
 	}
-	c.SafeSend(sharedModel.WebSocketMessage{
-		Type:    sharedModel.MessageResponse,
-		ID:      msg.ID,
-		Success: true,
-		Payload: result.GetPayload(),
-	})
+
+	sendSuccess(c, msg.ID, result.GetPayload())
 }
 
 func DeleteUserConfig(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	var principal *auth.Principal
-	if principal = authorizeOperation(c, msg, auth.ResourceUserConfig, auth.OperationDelete); principal == nil {
+	principal := AuthorizeOperation(c, msg, auth.ResourceUserConfig, auth.OperationDelete)
+	if principal == nil {
 		return
 	}
-	err := domainLogicLayer.DeleteUserConfig(principal.UserID)
-	if err != nil {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: err.Error(),
-		})
+
+	if err := domainLogicLayer.DeleteUserConfig(principal.UserID); err != nil {
+		sendError(c, msg.ID, err.Error())
 		return
 	}
-	c.SafeSend(sharedModel.WebSocketMessage{
-		Type:    sharedModel.MessageResponse,
-		ID:      msg.ID,
-		Success: true,
-	})
+
+	sendSuccess(c, msg.ID, nil)
 }

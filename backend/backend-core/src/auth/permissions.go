@@ -81,3 +81,11 @@ var RolePermissions = map[string]map[string]bool{
 		ResourceAPIKeys + "." + OperationDelete: true,
 	},
 }
+
+func GetAllRoleLabels() []string {
+	labels := make([]string, 0, len(RolePermissions))
+	for label := range RolePermissions {
+		labels = append(labels, label)
+	}
+	return labels
+}

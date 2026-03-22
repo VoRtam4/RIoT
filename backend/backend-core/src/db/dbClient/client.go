@@ -58,16 +58,15 @@ type RelationalDatabaseClient interface {
 	PersistUserConfig(userConfig dllModel.UserConfig) sharedUtils.Result[uint32]
 	LoadUserConfig(userId uint32) sharedUtils.Result[dllModel.UserConfig]
 	DeleteUserConfig(userId uint32) error
-	LoadUserRole(userID uint32) sharedUtils.Result[string]
-	AssignRoleToUser(userID uint32, roleID uint32) error
-	LoadPermissionsForUser(userID uint32) sharedUtils.Result[[]dbModel.PermissionEntity]
-	LoadRoleByLabel(label string) sharedUtils.Result[dbModel.RoleEntity]
-	LoadAPIKeyByHash(hash string) sharedUtils.Result[sharedUtils.Optional[dbModel.APIKeyEntity]]
-	LoadAPIKeyByID(id uint32) sharedUtils.Result[sharedUtils.Optional[dbModel.APIKeyEntity]]
-	PersistAPIKey(apiKey dbModel.APIKeyEntity) sharedUtils.Result[uint32]
-	LoadAPIKeysForUser(userID uint32) sharedUtils.Result[[]dbModel.APIKeyEntity]
-	UpdateAPIKey(apiKey dbModel.APIKeyEntity) error
+	LoadAPIKeyByHash(hash string) sharedUtils.Result[sharedUtils.Optional[dllModel.APIKey]]
+	LoadAPIKeyByID(id uint32) sharedUtils.Result[sharedUtils.Optional[dllModel.APIKey]]
+	LoadAPIKeysForUser(userID uint32) sharedUtils.Result[[]dllModel.APIKey]
+	CreateAPIKey(userID uint32, k dllModel.APIKey) sharedUtils.Result[dllModel.APIKey]
+	UpdateAPIKey(k dllModel.APIKey) sharedUtils.Result[dllModel.APIKey]
 	DeleteAPIKey(id uint32) error
+	GetRoleIDByLabel(label string) sharedUtils.Result[dllModel.Role]
+	GetUserRole(userID uint32) sharedUtils.Result[dllModel.Role]
+	SetUserRole(userID uint32, roleID uint32) error
 }
 
 var ErrOperationWouldLeadToForeignKeyIntegrityBreach = errors.New("operation would lead to foreign key integrity breach")
@@ -663,106 +662,194 @@ func (r *relationalDatabaseClientImpl) DeleteUserConfig(userId uint32) error {
 	return dbUtil.DeleteCertainEntityBasedOnId[dbModel.UserConfigEntity](r.db, userId)
 }
 
-func (r *relationalDatabaseClientImpl) LoadUserRole(userID uint32) sharedUtils.Result[string] {
+func (r *relationalDatabaseClientImpl) LoadAPIKeyByHash(hash string) sharedUtils.Result[sharedUtils.Optional[dllModel.APIKey]] {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	var user dbModel.UserEntity
-	err := r.db.Preload("Role").First(&user, "id = ?", userID).Error
-	if err != nil {
-		return sharedUtils.NewFailureResult[string](err)
+	result := dbUtil.LoadEntityFromDB[dbModel.APIKeyEntity](r.db, dbUtil.Preload("IPRestrictions"), dbUtil.Preload("Role.Permissions"), dbUtil.Where("key_hash = ?", hash))
+	if result.IsFailure() {
+		err := result.GetError()
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return sharedUtils.NewSuccessResult(sharedUtils.NewEmptyOptional[dllModel.APIKey]())
+		}
+		return sharedUtils.NewFailureResult[sharedUtils.Optional[dllModel.APIKey]](err)
 	}
-	return sharedUtils.NewSuccessResult(user.Role.Label)
+	entity := result.GetPayload()
+	dll := db2dll.ToDLLModelAPIKey(entity)
+	return sharedUtils.NewSuccessResult(sharedUtils.NewOptionalOf(dll))
 }
 
-func (r *relationalDatabaseClientImpl) AssignRoleToUser(userID uint32, roleID uint32) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.db.Model(&dbModel.UserEntity{}).Where("id = ?", userID).Update("role_id", roleID).Error
-}
-
-func (r *relationalDatabaseClientImpl) LoadPermissionsForUser(userID uint32) sharedUtils.Result[[]dbModel.PermissionEntity] {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	var user dbModel.UserEntity
-	err := r.db.Preload("Role.Permissions").First(&user, "id = ?", userID).Error
+func (c *relationalDatabaseClientImpl) LoadAPIKeyByID(id uint32) sharedUtils.Result[sharedUtils.Optional[dllModel.APIKey]] {
+	var entity dbModel.APIKeyEntity
+	err := c.db.Preload("Role.Permissions").Preload("IPRestrictions").First(&entity, id).Error
 	if err != nil {
-		return sharedUtils.NewFailureResult[[]dbModel.PermissionEntity](err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return sharedUtils.NewSuccessResult(sharedUtils.NewEmptyOptional[dllModel.APIKey]())
+		}
+		return sharedUtils.NewFailureResult[sharedUtils.Optional[dllModel.APIKey]](err)
 	}
-	return sharedUtils.NewSuccessResult(user.Role.Permissions)
+	return sharedUtils.NewSuccessResult(sharedUtils.NewOptionalOf(db2dll.ToDLLModelAPIKey(entity)))
 }
 
-func (r *relationalDatabaseClientImpl) LoadRoleByLabel(label string) sharedUtils.Result[dbModel.RoleEntity] {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+func (c *relationalDatabaseClientImpl) LoadAPIKeysForUser(userID uint32) sharedUtils.Result[[]dllModel.APIKey] {
+	var entities []dbModel.APIKeyEntity
+	err := c.db.Preload("Role.Permissions").Preload("IPRestrictions").Where("user_id = ?", userID).Find(&entities).Error
+	if err != nil {
+		return sharedUtils.NewFailureResult[[]dllModel.APIKey](err)
+	}
+	result := sharedUtils.Map(entities, func(e dbModel.APIKeyEntity) dllModel.APIKey {
+		return db2dll.ToDLLModelAPIKey(e)
+	})
+	return sharedUtils.NewSuccessResult(result)
+}
+
+func (c *relationalDatabaseClientImpl) CreateAPIKey(userID uint32, k dllModel.APIKey) sharedUtils.Result[dllModel.APIKey] {
+	perms, err := c.getOrCreatePermissions(k.Permissions)
+	if err != nil {
+		return sharedUtils.NewFailureResult[dllModel.APIKey](err)
+	}
+	role := dbModel.RoleEntity{
+		Label: fmt.Sprintf("api_key_%d", time.Now().UnixNano()),
+	}
+	if err := c.db.Create(&role).Error; err != nil {
+		return sharedUtils.NewFailureResult[dllModel.APIKey](err)
+	}
+	if err := c.db.Model(&role).Association("Permissions").Append(perms); err != nil {
+		return sharedUtils.NewFailureResult[dllModel.APIKey](err)
+	}
+	entity := dbModel.APIKeyEntity{
+		UserID:    userID,
+		RoleID:    role.ID,
+		Label:     k.Label,
+		ExpiresAt: k.ExpiresAt,
+		Revoked:   k.Revoked,
+		RateLimit: k.RateLimit,
+	}
+	if k.KeyHash != nil {
+		entity.KeyHash = *k.KeyHash
+	}
+	if err := c.db.Create(&entity).Error; err != nil {
+		return sharedUtils.NewFailureResult[dllModel.APIKey](err)
+	}
+	for _, cidr := range k.IPRestrictions {
+		ip := dbModel.APIKeyIPRestrictionEntity{
+			APIKeyID: entity.ID,
+			CIDR:     cidr,
+		}
+		if err := c.db.Create(&ip).Error; err != nil {
+			return sharedUtils.NewFailureResult[dllModel.APIKey](err)
+		}
+	}
+	err = c.db.Preload("Role.Permissions").Preload("IPRestrictions").First(&entity, entity.ID).Error
+	if err != nil {
+		return sharedUtils.NewFailureResult[dllModel.APIKey](err)
+	}
+	return sharedUtils.NewSuccessResult(db2dll.ToDLLModelAPIKey(entity))
+}
+
+func (c *relationalDatabaseClientImpl) getOrCreatePermissions(labels []string) ([]dbModel.PermissionEntity, error) {
+	if len(labels) == 0 {
+		return []dbModel.PermissionEntity{}, nil
+	}
+	var perms []dbModel.PermissionEntity
+	err := c.db.Where("label IN ?", labels).Find(&perms).Error
+	if err != nil {
+		return nil, err
+	}
+	existing := map[string]bool{}
+	for _, p := range perms {
+		existing[p.Label] = true
+	}
+	for _, label := range labels {
+		if !existing[label] {
+			p := dbModel.PermissionEntity{Label: label}
+			if err := c.db.Create(&p).Error; err != nil {
+				return nil, err
+			}
+			perms = append(perms, p)
+		}
+	}
+	return perms, nil
+}
+
+func (c *relationalDatabaseClientImpl) UpdateAPIKey(k dllModel.APIKey) sharedUtils.Result[dllModel.APIKey] {
+	if k.ID.IsEmpty() {
+		return sharedUtils.NewFailureResult[dllModel.APIKey](fmt.Errorf("missing id"))
+	}
+	var entity dbModel.APIKeyEntity
+	err := c.db.Preload("Role.Permissions").Preload("IPRestrictions").First(&entity, k.ID.GetPayload()).Error
+	if err != nil {
+		return sharedUtils.NewFailureResult[dllModel.APIKey](err)
+	}
+	entity.Label = k.Label
+	entity.ExpiresAt = k.ExpiresAt
+	entity.Revoked = k.Revoked
+	entity.RateLimit = k.RateLimit
+	if k.Permissions != nil {
+		perms, err := c.getOrCreatePermissions(k.Permissions)
+		if err != nil {
+			return sharedUtils.NewFailureResult[dllModel.APIKey](err)
+		}
+		if err := c.db.Model(&entity.Role).Association("Permissions").Replace(perms); err != nil {
+			return sharedUtils.NewFailureResult[dllModel.APIKey](err)
+		}
+	}
+	if k.IPRestrictions != nil {
+		if err := c.db.Where("api_key_id = ?", entity.ID).
+			Delete(&dbModel.APIKeyIPRestrictionEntity{}).Error; err != nil {
+			return sharedUtils.NewFailureResult[dllModel.APIKey](err)
+		}
+		for _, cidr := range k.IPRestrictions {
+			ip := dbModel.APIKeyIPRestrictionEntity{
+				APIKeyID: entity.ID,
+				CIDR:     cidr,
+			}
+			if err := c.db.Create(&ip).Error; err != nil {
+				return sharedUtils.NewFailureResult[dllModel.APIKey](err)
+			}
+		}
+	}
+	if err := c.db.Save(&entity).Error; err != nil {
+		return sharedUtils.NewFailureResult[dllModel.APIKey](err)
+	}
+	return sharedUtils.NewSuccessResult(db2dll.ToDLLModelAPIKey(entity))
+}
+
+func (c *relationalDatabaseClientImpl) DeleteAPIKey(id uint32) error {
+	var entity dbModel.APIKeyEntity
+	if err := c.db.Preload("Role").First(&entity, id).Error; err != nil {
+		return err
+	}
+	if err := c.db.Delete(&entity).Error; err != nil {
+		return err
+	}
+	if err := c.db.Delete(&dbModel.RoleEntity{}, entity.RoleID).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *relationalDatabaseClientImpl) GetRoleIDByLabel(label string) sharedUtils.Result[dllModel.Role] {
 	var role dbModel.RoleEntity
-	if err := r.db.Where("label = ?", label).First(&role).Error; err != nil {
-		return sharedUtils.NewFailureResult[dbModel.RoleEntity](err)
-	}
-	return sharedUtils.NewSuccessResult(role)
-}
-
-func (r *relationalDatabaseClientImpl) LoadAPIKeyByHash(hash string) sharedUtils.Result[sharedUtils.Optional[dbModel.APIKeyEntity]] {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	result := dbUtil.LoadEntityFromDB[dbModel.APIKeyEntity](r.db, dbUtil.Preload("IPRestrictions"), dbUtil.Preload("Role"), dbUtil.Where("key_hash = ?", hash))
-	if result.IsFailure() {
-		err := result.GetError()
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return sharedUtils.NewSuccessResult(sharedUtils.NewEmptyOptional[dbModel.APIKeyEntity]())
-		}
-		return sharedUtils.NewFailureResult[sharedUtils.Optional[dbModel.APIKeyEntity]](err)
-	}
-	return sharedUtils.NewSuccessResult(sharedUtils.NewOptionalOf(result.GetPayload()))
-}
-
-func (r *relationalDatabaseClientImpl) LoadAPIKeyByID(id uint32) sharedUtils.Result[sharedUtils.Optional[dbModel.APIKeyEntity]] {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	result := dbUtil.LoadEntityFromDB[dbModel.APIKeyEntity](r.db, dbUtil.Preload("IPRestrictions"), dbUtil.Preload("Role.Permissions"), dbUtil.Where("id = ?", id))
-	if result.IsFailure() {
-		err := result.GetError()
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return sharedUtils.NewSuccessResult(sharedUtils.NewEmptyOptional[dbModel.APIKeyEntity]())
-		}
-		return sharedUtils.NewFailureResult[sharedUtils.Optional[dbModel.APIKeyEntity]](err)
-	}
-	return sharedUtils.NewSuccessResult(sharedUtils.NewOptionalOf(result.GetPayload()))
-}
-
-func (r *relationalDatabaseClientImpl) PersistAPIKey(apiKey dbModel.APIKeyEntity) sharedUtils.Result[uint32] {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	err := r.db.Create(&apiKey).Error
+	err := c.db.Preload("Permissions").Where("label = ?", label).First(&role).Error
 	if err != nil {
-		return sharedUtils.NewFailureResult[uint32](err)
+		return sharedUtils.NewFailureResult[dllModel.Role](err)
 	}
-	return sharedUtils.NewSuccessResult(apiKey.ID)
+	return sharedUtils.NewSuccessResult(db2dll.ToDLLModelRole(role))
 }
 
-func (r *relationalDatabaseClientImpl) LoadAPIKeysForUser(userID uint32) sharedUtils.Result[[]dbModel.APIKeyEntity] {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	result := dbUtil.LoadEntitiesFromDB[dbModel.APIKeyEntity](r.db, dbUtil.Preload("IPRestrictions"), dbUtil.Preload("Role"), dbUtil.Where("user_id = ?", userID))
-	if result.IsFailure() {
-		return sharedUtils.NewFailureResult[[]dbModel.APIKeyEntity](result.GetError())
+func (c *relationalDatabaseClientImpl) GetUserRole(userID uint32) sharedUtils.Result[dllModel.Role] {
+	var user dbModel.UserEntity
+	err := c.db.Preload("Role.Permissions").Where("id = ?", userID).First(&user).Error
+	if err != nil {
+		return sharedUtils.NewFailureResult[dllModel.Role](err)
 	}
-	return sharedUtils.NewSuccessResult(result.GetPayload())
+	return sharedUtils.NewSuccessResult(db2dll.ToDLLModelRole(user.Role))
 }
 
-func (r *relationalDatabaseClientImpl) UpdateAPIKey(apiKey dbModel.APIKeyEntity) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	updates := map[string]interface{}{
-		"label":      apiKey.Label,
-		"role_id":    apiKey.RoleID,
-		"expires_at": apiKey.ExpiresAt,
-		"updated_at": time.Now(),
+func (c *relationalDatabaseClientImpl) SetUserRole(userID uint32, roleID uint32) error {
+	err := c.db.Model(&dbModel.UserEntity{}).Where("id = ?", userID).Update("role_id", roleID).Error
+	if err != nil {
+		return err
 	}
-	return r.db.Model(&dbModel.APIKeyEntity{}).Where("id = ?", apiKey.ID).Updates(updates).Error
-}
-
-func (r *relationalDatabaseClientImpl) DeleteAPIKey(id uint32) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.db.Delete(&dbModel.APIKeyEntity{}, id).Error
+	return nil
 }

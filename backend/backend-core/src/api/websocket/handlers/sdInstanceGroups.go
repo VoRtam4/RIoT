@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
-
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/websocket/connection"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
@@ -11,204 +9,124 @@ import (
 )
 
 func GetSDInstanceGroups(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	if principal := authorizeOperation(c, msg, auth.ResourceSDInstances, auth.OperationRead); principal == nil {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceSDInstances, auth.OperationRead); principal == nil {
 		return
 	}
+
 	result := domainLogicLayer.GetSDInstanceGroups()
 	if result.IsFailure() {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: result.GetError().Error(),
-		})
+		sendError(c, msg.ID, result.GetError().Error())
 		return
 	}
-	c.SafeSend(sharedModel.WebSocketMessage{
-		Type:    sharedModel.MessageResponse,
-		ID:      msg.ID,
-		Success: true,
-		Payload: result.GetPayload(),
-	})
-}
 
+	sendSuccess(c, msg.ID, result.GetPayload())
+}
 func GetSDInstanceGroup(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	if principal := authorizeOperation(c, msg, auth.ResourceSDInstances, auth.OperationRead); principal == nil {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceSDInstances, auth.OperationRead); principal == nil {
 		return
 	}
+
 	payload, ok := msg.Payload.(map[string]any)
 	if !ok {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: "invalid payload",
-		})
+		sendError(c, msg.ID, "invalid payload")
 		return
 	}
-	idFloat, ok := payload["id"].(float64)
+
+	id, ok := parseID(payload)
 	if !ok {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: "invalid id",
-		})
+		sendError(c, msg.ID, "invalid id")
 		return
 	}
-	result := domainLogicLayer.GetSDInstanceGroup(uint32(idFloat))
+
+	result := domainLogicLayer.GetSDInstanceGroup(id)
 	if result.IsFailure() {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: result.GetError().Error(),
-		})
+		sendError(c, msg.ID, result.GetError().Error())
 		return
 	}
-	c.SafeSend(sharedModel.WebSocketMessage{
-		Type:    sharedModel.MessageResponse,
-		ID:      msg.ID,
-		Success: true,
-		Payload: result.GetPayload(),
-	})
+
+	sendSuccess(c, msg.ID, result.GetPayload())
 }
 
 func CreateSDInstanceGroup(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	if principal := authorizeOperation(c, msg, auth.ResourceSDInstances, auth.OperationCreate); principal == nil {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceSDInstances, auth.OperationCreate); principal == nil {
 		return
 	}
-	bytes, err := json.Marshal(msg.Payload)
+
+	input, err := parsePayload[graphQLModel.SDInstanceGroupInput](msg)
 	if err != nil {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: "invalid payload",
-		})
+		sendError(c, msg.ID, "invalid payload")
 		return
 	}
-	var input graphQLModel.SDInstanceGroupInput
-	if err := json.Unmarshal(bytes, &input); err != nil {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: "invalid payload",
-		})
-		return
-	}
+
 	result := domainLogicLayer.CreateSDInstanceGroup(input)
 	if result.IsFailure() {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: result.GetError().Error(),
-		})
+		sendError(c, msg.ID, result.GetError().Error())
 		return
 	}
-	c.SafeSend(sharedModel.WebSocketMessage{
-		Type:    sharedModel.MessageResponse,
-		ID:      msg.ID,
-		Success: true,
-		Payload: result.GetPayload(),
-	})
+
+	sendSuccess(c, msg.ID, result.GetPayload())
 }
 
 func UpdateSDInstanceGroup(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	if principal := authorizeOperation(c, msg, auth.ResourceSDInstances, auth.OperationUpdate); principal == nil {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceSDInstances, auth.OperationUpdate); principal == nil {
 		return
 	}
+
 	payload, ok := msg.Payload.(map[string]any)
 	if !ok {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: "invalid payload",
-		})
+		sendError(c, msg.ID, "invalid payload")
 		return
 	}
-	idFloat, ok := payload["id"].(float64)
+
+	id, ok := parseID(payload)
 	if !ok {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: "invalid id",
-		})
+		sendError(c, msg.ID, "invalid id")
 		return
 	}
+
 	inputRaw, ok := payload["input"]
 	if !ok {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: "missing input",
-		})
+		sendError(c, msg.ID, "missing input")
 		return
 	}
-	bytes, err := json.Marshal(inputRaw)
+
+	inputMsg := sharedModel.WebSocketMessage{Payload: inputRaw}
+	input, err := parsePayload[graphQLModel.SDInstanceGroupInput](inputMsg)
 	if err != nil {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: "invalid input",
-		})
+		sendError(c, msg.ID, "invalid input")
 		return
 	}
-	var input graphQLModel.SDInstanceGroupInput
-	if err := json.Unmarshal(bytes, &input); err != nil {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: "invalid input",
-		})
-		return
-	}
-	result := domainLogicLayer.UpdateSDInstanceGroup(uint32(idFloat), input)
+
+	result := domainLogicLayer.UpdateSDInstanceGroup(id, input)
 	if result.IsFailure() {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: result.GetError().Error(),
-		})
+		sendError(c, msg.ID, result.GetError().Error())
 		return
 	}
-	c.SafeSend(sharedModel.WebSocketMessage{
-		Type:    sharedModel.MessageResponse,
-		ID:      msg.ID,
-		Success: true,
-		Payload: result.GetPayload(),
-	})
+
+	sendSuccess(c, msg.ID, result.GetPayload())
 }
 
 func DeleteSDInstanceGroup(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	if principal := authorizeOperation(c, msg, auth.ResourceSDInstances, auth.OperationDelete); principal == nil {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceSDInstances, auth.OperationDelete); principal == nil {
 		return
 	}
+
 	payload, ok := msg.Payload.(map[string]any)
 	if !ok {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: "invalid payload",
-		})
+		sendError(c, msg.ID, "invalid payload")
 		return
 	}
-	idFloat, ok := payload["id"].(float64)
+
+	id, ok := parseID(payload)
 	if !ok {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: "invalid id",
-		})
+		sendError(c, msg.ID, "invalid id")
 		return
 	}
-	err := domainLogicLayer.DeleteSDInstanceGroup(uint32(idFloat))
-	if err != nil {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: err.Error(),
-		})
+
+	if err := domainLogicLayer.DeleteSDInstanceGroup(id); err != nil {
+		sendError(c, msg.ID, err.Error())
 		return
 	}
-	c.SafeSend(sharedModel.WebSocketMessage{
-		Type:    sharedModel.MessageResponse,
-		ID:      msg.ID,
-		Success: true,
-	})
+
+	sendSuccess(c, msg.ID, nil)
 }

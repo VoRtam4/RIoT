@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
-
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/websocket/connection"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
@@ -11,53 +9,125 @@ import (
 )
 
 func GetKPIDefinitions(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	if principal := authorizeOperation(c, msg, auth.ResourceKPIDefinitions, auth.OperationRead); principal == nil {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceKPIDefinitions, auth.OperationRead); principal == nil {
 		return
 	}
+
 	result := domainLogicLayer.GetKPIDefinitions()
 	if result.IsFailure() {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: result.GetError().Error(),
-		})
+		sendError(c, msg.ID, result.GetError().Error())
 		return
 	}
-	c.SafeSend(sharedModel.WebSocketMessage{
-		Type:    sharedModel.MessageResponse,
-		ID:      msg.ID,
-		Success: true,
-		Payload: result.GetPayload(),
-	})
+
+	sendSuccess(c, msg.ID, result.GetPayload())
 }
 
 func CreateKPIDefinition(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	if principal := authorizeOperation(c, msg, auth.ResourceKPIDefinitions, auth.OperationCreate); principal == nil {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceKPIDefinitions, auth.OperationCreate); principal == nil {
 		return
 	}
-	bytes, _ := json.Marshal(msg.Payload)
-	var input graphQLModel.KPIDefinitionInput
-	if err := json.Unmarshal(bytes, &input); err != nil {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: "invalid payload",
-		})
+
+	input, err := parsePayload[graphQLModel.KPIDefinitionInput](msg)
+	if err != nil {
+		sendError(c, msg.ID, "invalid payload")
 		return
 	}
+
 	result := domainLogicLayer.CreateKPIDefinition(input)
 	if result.IsFailure() {
-		c.SafeSend(sharedModel.WebSocketMessage{
-			Type:  sharedModel.MessageResponse,
-			ID:    msg.ID,
-			Error: result.GetError().Error(),
-		})
+		sendError(c, msg.ID, result.GetError().Error())
 		return
 	}
-	c.SafeSend(sharedModel.WebSocketMessage{
-		Type:    sharedModel.MessageResponse,
-		ID:      msg.ID,
-		Success: true,
-		Payload: result.GetPayload(),
-	})
+
+	sendSuccess(c, msg.ID, result.GetPayload())
+}
+
+func GetKPIDefinition(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceKPIDefinitions, auth.OperationRead); principal == nil {
+		return
+	}
+
+	payload, ok := msg.Payload.(map[string]any)
+	if !ok {
+		sendError(c, msg.ID, "invalid payload")
+		return
+	}
+
+	id, ok := parseID(payload)
+	if !ok {
+		sendError(c, msg.ID, "invalid id")
+		return
+	}
+
+	result := domainLogicLayer.GetKPIDefinition(id)
+	if result.IsFailure() {
+		sendError(c, msg.ID, result.GetError().Error())
+		return
+	}
+
+	sendSuccess(c, msg.ID, result.GetPayload())
+}
+
+func UpdateKPIDefinition(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceKPIDefinitions, auth.OperationUpdate); principal == nil {
+		return
+	}
+
+	payload, ok := msg.Payload.(map[string]any)
+	if !ok {
+		sendError(c, msg.ID, "invalid payload")
+		return
+	}
+
+	id, ok := parseID(payload)
+	if !ok {
+		sendError(c, msg.ID, "invalid id")
+		return
+	}
+
+	inputRaw, ok := payload["input"]
+	if !ok {
+		sendError(c, msg.ID, "missing input")
+		return
+	}
+
+	inputMsg := sharedModel.WebSocketMessage{Payload: inputRaw}
+	input, err := parsePayload[graphQLModel.KPIDefinitionInput](inputMsg)
+	if err != nil {
+		sendError(c, msg.ID, "invalid input")
+		return
+	}
+
+	result := domainLogicLayer.UpdateKPIDefinition(id, input)
+	if result.IsFailure() {
+		sendError(c, msg.ID, result.GetError().Error())
+		return
+	}
+
+	sendSuccess(c, msg.ID, result.GetPayload())
+}
+
+func DeleteKPIDefinition(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceKPIDefinitions, auth.OperationDelete); principal == nil {
+		return
+	}
+
+	payload, ok := msg.Payload.(map[string]any)
+	if !ok {
+		sendError(c, msg.ID, "invalid payload")
+		return
+	}
+
+	id, ok := parseID(payload)
+	if !ok {
+		sendError(c, msg.ID, "invalid id")
+		return
+	}
+
+	if err := domainLogicLayer.DeleteKPIDefinition(id); err != nil {
+		sendError(c, msg.ID, err.Error())
+		return
+	}
+
+	sendSuccess(c, msg.ID, nil)
 }

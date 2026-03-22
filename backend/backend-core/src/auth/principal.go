@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/db/dbClient"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
-	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dbModel"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dllModel"
+	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 )
 
 type PrincipalType string
@@ -43,9 +43,8 @@ func AuthenticatePrincipal(w http.ResponseWriter, r *http.Request) (*Principal, 
 	clientIP := extractClientIP(r)
 	apiKeyRaw := extractAPIKey(r)
 	if apiKeyRaw != "" {
-		hash := hashAPIKey(apiKeyRaw)
-		db := dbClient.GetRelationalDatabaseClientInstance()
-		apiKeyResult := db.LoadAPIKeyByHash(hash)
+		hash := sharedUtils.GenerateHexHash(apiKeyRaw)
+		apiKeyResult := domainLogicLayer.LoadAPIKeyByHash(hash)
 		if apiKeyResult.IsFailure() {
 			return nil, apiKeyResult.GetError()
 		}
@@ -80,7 +79,7 @@ func CanAccessOperation(principal *Principal, resource string, operation string)
 	return ok && allowed
 }
 
-func buildAPIKeyPrincipal(apiKey dbModel.APIKeyEntity, clientIP string) (*Principal, error) {
+func buildAPIKeyPrincipal(apiKey dllModel.APIKey, clientIP string) (*Principal, error) {
 	if apiKey.Revoked {
 		return nil, fmt.Errorf("api key revoked")
 	}
@@ -90,14 +89,17 @@ func buildAPIKeyPrincipal(apiKey dbModel.APIKeyEntity, clientIP string) (*Princi
 	if !isIPAllowed(clientIP, apiKey.IPRestrictions) {
 		return nil, fmt.Errorf("ip not allowed")
 	}
-	allowed := make(map[string]bool)
-	for _, p := range apiKey.Role.Permissions {
-		allowed[p.Label] = true
+	allowed := make(map[string]bool, len(apiKey.Permissions))
+	for _, p := range apiKey.Permissions {
+		allowed[p] = true
 	}
+	if apiKey.ID.IsEmpty() {
+		return nil, fmt.Errorf("api key missing id")
+	}
+	id := apiKey.ID.GetPayload()
 	return &Principal{
 		Type:              PrincipalAPIKey,
-		UserID:            apiKey.UserID,
-		APIKeyID:          &apiKey.ID,
+		APIKeyID:          &id,
 		AllowedOperations: allowed,
 		SynchronizedAt:    time.Now(),
 		ClientIP:          clientIP,
@@ -105,13 +107,13 @@ func buildAPIKeyPrincipal(apiKey dbModel.APIKeyEntity, clientIP string) (*Princi
 }
 
 func buildUserPrincipal(userID uint32, clientIP string) (*Principal, error) {
-	permsResult := domainLogicLayer.LoadPermissionsForUser(userID)
+	permsResult := domainLogicLayer.LoadUserRole(userID)
 	if permsResult.IsFailure() {
 		return nil, permsResult.GetError()
 	}
 	allowed := make(map[string]bool)
-	for _, p := range permsResult.GetPayload() {
-		allowed[p.Label] = true
+	for _, p := range permsResult.GetPayload().Permissions {
+		allowed[p] = true
 	}
 	return &Principal{
 		Type:              PrincipalUserSession,
@@ -125,6 +127,7 @@ func buildUserPrincipal(userID uint32, clientIP string) (*Principal, error) {
 
 func refreshPrincipalPermissions(principal *Principal) error {
 	switch principal.Type {
+
 	case PrincipalUserSession:
 		newPrincipal, err := buildUserPrincipal(principal.UserID, principal.ClientIP)
 		if err != nil {
@@ -138,29 +141,25 @@ func refreshPrincipalPermissions(principal *Principal) error {
 		if principal.APIKeyID == nil {
 			return fmt.Errorf("missing api key id")
 		}
-		apiKeyResult := domainLogicLayer.LoadAPIKeyByID(*principal.APIKeyID)
-		if apiKeyResult.IsFailure() {
-			return apiKeyResult.GetError()
+		result := domainLogicLayer.LoadAPIKeyByID(principal.UserID, *principal.APIKeyID)
+		if result.IsFailure() {
+			return result.GetError()
 		}
-		apiKeyOpt := apiKeyResult.GetPayload()
-		if apiKeyOpt.IsEmpty() {
-			return fmt.Errorf("api key not found")
+		apiKeyResult := result.GetPayload()
+		end, err := time.Parse(time.RFC1123, *apiKeyResult.ExpiresAt)
+		if err != nil {
+			return fmt.Errorf("time conversion failed")
 		}
-		apiKey := apiKeyOpt.GetPayload()
-		if apiKey.Revoked {
-			return fmt.Errorf("api key revoked")
-		}
-		if apiKey.ExpiresAt != nil && apiKey.ExpiresAt.Before(time.Now()) {
+		if apiKeyResult.ExpiresAt != nil && end.Before(time.Now()) {
 			return fmt.Errorf("api key expired")
 		}
-		if !isIPAllowed(principal.ClientIP, apiKey.IPRestrictions) {
+		if !isIPAllowed(principal.ClientIP, apiKeyResult.IPRestrictions) {
 			return fmt.Errorf("ip not allowed")
 		}
 		allowed := make(map[string]bool)
-		for _, p := range apiKey.Role.Permissions {
-			allowed[p.Label] = true
+		for _, p := range apiKeyResult.Permissions {
+			allowed[p] = true
 		}
-		principal.UserID = apiKey.UserID
 		principal.AllowedOperations = allowed
 		principal.SynchronizedAt = time.Now()
 		return nil
