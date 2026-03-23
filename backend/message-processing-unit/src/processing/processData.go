@@ -68,17 +68,14 @@ func ProcessRaw(rabbitMQClient rabbitmq.Client, messagePayload sharedModel.KPIFu
 		lastSnapshot = lastSnapshotRaw.(sharedModel.RawState)
 	} else {
 		lastSnapshot = sharedModel.RawState{
-			Values: map[string]interface{}{},
+			Values:    map[string]interface{}{},
+			Duplicate: false,
 		}
 	}
 	changed := false
 	for k, v := range params {
 		oldVal, ok := lastSnapshot.Values[k]
-		if !ok {
-			changed = true
-			break
-		}
-		if !sharedUtils.CompareJSONs(oldVal, v) {
+		if !ok || !sharedUtils.CompareJSONs(oldVal, v) {
 			changed = true
 			break
 		}
@@ -93,7 +90,10 @@ func ProcessRaw(rabbitMQClient rabbitmq.Client, messagePayload sharedModel.KPIFu
 	}
 	if exists {
 		lastSnapshot.SynchronizedAt = time.Now()
-		lastRaw.Store(uid, lastSnapshot)
+		if !changed {
+			lastSnapshot.Duplicate = true
+			lastRaw.Store(uid, lastSnapshot)
+		}
 	}
 	newValues := make(map[string]interface{}, len(params))
 	for k, v := range params {
@@ -120,10 +120,22 @@ func ProcessRaw(rabbitMQClient rabbitmq.Client, messagePayload sharedModel.KPIFu
 		log.Printf("[MPU][RAW] No change detected -> skipping RAW write | uid=%s", uid)
 		return false
 	}
+	if exists && lastSnapshot.Duplicate {
+		log.Printf("[MPU][RAW] Edge detected -> storing LAST duplicate snapshot | uid=%s", uid)
+		oldFields, oldTags := splitParamsBySDType(messagePayload.SDTypeSpecification, lastSnapshot.Values)
+		storeRaw(rabbitMQClient, []sharedModel.TimeSeriesRawRecord{{
+			EventTime:           lastSnapshot.EventTime, //eventTime.Add(-time.Nanosecond),
+			SDInstanceUID:       uid,
+			SDTypeSpecification: messagePayload.SDTypeSpecification,
+			Fields:              oldFields,
+			Tags:                oldTags,
+		}})
+	}
 	newSnapshot := sharedModel.RawState{
 		Values:         newValues,
 		EventTime:      eventTime,
 		SynchronizedAt: time.Now(),
+		Duplicate:      false,
 	}
 	lastRaw.Store(uid, newSnapshot)
 	log.Printf("[MPU][RAW] Change detected -> storing RAW snapshot | uid=%s snapshot=%v", uid, newValues)
@@ -142,14 +154,12 @@ func ProcessKPI(rabbitMQClient rabbitmq.Client, messagePayload sharedModel.KPIFu
 	kpiDefinitionsBySDTypeDenotationMapMutex.RLock()
 	kpiDefinitions := kpiDefinitionsBySDTypeDenotationMap[messagePayload.SDTypeSpecification]
 	kpiDefinitionsBySDTypeDenotationMapMutex.RUnlock()
-	log.Printf("[MPU][KPI] Found KPI definitions | count=%d type=%s", len(kpiDefinitions), messagePayload.SDTypeSpecification)
 	sdInstanceUID := messagePayload.SDInstanceUID
 	results := sharedUtils.EmptySlice[sharedModel.KPIFulfillmentCheckResultISCMessage]()
 	tsRecords := sharedUtils.EmptySlice[sharedModel.TimeSeriesKPIResultRecord]()
 	_, tags := splitParamsBySDType(messagePayload.SDTypeSpecification, params)
 	var paramAny any = params
 	for _, kpiDefinition := range kpiDefinitions {
-		log.Printf("[MPU][KPI] Evaluating KPI | id=%v uid=%s", kpiDefinition.ID, sdInstanceUID)
 		if kpiDefinition.SDInstanceMode != sharedModel.ALL {
 			containsUID := false
 			for _, uid := range kpiDefinition.SelectedSDInstanceUIDs {
@@ -159,18 +169,15 @@ func ProcessKPI(rabbitMQClient rabbitmq.Client, messagePayload sharedModel.KPIFu
 				}
 			}
 			if !containsUID {
-				log.Printf("[MPU][KPI] Instance not selected for KPI | kpiID=%v uid=%s", kpiDefinition.ID, sdInstanceUID)
 				continue
 			}
 		}
 		result := CheckKPIFulfillment(kpiDefinition, &paramAny)
 		if result.IsFailure() {
-			log.Printf("[MPU][KPI] KPI evaluation failed | kpiID=%v error=%s", kpiDefinition.ID, result.GetError().Error())
 			continue
 		}
 		value := result.GetPayload()
 		kpiID := sharedUtils.NewOptionalFromPointer(kpiDefinition.ID).GetPayload()
-		log.Printf("[MPU][KPI] KPI evaluation result | kpiID=%d uid=%s fulfilled=%v", kpiID, sdInstanceUID, value)
 		key := sharedModel.KPIKey{
 			SDInstanceUID:   sdInstanceUID,
 			KPIDefinitionID: kpiID,
@@ -178,8 +185,20 @@ func ProcessKPI(rabbitMQClient rabbitmq.Client, messagePayload sharedModel.KPIFu
 		last, exists := lastKPI.Load(key)
 		if exists {
 			state := last.(sharedModel.KPIState)
+			if !eventTime.Before(state.EventTime) && state.Value != value && state.Duplicate {
+				log.Printf("[MPU][KPI] Edge detected -> storing LAST duplicate | kpiID=%d uid=%s", kpiID, sdInstanceUID)
+				tsRecords = append(tsRecords, sharedModel.TimeSeriesKPIResultRecord{
+					EventTime:           state.EventTime, //eventTime.Add(-time.Nanosecond),
+					SDInstanceUID:       sdInstanceUID,
+					SDTypeSpecification: messagePayload.SDTypeSpecification,
+					KPIDefinitionID:     kpiID,
+					Fulfilled:           state.Value,
+					Tags:                tags,
+				})
+			}
 			if !eventTime.Before(state.EventTime) && state.Value == value {
 				state.SynchronizedAt = time.Now()
+				state.Duplicate = true
 				lastKPI.Store(key, state)
 				log.Printf("[MPU][KPI] KPI unchanged -> skipping store | kpiID=%d uid=%s", kpiID, sdInstanceUID)
 				continue
@@ -188,6 +207,7 @@ func ProcessKPI(rabbitMQClient rabbitmq.Client, messagePayload sharedModel.KPIFu
 		lastKPI.Store(key, sharedModel.KPIState{
 			Value:          value,
 			EventTime:      eventTime,
+			Duplicate:      false,
 			SynchronizedAt: time.Now(),
 		})
 		results = append(results, sharedModel.KPIFulfillmentCheckResultISCMessage{
@@ -205,9 +225,7 @@ func ProcessKPI(rabbitMQClient rabbitmq.Client, messagePayload sharedModel.KPIFu
 			Tags:                tags,
 		})
 	}
-	log.Printf("[MPU][KPI] Storing KPI results to TS | count=%d", len(tsRecords))
 	storeKPI(rabbitMQClient, tsRecords)
-	log.Printf("[MPU][KPI] Publishing KPI results | count=%d", len(results))
 	publishKPI(rabbitMQClient, results)
 	return nil
 }
@@ -264,11 +282,35 @@ func createReprocessHandler(client rabbitmq.Client, req sharedModel.KPIReprocess
 			}
 			prev, exists := instanceState[result.SDInstanceUID]
 			if exists && prev.Value == result.Fulfilled {
+				prev.Duplicate = true
+				prev.SynchronizedAt = time.Now()
+				instanceState[result.SDInstanceUID] = prev
 				continue
+			}
+			if exists && prev.Value != result.Fulfilled && prev.Duplicate {
+				log.Printf("[MPU][REPROCESS] Edge detected -> storing LAST duplicate | uid=%s", result.SDInstanceUID)
+				tags := make(map[string]string)
+				for k, v := range point.Tags {
+					switch k {
+					case "sdInstanceUID", "sdType", "kpiDefinitionID":
+						continue
+					default:
+						tags[k] = v
+					}
+				}
+				tsBatch = append(tsBatch, sharedModel.TimeSeriesKPIResultRecord{
+					EventTime:           result.EventTime.Add(-time.Nanosecond),
+					SDInstanceUID:       result.SDInstanceUID,
+					SDTypeSpecification: req.SDTypeSpecification,
+					KPIDefinitionID:     result.KPIDefinitionID,
+					Fulfilled:           prev.Value,
+					Tags:                tags,
+				})
 			}
 			instanceState[result.SDInstanceUID] = sharedModel.KPIState{
 				Value:          result.Fulfilled,
 				EventTime:      result.EventTime,
+				Duplicate:      false,
 				SynchronizedAt: time.Now(),
 			}
 			tags := make(map[string]string)
@@ -348,7 +390,15 @@ func finalizeReprocess(client rabbitmq.Client, req sharedModel.KPIReprocessReque
 		if exists {
 			lastState := last.(sharedModel.KPIState)
 			if !lastState.EventTime.Before(req.To) {
-				continue
+				if state.Duplicate {
+					log.Printf("[MPU][REPROCESS] Final edge write despite newer data | uid=%s", uid)
+					results = append(results, sharedModel.KPIFulfillmentCheckResultISCMessage{
+						EventTime:       state.EventTime,
+						SDInstanceUID:   uid,
+						KPIDefinitionID: req.KPIDefinitionID,
+						Fulfilled:       state.Value,
+					})
+				}
 			}
 		}
 		lastKPI.Store(key, state)
