@@ -184,7 +184,7 @@ func EnqueueMessageRepresentingCurrentSDInstanceConfiguration(rabbitMQClient rab
 
 func EnqueueMessageRepresentingCurrentKPIDefinitionConfiguration(rabbitMQClient rabbitmq.Client) {
 	sharedUtils.TerminateOnError(func() error {
-		kpiDefinitionsLoadResult := dbClient.GetRelationalDatabaseClientInstance().LoadKPIDefinitions()
+		kpiDefinitionsLoadResult := dbClient.GetRelationalDatabaseClientInstance().LoadAllKPIDefinitions()
 		if kpiDefinitionsLoadResult.IsFailure() {
 			return kpiDefinitionsLoadResult.GetError()
 		}

@@ -9,11 +9,12 @@ import (
 )
 
 func GetKPIDefinitions(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	if principal := AuthorizeOperation(c, msg, auth.ResourceKPIDefinitions, auth.OperationRead); principal == nil {
+	principal := AuthorizeOperation(c, msg, auth.ResourceKPIDefinitions, auth.OperationRead)
+	if principal == nil {
 		return
 	}
 
-	result := domainLogicLayer.GetKPIDefinitions()
+	result := domainLogicLayer.GetKPIDefinitions(principal.UserID)
 	if result.IsFailure() {
 		sendError(c, msg.ID, result.GetError().Error())
 		return
@@ -23,7 +24,8 @@ func GetKPIDefinitions(c *connection.Client, msg sharedModel.WebSocketMessage) {
 }
 
 func CreateKPIDefinition(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	if principal := AuthorizeOperation(c, msg, auth.ResourceKPIDefinitions, auth.OperationCreate); principal == nil {
+	principal := AuthorizeOperation(c, msg, auth.ResourceKPIDefinitions, auth.OperationCreate)
+	if principal == nil {
 		return
 	}
 
@@ -33,7 +35,7 @@ func CreateKPIDefinition(c *connection.Client, msg sharedModel.WebSocketMessage)
 		return
 	}
 
-	result := domainLogicLayer.CreateKPIDefinition(input)
+	result := domainLogicLayer.CreateKPIDefinition(principal.UserID, input)
 	if result.IsFailure() {
 		sendError(c, msg.ID, result.GetError().Error())
 		return
@@ -43,7 +45,8 @@ func CreateKPIDefinition(c *connection.Client, msg sharedModel.WebSocketMessage)
 }
 
 func GetKPIDefinition(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	if principal := AuthorizeOperation(c, msg, auth.ResourceKPIDefinitions, auth.OperationRead); principal == nil {
+	principal := AuthorizeOperation(c, msg, auth.ResourceKPIDefinitions, auth.OperationRead)
+	if principal == nil {
 		return
 	}
 
@@ -59,7 +62,7 @@ func GetKPIDefinition(c *connection.Client, msg sharedModel.WebSocketMessage) {
 		return
 	}
 
-	result := domainLogicLayer.GetKPIDefinition(id)
+	result := domainLogicLayer.GetKPIDefinition(principal.UserID, id)
 	if result.IsFailure() {
 		sendError(c, msg.ID, result.GetError().Error())
 		return
@@ -69,7 +72,8 @@ func GetKPIDefinition(c *connection.Client, msg sharedModel.WebSocketMessage) {
 }
 
 func UpdateKPIDefinition(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	if principal := AuthorizeOperation(c, msg, auth.ResourceKPIDefinitions, auth.OperationUpdate); principal == nil {
+	principal := AuthorizeOperation(c, msg, auth.ResourceKPIDefinitions, auth.OperationUpdate)
+	if principal == nil {
 		return
 	}
 
@@ -98,7 +102,7 @@ func UpdateKPIDefinition(c *connection.Client, msg sharedModel.WebSocketMessage)
 		return
 	}
 
-	result := domainLogicLayer.UpdateKPIDefinition(id, input)
+	result := domainLogicLayer.UpdateKPIDefinition(principal.UserID, id, input)
 	if result.IsFailure() {
 		sendError(c, msg.ID, result.GetError().Error())
 		return
@@ -108,7 +112,8 @@ func UpdateKPIDefinition(c *connection.Client, msg sharedModel.WebSocketMessage)
 }
 
 func DeleteKPIDefinition(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	if principal := AuthorizeOperation(c, msg, auth.ResourceKPIDefinitions, auth.OperationDelete); principal == nil {
+	principal := AuthorizeOperation(c, msg, auth.ResourceKPIDefinitions, auth.OperationDelete)
+	if principal == nil {
 		return
 	}
 
@@ -124,7 +129,7 @@ func DeleteKPIDefinition(c *connection.Client, msg sharedModel.WebSocketMessage)
 		return
 	}
 
-	if err := domainLogicLayer.DeleteKPIDefinition(id); err != nil {
+	if err := domainLogicLayer.DeleteKPIDefinition(principal.UserID, id); err != nil {
 		sendError(c, msg.ID, err.Error())
 		return
 	}

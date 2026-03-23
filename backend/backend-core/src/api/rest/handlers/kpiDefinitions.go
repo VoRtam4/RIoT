@@ -10,10 +10,11 @@ import (
 )
 
 func GetKPIDefinitions(w http.ResponseWriter, r *http.Request) {
-	if principal := authorizeOperation(w, r, auth.ResourceKPIDefinitions, auth.OperationRead); principal == nil {
+	principal := authorizeOperation(w, r, auth.ResourceKPIDefinitions, auth.OperationRead)
+	if principal == nil {
 		return
 	}
-	result := domainLogicLayer.GetKPIDefinitions()
+	result := domainLogicLayer.GetKPIDefinitions(principal.UserID)
 	if result.IsFailure() {
 		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
 		return
@@ -22,14 +23,15 @@ func GetKPIDefinitions(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetKPIDefinition(w http.ResponseWriter, r *http.Request) {
-	if principal := authorizeOperation(w, r, auth.ResourceKPIDefinitions, auth.OperationRead); principal == nil {
+	principal := authorizeOperation(w, r, auth.ResourceKPIDefinitions, auth.OperationRead)
+	if principal == nil {
 		return
 	}
 	id, ok := parseID(w, r)
 	if !ok {
 		return
 	}
-	result := domainLogicLayer.GetKPIDefinition(id)
+	result := domainLogicLayer.GetKPIDefinition(principal.UserID, id)
 	if result.IsFailure() {
 		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
 		return
@@ -38,7 +40,8 @@ func GetKPIDefinition(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateKPIDefinition(w http.ResponseWriter, r *http.Request) {
-	if principal := authorizeOperation(w, r, auth.ResourceKPIDefinitions, auth.OperationCreate); principal == nil {
+	principal := authorizeOperation(w, r, auth.ResourceKPIDefinitions, auth.OperationCreate)
+	if principal == nil {
 		return
 	}
 	var input graphQLModel.KPIDefinitionInput
@@ -47,7 +50,7 @@ func CreateKPIDefinition(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	result := domainLogicLayer.CreateKPIDefinition(input)
+	result := domainLogicLayer.CreateKPIDefinition(principal.UserID, input)
 	if result.IsFailure() {
 		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
 		return
@@ -57,7 +60,8 @@ func CreateKPIDefinition(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateKPIDefinition(w http.ResponseWriter, r *http.Request) {
-	if principal := authorizeOperation(w, r, auth.ResourceKPIDefinitions, auth.OperationUpdate); principal == nil {
+	principal := authorizeOperation(w, r, auth.ResourceKPIDefinitions, auth.OperationUpdate)
+	if principal == nil {
 		return
 	}
 	id, ok := parseID(w, r)
@@ -70,7 +74,7 @@ func UpdateKPIDefinition(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	result := domainLogicLayer.UpdateKPIDefinition(id, input)
+	result := domainLogicLayer.UpdateKPIDefinition(principal.UserID, id, input)
 	if result.IsFailure() {
 		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
 		return
@@ -79,14 +83,15 @@ func UpdateKPIDefinition(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteKPIDefinition(w http.ResponseWriter, r *http.Request) {
-	if principal := authorizeOperation(w, r, auth.ResourceKPIDefinitions, auth.OperationDelete); principal == nil {
+	principal := authorizeOperation(w, r, auth.ResourceKPIDefinitions, auth.OperationDelete)
+	if principal == nil {
 		return
 	}
 	id, ok := parseID(w, r)
 	if !ok {
 		return
 	}
-	err := domainLogicLayer.DeleteKPIDefinition(id)
+	err := domainLogicLayer.DeleteKPIDefinition(principal.UserID, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -334,6 +334,8 @@ type Query {
   statisticsQuerySensorsWithFields(request: StatisticsInput sensors: SensorsWithFields!): [OutputData!]!
   userConfig(id: ID!): UserConfig!
   myUserConfig: UserConfig!
+  myApiKeys: [APIKey!]!
+  myApiKey(id: ID!): APIKey!
 }
 
 type Mutation {
@@ -349,6 +351,9 @@ type Mutation {
   statisticsMutate(inputData: InputData!): Boolean!
   updateUserConfig(userId: ID!, input: UserConfigInput!): UserConfig!
   deleteUserConfig(userId: ID!): Boolean!
+  createMyAPIKey(input: APIKeyInput!): String! # vrací key
+  updateMyAPIKey(id: ID!, input: APIKeyInput!): Boolean!
+  deleteMyAPIKey(id: ID!): Boolean!
 }
 
 type Subscription {

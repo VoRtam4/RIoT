@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
+	"fmt"
 	"strings"
 )
 
@@ -30,4 +31,17 @@ func VerifyAPIKeyHash(rawKey string, stored string) bool {
 	hash := sha256.Sum256([]byte(input))
 	computed := hex.EncodeToString(hash[:])
 	return subtle.ConstantTimeCompare([]byte(computed), []byte(expectedHash)) == 1
+}
+
+func ValidatePermissions(userPermissions []string, requested []string) error {
+	allowed := make(map[string]bool, len(userPermissions))
+	for _, p := range userPermissions {
+		allowed[p] = true
+	}
+	for _, p := range requested {
+		if !allowed[p] {
+			return fmt.Errorf("permission '%s' is not allowed", p)
+		}
+	}
+	return nil
 }

@@ -15,13 +15,13 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 )
 
-func CreateKPIDefinition(kpiDefinitionInput graphQLModel.KPIDefinitionInput) sharedUtils.Result[graphQLModel.KPIDefinition] {
+func CreateKPIDefinition(userID uint32, kpiDefinitionInput graphQLModel.KPIDefinitionInput) sharedUtils.Result[graphQLModel.KPIDefinition] {
 	toDLLModelTransformResult := gql2dll.ToDLLModelKPIDefinition(kpiDefinitionInput)
 	if toDLLModelTransformResult.IsFailure() {
 		return sharedUtils.NewFailureResult[graphQLModel.KPIDefinition](toDLLModelTransformResult.GetError())
 	}
 	kpiDefinition := toDLLModelTransformResult.GetPayload()
-	persistResult := dbClient.GetRelationalDatabaseClientInstance().PersistKPIDefinition(kpiDefinition)
+	persistResult := dbClient.GetRelationalDatabaseClientInstance().PersistKPIDefinition(userID, kpiDefinition)
 	if persistResult.IsFailure() {
 		return sharedUtils.NewFailureResult[graphQLModel.KPIDefinition](persistResult.GetError())
 	}
@@ -35,14 +35,14 @@ func CreateKPIDefinition(kpiDefinitionInput graphQLModel.KPIDefinitionInput) sha
 	return sharedUtils.NewSuccessResult[graphQLModel.KPIDefinition](dll2gql.ToGraphQLModelKPIDefinition(kpiDefinition))
 }
 
-func UpdateKPIDefinition(id uint32, kpiDefinitionInput graphQLModel.KPIDefinitionInput) sharedUtils.Result[graphQLModel.KPIDefinition] {
+func UpdateKPIDefinition(userID uint32, id uint32, kpiDefinitionInput graphQLModel.KPIDefinitionInput) sharedUtils.Result[graphQLModel.KPIDefinition] {
 	toDLLModelTransformResult := gql2dll.ToDLLModelKPIDefinition(kpiDefinitionInput)
 	if toDLLModelTransformResult.IsFailure() {
 		return sharedUtils.NewFailureResult[graphQLModel.KPIDefinition](toDLLModelTransformResult.GetError())
 	}
 	kpiDefinition := toDLLModelTransformResult.GetPayload()
 	kpiDefinition.ID = &id
-	persistResult := dbClient.GetRelationalDatabaseClientInstance().PersistKPIDefinition(kpiDefinition)
+	persistResult := dbClient.GetRelationalDatabaseClientInstance().PersistKPIDefinition(userID, kpiDefinition)
 	if persistResult.IsFailure() {
 		return sharedUtils.NewFailureResult[graphQLModel.KPIDefinition](persistResult.GetError())
 	}
@@ -56,7 +56,10 @@ func UpdateKPIDefinition(id uint32, kpiDefinitionInput graphQLModel.KPIDefinitio
 	return sharedUtils.NewSuccessResult[graphQLModel.KPIDefinition](dll2gql.ToGraphQLModelKPIDefinition(kpiDefinition))
 }
 
-func DeleteKPIDefinition(id uint32) error {
+func DeleteKPIDefinition(userID uint32, id uint32) error {
+	if err := dbClient.GetRelationalDatabaseClientInstance().LoadKPIDefinition(userID, id); err.IsFailure() {
+		return err.GetError()
+	}
 	if err := dbClient.GetRelationalDatabaseClientInstance().DeleteKPIDefinition(id); err != nil {
 		return err
 	}
@@ -67,17 +70,17 @@ func DeleteKPIDefinition(id uint32) error {
 	return nil
 }
 
-func GetKPIDefinitions() sharedUtils.Result[[]graphQLModel.KPIDefinition] {
-	loadResult := dbClient.GetRelationalDatabaseClientInstance().LoadKPIDefinitions()
+func GetKPIDefinitions(userID uint32) sharedUtils.Result[[]graphQLModel.KPIDefinition] {
+	loadResult := dbClient.GetRelationalDatabaseClientInstance().LoadKPIDefinitions(userID)
 	if loadResult.IsFailure() {
 		return sharedUtils.NewFailureResult[[]graphQLModel.KPIDefinition](loadResult.GetError())
 	}
 	return sharedUtils.NewSuccessResult[[]graphQLModel.KPIDefinition](sharedUtils.Map(loadResult.GetPayload(), dll2gql.ToGraphQLModelKPIDefinition))
 }
 
-func GetKPIDefinition(id uint32) sharedUtils.Result[graphQLModel.KPIDefinition] {
+func GetKPIDefinition(userID uint32, id uint32) sharedUtils.Result[graphQLModel.KPIDefinition] {
 	// FIXME: Searching for target KPI definition on domain-logic layer (suboptimal)
-	loadResult := dbClient.GetRelationalDatabaseClientInstance().LoadKPIDefinitions()
+	loadResult := dbClient.GetRelationalDatabaseClientInstance().LoadKPIDefinitions(userID)
 	if loadResult.IsFailure() {
 		return sharedUtils.NewFailureResult[graphQLModel.KPIDefinition](loadResult.GetError())
 	}

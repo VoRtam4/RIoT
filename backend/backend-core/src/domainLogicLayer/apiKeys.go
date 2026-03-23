@@ -15,21 +15,15 @@ import (
 func LoadAPIKeyByHash(hash string) sharedUtils.Result[sharedUtils.Optional[dllModel.APIKey]] {
 	result := dbClient.GetRelationalDatabaseClientInstance().LoadAPIKeyByHash(hash)
 	if result.IsFailure() {
-		return sharedUtils.NewFailureResult[sharedUtils.Optional[dllModel.APIKey]](
-			result.GetError(),
-		)
+		return sharedUtils.NewFailureResult[sharedUtils.Optional[dllModel.APIKey]](result.GetError())
 	}
 	apiKeyOpt := result.GetPayload()
 	if apiKeyOpt.IsEmpty() {
-		return sharedUtils.NewSuccessResult(
-			sharedUtils.NewEmptyOptional[dllModel.APIKey](),
-		)
+		return sharedUtils.NewSuccessResult(sharedUtils.NewEmptyOptional[dllModel.APIKey]())
 	}
 	apiKey := apiKeyOpt.GetPayload()
 	if apiKey.Revoked {
-		return sharedUtils.NewFailureResult[sharedUtils.Optional[dllModel.APIKey]](
-			fmt.Errorf("api key revoked"),
-		)
+		return sharedUtils.NewFailureResult[sharedUtils.Optional[dllModel.APIKey]](fmt.Errorf("api key revoked"))
 	}
 	if apiKey.ExpiresAt != nil && apiKey.ExpiresAt.Before(time.Now()) {
 		return sharedUtils.NewFailureResult[sharedUtils.Optional[dllModel.APIKey]](fmt.Errorf("api key expired"))
@@ -57,14 +51,22 @@ func LoadAPIKeysForUser(userID uint32) sharedUtils.Result[[]graphQLModel.APIKey]
 	if result.IsFailure() {
 		return sharedUtils.NewFailureResult[[]graphQLModel.APIKey](result.GetError())
 	}
-	return sharedUtils.NewSuccessResult(
-		sharedUtils.Map(result.GetPayload(), func(k dllModel.APIKey) graphQLModel.APIKey {
-			return dll2gql.ToGraphQLModelAPIKey(k)
-		}),
-	)
+	return sharedUtils.NewSuccessResult(sharedUtils.Map(result.GetPayload(), func(k dllModel.APIKey) graphQLModel.APIKey {
+		return dll2gql.ToGraphQLModelAPIKey(k)
+	}))
 }
 
 func CreateAPIKey(userID uint32, input graphQLModel.APIKeyInput) sharedUtils.Result[string] {
+	if input.Permissions != nil {
+		roleResult := LoadUserRole(userID)
+		if roleResult.IsFailure() {
+			return sharedUtils.NewFailureResult[string](roleResult.GetError())
+		}
+		userRole := roleResult.GetPayload()
+		if err := sharedUtils.ValidatePermissions(userRole.Permissions, input.Permissions); err != nil {
+			return sharedUtils.NewFailureResult[string](err)
+		}
+	}
 	rawKey := sharedUtils.GenerateRandomAlphanumericString(32)
 	hash := sharedUtils.GenerateHexHash(rawKey)
 	k := gql2dll.ToDLLModelAPIKey(input)
@@ -86,6 +88,16 @@ func UpdateAPIKeyForUser(userID uint32, id uint32, input graphQLModel.APIKeyInpu
 	k := load.GetPayload().GetPayload()
 	if userID != *k.UserID {
 		return fmt.Errorf("not found")
+	}
+	if input.Permissions != nil {
+		roleResult := LoadUserRole(userID)
+		if roleResult.IsFailure() {
+			return roleResult.GetError()
+		}
+		userRole := roleResult.GetPayload()
+		if err := sharedUtils.ValidatePermissions(userRole.Permissions, input.Permissions); err != nil {
+			return err
+		}
 	}
 	updated := gql2dll.ApplyAPIKeyUpdate(k, input)
 	updated.ID = sharedUtils.NewOptionalOf(id)

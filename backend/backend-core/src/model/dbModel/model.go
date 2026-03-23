@@ -8,6 +8,7 @@ import (
 
 type KPIDefinitionEntity struct {
 	ID                                         uint32                                      `gorm:"column:id;primaryKey"`
+	UserID                                     uint32                                      `gorm:"column:userID;not null"`
 	UserIdentifier                             string                                      `gorm:"column:user_identifier;not null"`
 	RootNodeID                                 *uint32                                     `gorm:"column:root_node_id;not null"`
 	RootNode                                   *KPINodeEntity                              `gorm:"foreignKey:RootNodeID"`

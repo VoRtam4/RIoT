@@ -32,6 +32,7 @@ const (
 
 type KPIDefinition struct {
 	ID                     *uint32        `json:"id,omitempty"`
+	UserID                 *uint32        `json:"userID,omitempty"`
 	SDTypeID               uint32         `json:"sdTypeID"`
 	SDTypeSpecification    string         `json:"sdTypeSpecification"`
 	UserIdentifier         string         `json:"userIdentifier"`
@@ -131,11 +132,13 @@ type KPIKey struct {
 type RawState struct {
 	Values         map[string]interface{}
 	EventTime      time.Time
+	Duplicate      bool
 	SynchronizedAt time.Time
 }
 
 type KPIState struct {
 	Value          bool
 	EventTime      time.Time
+	Duplicate      bool
 	SynchronizedAt time.Time
 }
