@@ -63,6 +63,7 @@ type MutationResolver interface {
 	StatisticsMutate(ctx context.Context, inputData graphQLModel.InputData) (bool, error)
 	UpdateUserConfig(ctx context.Context, userID uint32, input graphQLModel.UserConfigInput) (graphQLModel.UserConfig, error)
 	DeleteUserConfig(ctx context.Context, userID uint32) (bool, error)
+	AssignRoleToUser(ctx context.Context, input graphQLModel.AssignRoleInput) (bool, error)
 	CreateMyAPIKey(ctx context.Context, input graphQLModel.APIKeyInput) (string, error)
 	UpdateMyAPIKey(ctx context.Context, id uint32, input graphQLModel.APIKeyInput) (bool, error)
 	DeleteMyAPIKey(ctx context.Context, id uint32) (bool, error)
@@ -71,6 +72,7 @@ type QueryResolver interface {
 	SdType(ctx context.Context, id uint32) (graphQLModel.SDType, error)
 	SdTypes(ctx context.Context) ([]graphQLModel.SDType, error)
 	SdInstances(ctx context.Context) ([]graphQLModel.SDInstance, error)
+	SdInstancesByType(ctx context.Context, sdTypeID uint32) ([]graphQLModel.SDInstance, error)
 	KpiDefinition(ctx context.Context, id uint32) (graphQLModel.KPIDefinition, error)
 	KpiDefinitions(ctx context.Context) ([]graphQLModel.KPIDefinition, error)
 	KpiFulfillmentCheckResults(ctx context.Context) ([]graphQLModel.KPIFulfillmentCheckResult, error)
@@ -80,6 +82,9 @@ type QueryResolver interface {
 	StatisticsQuerySensorsWithFields(ctx context.Context, request *graphQLModel.StatisticsInput, sensors graphQLModel.SensorsWithFields) ([]graphQLModel.OutputData, error)
 	UserConfig(ctx context.Context, id uint32) (graphQLModel.UserConfig, error)
 	MyUserConfig(ctx context.Context) (graphQLModel.UserConfig, error)
+	Roles(ctx context.Context) ([]graphQLModel.Role, error)
+	UserRole(ctx context.Context, userID uint32) (*graphQLModel.Role, error)
+	MyRole(ctx context.Context) (*graphQLModel.Role, error)
 	MyAPIKeys(ctx context.Context) ([]graphQLModel.APIKey, error)
 	MyAPIKey(ctx context.Context, id uint32) (graphQLModel.APIKey, error)
 }
@@ -256,6 +261,7 @@ enum SDParameterRole {
 
 type SDParameter {
   id: ID!
+  label: String!
   denotation: String!
   type: SDParameterType!
   role: SDParameterRole! 
@@ -263,17 +269,20 @@ type SDParameter {
 
 type SDType {
   id: ID!
+  label: String!
   denotation: String!
   parameters: [SDParameter!]!
 }
 
 input SDParameterInput {
+  label: String!
   denotation: String!
   type: SDParameterType!
   role: SDParameterRole!
 }
 
 input SDTypeInput {
+  label: String!
   denotation: String!
   parameters: [SDParameterInput!]!
 }
@@ -281,12 +290,14 @@ input SDTypeInput {
 type SDInstance {
   id: ID!
   uid: String!
+  label: String!
   confirmedByUser: Boolean!
   userIdentifier: String!
   type: SDType!
 }
 
 input SDInstanceUpdateInput {
+  label: String
   userIdentifier: String
   confirmedByUser: Boolean
 }
@@ -300,6 +311,7 @@ enum SDInstanceMode {
 
 type KPIDefinition {
   id: ID!
+  label: String! 
   sdTypeID: ID!
   sdTypeSpecification: String!
   userIdentifier: String!
@@ -399,6 +411,7 @@ type NumericLEQAtomKPINode implements KPINode & AtomKPINode {
 }
 
 input KPIDefinitionInput {
+  label: String!
   sdTypeID: ID!
   sdTypeSpecification: String!
   userIdentifier: String!
@@ -446,11 +459,13 @@ type KPIFulfillmentCheckResultTuple {
 
 type SDInstanceGroup {
   id: ID!
+  label: String!
   userIdentifier: String!
   sdInstanceIDs: [ID!]!
 }
 
 input SDInstanceGroupInput {
+  label: String!
   userIdentifier: String!
   sdInstanceIDs: [ID!]!
 }
@@ -568,6 +583,7 @@ type Query {
   sdType(id: ID!): SDType!
   sdTypes: [SDType!]!
   sdInstances: [SDInstance!]!
+  sdInstancesByType(sdTypeID: ID!): [SDInstance!]!
   kpiDefinition(id: ID!): KPIDefinition!
   kpiDefinitions: [KPIDefinition!]!
   kpiFulfillmentCheckResults: [KPIFulfillmentCheckResult!]!
@@ -577,6 +593,9 @@ type Query {
   statisticsQuerySensorsWithFields(request: StatisticsInput sensors: SensorsWithFields!): [OutputData!]!
   userConfig(id: ID!): UserConfig!
   myUserConfig: UserConfig!
+  roles: [Role!]!
+  userRole(userID: ID!): Role
+  myRole: Role
   myApiKeys: [APIKey!]!
   myApiKey(id: ID!): APIKey!
 }
@@ -594,7 +613,8 @@ type Mutation {
   statisticsMutate(inputData: InputData!): Boolean!
   updateUserConfig(userId: ID!, input: UserConfigInput!): UserConfig!
   deleteUserConfig(userId: ID!): Boolean!
-  createMyAPIKey(input: APIKeyInput!): String! # vrací key
+  assignRoleToUser(input: AssignRoleInput!): Boolean!
+  createMyAPIKey(input: APIKeyInput!): String!
   updateMyAPIKey(id: ID!, input: APIKeyInput!): Boolean!
   deleteMyAPIKey(id: ID!): Boolean!
 }
@@ -632,6 +652,34 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
+
+func (ec *executionContext) field_Mutation_assignRoleToUser_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_assignRoleToUser_argsInput(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_assignRoleToUser_argsInput(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (graphQLModel.AssignRoleInput, error) {
+	if _, ok := rawArgs["input"]; !ok {
+		var zeroVal graphQLModel.AssignRoleInput
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+	if tmp, ok := rawArgs["input"]; ok {
+		return ec.unmarshalNAssignRoleInput2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐAssignRoleInput(ctx, tmp)
+	}
+
+	var zeroVal graphQLModel.AssignRoleInput
+	return zeroVal, nil
+}
 
 func (ec *executionContext) field_Mutation_createKPIDefinition_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
@@ -1280,6 +1328,34 @@ func (ec *executionContext) field_Query_sdInstanceGroup_argsID(
 	return zeroVal, nil
 }
 
+func (ec *executionContext) field_Query_sdInstancesByType_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_sdInstancesByType_argsSdTypeID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["sdTypeID"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_sdInstancesByType_argsSdTypeID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (uint32, error) {
+	if _, ok := rawArgs["sdTypeID"]; !ok {
+		var zeroVal uint32
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("sdTypeID"))
+	if tmp, ok := rawArgs["sdTypeID"]; ok {
+		return ec.unmarshalNID2uint32(ctx, tmp)
+	}
+
+	var zeroVal uint32
+	return zeroVal, nil
+}
+
 func (ec *executionContext) field_Query_sdType_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1431,6 +1507,34 @@ func (ec *executionContext) field_Query_userConfig_argsID(
 
 	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
 	if tmp, ok := rawArgs["id"]; ok {
+		return ec.unmarshalNID2uint32(ctx, tmp)
+	}
+
+	var zeroVal uint32
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_userRole_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_userRole_argsUserID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["userID"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_userRole_argsUserID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (uint32, error) {
+	if _, ok := rawArgs["userID"]; !ok {
+		var zeroVal uint32
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("userID"))
+	if tmp, ok := rawArgs["userID"]; ok {
 		return ec.unmarshalNID2uint32(ctx, tmp)
 	}
 
@@ -2206,6 +2310,50 @@ func (ec *executionContext) fieldContext_KPIDefinition_id(_ context.Context, fie
 	return fc, nil
 }
 
+func (ec *executionContext) _KPIDefinition_label(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.KPIDefinition) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_KPIDefinition_label(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Label, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_KPIDefinition_label(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "KPIDefinition",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _KPIDefinition_sdTypeID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.KPIDefinition) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_KPIDefinition_sdTypeID(ctx, field)
 	if err != nil {
@@ -2868,6 +3016,8 @@ func (ec *executionContext) fieldContext_Mutation_createSDType(ctx context.Conte
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_SDType_id(ctx, field)
+			case "label":
+				return ec.fieldContext_SDType_label(ctx, field)
 			case "denotation":
 				return ec.fieldContext_SDType_denotation(ctx, field)
 			case "parameters":
@@ -2988,6 +3138,8 @@ func (ec *executionContext) fieldContext_Mutation_updateSDInstance(ctx context.C
 				return ec.fieldContext_SDInstance_id(ctx, field)
 			case "uid":
 				return ec.fieldContext_SDInstance_uid(ctx, field)
+			case "label":
+				return ec.fieldContext_SDInstance_label(ctx, field)
 			case "confirmedByUser":
 				return ec.fieldContext_SDInstance_confirmedByUser(ctx, field)
 			case "userIdentifier":
@@ -3053,6 +3205,8 @@ func (ec *executionContext) fieldContext_Mutation_createKPIDefinition(ctx contex
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_KPIDefinition_id(ctx, field)
+			case "label":
+				return ec.fieldContext_KPIDefinition_label(ctx, field)
 			case "sdTypeID":
 				return ec.fieldContext_KPIDefinition_sdTypeID(ctx, field)
 			case "sdTypeSpecification":
@@ -3124,6 +3278,8 @@ func (ec *executionContext) fieldContext_Mutation_updateKPIDefinition(ctx contex
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_KPIDefinition_id(ctx, field)
+			case "label":
+				return ec.fieldContext_KPIDefinition_label(ctx, field)
 			case "sdTypeID":
 				return ec.fieldContext_KPIDefinition_sdTypeID(ctx, field)
 			case "sdTypeSpecification":
@@ -3250,6 +3406,8 @@ func (ec *executionContext) fieldContext_Mutation_createSDInstanceGroup(ctx cont
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_SDInstanceGroup_id(ctx, field)
+			case "label":
+				return ec.fieldContext_SDInstanceGroup_label(ctx, field)
 			case "userIdentifier":
 				return ec.fieldContext_SDInstanceGroup_userIdentifier(ctx, field)
 			case "sdInstanceIDs":
@@ -3313,6 +3471,8 @@ func (ec *executionContext) fieldContext_Mutation_updateSDInstanceGroup(ctx cont
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_SDInstanceGroup_id(ctx, field)
+			case "label":
+				return ec.fieldContext_SDInstanceGroup_label(ctx, field)
 			case "userIdentifier":
 				return ec.fieldContext_SDInstanceGroup_userIdentifier(ctx, field)
 			case "sdInstanceIDs":
@@ -3555,6 +3715,61 @@ func (ec *executionContext) fieldContext_Mutation_deleteUserConfig(ctx context.C
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_deleteUserConfig_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_assignRoleToUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_assignRoleToUser(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().AssignRoleToUser(rctx, fc.Args["input"].(graphQLModel.AssignRoleInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_assignRoleToUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_assignRoleToUser_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -5245,6 +5460,8 @@ func (ec *executionContext) fieldContext_Query_sdType(ctx context.Context, field
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_SDType_id(ctx, field)
+			case "label":
+				return ec.fieldContext_SDType_label(ctx, field)
 			case "denotation":
 				return ec.fieldContext_SDType_denotation(ctx, field)
 			case "parameters":
@@ -5308,6 +5525,8 @@ func (ec *executionContext) fieldContext_Query_sdTypes(_ context.Context, field 
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_SDType_id(ctx, field)
+			case "label":
+				return ec.fieldContext_SDType_label(ctx, field)
 			case "denotation":
 				return ec.fieldContext_SDType_denotation(ctx, field)
 			case "parameters":
@@ -5362,6 +5581,8 @@ func (ec *executionContext) fieldContext_Query_sdInstances(_ context.Context, fi
 				return ec.fieldContext_SDInstance_id(ctx, field)
 			case "uid":
 				return ec.fieldContext_SDInstance_uid(ctx, field)
+			case "label":
+				return ec.fieldContext_SDInstance_label(ctx, field)
 			case "confirmedByUser":
 				return ec.fieldContext_SDInstance_confirmedByUser(ctx, field)
 			case "userIdentifier":
@@ -5371,6 +5592,75 @@ func (ec *executionContext) fieldContext_Query_sdInstances(_ context.Context, fi
 			}
 			return nil, fmt.Errorf("no field named %q was found under type SDInstance", field.Name)
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_sdInstancesByType(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_sdInstancesByType(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().SdInstancesByType(rctx, fc.Args["sdTypeID"].(uint32))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]graphQLModel.SDInstance)
+	fc.Result = res
+	return ec.marshalNSDInstance2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐSDInstanceᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_sdInstancesByType(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_SDInstance_id(ctx, field)
+			case "uid":
+				return ec.fieldContext_SDInstance_uid(ctx, field)
+			case "label":
+				return ec.fieldContext_SDInstance_label(ctx, field)
+			case "confirmedByUser":
+				return ec.fieldContext_SDInstance_confirmedByUser(ctx, field)
+			case "userIdentifier":
+				return ec.fieldContext_SDInstance_userIdentifier(ctx, field)
+			case "type":
+				return ec.fieldContext_SDInstance_type(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type SDInstance", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_sdInstancesByType_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -5416,6 +5706,8 @@ func (ec *executionContext) fieldContext_Query_kpiDefinition(ctx context.Context
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_KPIDefinition_id(ctx, field)
+			case "label":
+				return ec.fieldContext_KPIDefinition_label(ctx, field)
 			case "sdTypeID":
 				return ec.fieldContext_KPIDefinition_sdTypeID(ctx, field)
 			case "sdTypeSpecification":
@@ -5487,6 +5779,8 @@ func (ec *executionContext) fieldContext_Query_kpiDefinitions(_ context.Context,
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_KPIDefinition_id(ctx, field)
+			case "label":
+				return ec.fieldContext_KPIDefinition_label(ctx, field)
 			case "sdTypeID":
 				return ec.fieldContext_KPIDefinition_sdTypeID(ctx, field)
 			case "sdTypeSpecification":
@@ -5599,6 +5893,8 @@ func (ec *executionContext) fieldContext_Query_sdInstanceGroup(ctx context.Conte
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_SDInstanceGroup_id(ctx, field)
+			case "label":
+				return ec.fieldContext_SDInstanceGroup_label(ctx, field)
 			case "userIdentifier":
 				return ec.fieldContext_SDInstanceGroup_userIdentifier(ctx, field)
 			case "sdInstanceIDs":
@@ -5662,6 +5958,8 @@ func (ec *executionContext) fieldContext_Query_sdInstanceGroups(_ context.Contex
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_SDInstanceGroup_id(ctx, field)
+			case "label":
+				return ec.fieldContext_SDInstanceGroup_label(ctx, field)
 			case "userIdentifier":
 				return ec.fieldContext_SDInstanceGroup_userIdentifier(ctx, field)
 			case "sdInstanceIDs":
@@ -5909,6 +6207,167 @@ func (ec *executionContext) fieldContext_Query_myUserConfig(_ context.Context, f
 				return ec.fieldContext_UserConfig_config(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type UserConfig", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_roles(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_roles(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().Roles(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]graphQLModel.Role)
+	fc.Result = res
+	return ec.marshalNRole2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐRoleᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_roles(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Role_id(ctx, field)
+			case "label":
+				return ec.fieldContext_Role_label(ctx, field)
+			case "permissions":
+				return ec.fieldContext_Role_permissions(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Role", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_userRole(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_userRole(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().UserRole(rctx, fc.Args["userID"].(uint32))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*graphQLModel.Role)
+	fc.Result = res
+	return ec.marshalORole2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐRole(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_userRole(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Role_id(ctx, field)
+			case "label":
+				return ec.fieldContext_Role_label(ctx, field)
+			case "permissions":
+				return ec.fieldContext_Role_permissions(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Role", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_userRole_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_myRole(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_myRole(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().MyRole(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*graphQLModel.Role)
+	fc.Result = res
+	return ec.marshalORole2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐRole(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_myRole(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Role_id(ctx, field)
+			case "label":
+				return ec.fieldContext_Role_label(ctx, field)
+			case "permissions":
+				return ec.fieldContext_Role_permissions(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Role", field.Name)
 		},
 	}
 	return fc, nil
@@ -6397,6 +6856,50 @@ func (ec *executionContext) fieldContext_SDInstance_uid(_ context.Context, field
 	return fc, nil
 }
 
+func (ec *executionContext) _SDInstance_label(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.SDInstance) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SDInstance_label(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Label, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SDInstance_label(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SDInstance",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _SDInstance_confirmedByUser(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.SDInstance) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_SDInstance_confirmedByUser(ctx, field)
 	if err != nil {
@@ -6526,6 +7029,8 @@ func (ec *executionContext) fieldContext_SDInstance_type(_ context.Context, fiel
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_SDType_id(ctx, field)
+			case "label":
+				return ec.fieldContext_SDType_label(ctx, field)
 			case "denotation":
 				return ec.fieldContext_SDType_denotation(ctx, field)
 			case "parameters":
@@ -6576,6 +7081,50 @@ func (ec *executionContext) fieldContext_SDInstanceGroup_id(_ context.Context, f
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SDInstanceGroup_label(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.SDInstanceGroup) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SDInstanceGroup_label(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Label, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SDInstanceGroup_label(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SDInstanceGroup",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -6708,6 +7257,50 @@ func (ec *executionContext) fieldContext_SDParameter_id(_ context.Context, field
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SDParameter_label(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.SDParameter) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SDParameter_label(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Label, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SDParameter_label(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SDParameter",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -6889,6 +7482,50 @@ func (ec *executionContext) fieldContext_SDType_id(_ context.Context, field grap
 	return fc, nil
 }
 
+func (ec *executionContext) _SDType_label(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.SDType) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SDType_label(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Label, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SDType_label(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SDType",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _SDType_denotation(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.SDType) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_SDType_denotation(ctx, field)
 	if err != nil {
@@ -6974,6 +7611,8 @@ func (ec *executionContext) fieldContext_SDType_parameters(_ context.Context, fi
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_SDParameter_id(ctx, field)
+			case "label":
+				return ec.fieldContext_SDParameter_label(ctx, field)
 			case "denotation":
 				return ec.fieldContext_SDParameter_denotation(ctx, field)
 			case "type":
@@ -7305,6 +7944,8 @@ func (ec *executionContext) fieldContext_Subscription_onSDInstanceRegistered(_ c
 				return ec.fieldContext_SDInstance_id(ctx, field)
 			case "uid":
 				return ec.fieldContext_SDInstance_uid(ctx, field)
+			case "label":
+				return ec.fieldContext_SDInstance_label(ctx, field)
 			case "confirmedByUser":
 				return ec.fieldContext_SDInstance_confirmedByUser(ctx, field)
 			case "userIdentifier":
@@ -9570,13 +10211,20 @@ func (ec *executionContext) unmarshalInputKPIDefinitionInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"sdTypeID", "sdTypeSpecification", "userIdentifier", "nodes", "sdInstanceMode", "selectedSDInstanceUIDs"}
+	fieldsInOrder := [...]string{"label", "sdTypeID", "sdTypeSpecification", "userIdentifier", "nodes", "sdInstanceMode", "selectedSDInstanceUIDs"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
+		case "label":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("label"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Label = data
 		case "sdTypeID":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sdTypeID"))
 			data, err := ec.unmarshalNID2uint32(ctx, v)
@@ -9715,13 +10363,20 @@ func (ec *executionContext) unmarshalInputSDInstanceGroupInput(ctx context.Conte
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"userIdentifier", "sdInstanceIDs"}
+	fieldsInOrder := [...]string{"label", "userIdentifier", "sdInstanceIDs"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
+		case "label":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("label"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Label = data
 		case "userIdentifier":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userIdentifier"))
 			data, err := ec.unmarshalNString2string(ctx, v)
@@ -9749,13 +10404,20 @@ func (ec *executionContext) unmarshalInputSDInstanceUpdateInput(ctx context.Cont
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"userIdentifier", "confirmedByUser"}
+	fieldsInOrder := [...]string{"label", "userIdentifier", "confirmedByUser"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
+		case "label":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("label"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Label = data
 		case "userIdentifier":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userIdentifier"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -9783,13 +10445,20 @@ func (ec *executionContext) unmarshalInputSDParameterInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"denotation", "type", "role"}
+	fieldsInOrder := [...]string{"label", "denotation", "type", "role"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
+		case "label":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("label"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Label = data
 		case "denotation":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("denotation"))
 			data, err := ec.unmarshalNString2string(ctx, v)
@@ -9824,13 +10493,20 @@ func (ec *executionContext) unmarshalInputSDTypeInput(ctx context.Context, obj a
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"denotation", "parameters"}
+	fieldsInOrder := [...]string{"label", "denotation", "parameters"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
+		case "label":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("label"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Label = data
 		case "denotation":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("denotation"))
 			data, err := ec.unmarshalNString2string(ctx, v)
@@ -10299,6 +10975,11 @@ func (ec *executionContext) _KPIDefinition(ctx context.Context, sel ast.Selectio
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "label":
+			out.Values[i] = ec._KPIDefinition_label(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "sdTypeID":
 			out.Values[i] = ec._KPIDefinition_sdTypeID(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -10590,6 +11271,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "deleteUserConfig":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_deleteUserConfig(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "assignRoleToUser":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_assignRoleToUser(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -11079,6 +11767,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "sdInstancesByType":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_sdInstancesByType(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "kpiDefinition":
 			field := field
 
@@ -11277,6 +11987,66 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "roles":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_roles(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "userRole":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_userRole(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "myRole":
+			field := field
+
+			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_myRole(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "myApiKeys":
 			field := field
 
@@ -11419,6 +12189,11 @@ func (ec *executionContext) _SDInstance(ctx context.Context, sel ast.SelectionSe
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "label":
+			out.Values[i] = ec._SDInstance_label(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "confirmedByUser":
 			out.Values[i] = ec._SDInstance_confirmedByUser(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -11473,6 +12248,11 @@ func (ec *executionContext) _SDInstanceGroup(ctx context.Context, sel ast.Select
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "label":
+			out.Values[i] = ec._SDInstanceGroup_label(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "userIdentifier":
 			out.Values[i] = ec._SDInstanceGroup_userIdentifier(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -11519,6 +12299,11 @@ func (ec *executionContext) _SDParameter(ctx context.Context, sel ast.SelectionS
 			out.Values[i] = graphql.MarshalString("SDParameter")
 		case "id":
 			out.Values[i] = ec._SDParameter_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "label":
+			out.Values[i] = ec._SDParameter_label(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -11573,6 +12358,11 @@ func (ec *executionContext) _SDType(ctx context.Context, sel ast.SelectionSet, o
 			out.Values[i] = graphql.MarshalString("SDType")
 		case "id":
 			out.Values[i] = ec._SDType_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "label":
+			out.Values[i] = ec._SDType_label(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -12124,6 +12914,11 @@ func (ec *executionContext) unmarshalNAPIKeyInput2githubᚗcomᚋMichalBuresᚑO
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) unmarshalNAssignRoleInput2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐAssignRoleInput(ctx context.Context, v any) (graphQLModel.AssignRoleInput, error) {
+	res, err := ec.unmarshalInputAssignRoleInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v any) (bool, error) {
 	res, err := graphql.UnmarshalBoolean(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -12462,6 +13257,54 @@ func (ec *executionContext) marshalNOutputData2ᚕgithubᚗcomᚋMichalBuresᚑO
 				defer wg.Done()
 			}
 			ret[i] = ec.marshalNOutputData2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐOutputData(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNRole2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐRole(ctx context.Context, sel ast.SelectionSet, v graphQLModel.Role) graphql.Marshaler {
+	return ec._Role(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNRole2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐRoleᚄ(ctx context.Context, sel ast.SelectionSet, v []graphQLModel.Role) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNRole2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐRole(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -13177,6 +14020,13 @@ func (ec *executionContext) marshalOLogicalOperationType2ᚖgithubᚗcomᚋMicha
 		return graphql.Null
 	}
 	return v
+}
+
+func (ec *executionContext) marshalORole2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐRole(ctx context.Context, sel ast.SelectionSet, v *graphQLModel.Role) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Role(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOStatisticsInput2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐStatisticsInput(ctx context.Context, v any) (*graphQLModel.StatisticsInput, error) {

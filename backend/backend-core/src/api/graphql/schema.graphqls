@@ -13,6 +13,7 @@ enum SDParameterRole {
 
 type SDParameter {
   id: ID!
+  label: String!
   denotation: String!
   type: SDParameterType!
   role: SDParameterRole! 
@@ -20,17 +21,20 @@ type SDParameter {
 
 type SDType {
   id: ID!
+  label: String!
   denotation: String!
   parameters: [SDParameter!]!
 }
 
 input SDParameterInput {
+  label: String!
   denotation: String!
   type: SDParameterType!
   role: SDParameterRole!
 }
 
 input SDTypeInput {
+  label: String!
   denotation: String!
   parameters: [SDParameterInput!]!
 }
@@ -38,12 +42,14 @@ input SDTypeInput {
 type SDInstance {
   id: ID!
   uid: String!
+  label: String!
   confirmedByUser: Boolean!
   userIdentifier: String!
   type: SDType!
 }
 
 input SDInstanceUpdateInput {
+  label: String
   userIdentifier: String
   confirmedByUser: Boolean
 }
@@ -57,6 +63,7 @@ enum SDInstanceMode {
 
 type KPIDefinition {
   id: ID!
+  label: String! 
   sdTypeID: ID!
   sdTypeSpecification: String!
   userIdentifier: String!
@@ -156,6 +163,7 @@ type NumericLEQAtomKPINode implements KPINode & AtomKPINode {
 }
 
 input KPIDefinitionInput {
+  label: String!
   sdTypeID: ID!
   sdTypeSpecification: String!
   userIdentifier: String!
@@ -203,11 +211,13 @@ type KPIFulfillmentCheckResultTuple {
 
 type SDInstanceGroup {
   id: ID!
+  label: String!
   userIdentifier: String!
   sdInstanceIDs: [ID!]!
 }
 
 input SDInstanceGroupInput {
+  label: String!
   userIdentifier: String!
   sdInstanceIDs: [ID!]!
 }
@@ -325,6 +335,7 @@ type Query {
   sdType(id: ID!): SDType!
   sdTypes: [SDType!]!
   sdInstances: [SDInstance!]!
+  sdInstancesByType(sdTypeID: ID!): [SDInstance!]!
   kpiDefinition(id: ID!): KPIDefinition!
   kpiDefinitions: [KPIDefinition!]!
   kpiFulfillmentCheckResults: [KPIFulfillmentCheckResult!]!
@@ -334,6 +345,9 @@ type Query {
   statisticsQuerySensorsWithFields(request: StatisticsInput sensors: SensorsWithFields!): [OutputData!]!
   userConfig(id: ID!): UserConfig!
   myUserConfig: UserConfig!
+  roles: [Role!]!
+  userRole(userID: ID!): Role
+  myRole: Role
   myApiKeys: [APIKey!]!
   myApiKey(id: ID!): APIKey!
 }
@@ -351,7 +365,8 @@ type Mutation {
   statisticsMutate(inputData: InputData!): Boolean!
   updateUserConfig(userId: ID!, input: UserConfigInput!): UserConfig!
   deleteUserConfig(userId: ID!): Boolean!
-  createMyAPIKey(input: APIKeyInput!): String! # vrací key
+  assignRoleToUser(input: AssignRoleInput!): Boolean!
+  createMyAPIKey(input: APIKeyInput!): String!
   updateMyAPIKey(id: ID!, input: APIKeyInput!): Boolean!
   deleteMyAPIKey(id: ID!): Boolean!
 }

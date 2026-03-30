@@ -1,8 +1,10 @@
 package graphql
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -64,7 +66,18 @@ func GetHandler() http.Handler {
 		},
 	})
 	graphQLServer.Use(extension.Introspection{})
-	return auth.JWTAuthenticationMiddleware(graphQLServer)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		bodyBytes, _ := io.ReadAll(r.Body)
+		r.Body.Close()
+		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+		bodyStr := string(bodyBytes)
+		if strings.Contains(bodyStr, "__schema") {
+			fmt.Println("[GRAPHQL] introspection → skipping auth")
+			graphQLServer.ServeHTTP(w, r)
+			return
+		}
+		auth.JWTAuthenticationMiddleware(graphQLServer).ServeHTTP(w, r)
+	})
 }
 
 func authorizeOperation(ctx context.Context, operation string, opType string) (*auth.Principal, error) {

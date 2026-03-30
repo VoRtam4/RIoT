@@ -8,6 +8,7 @@ import (
 
 type User struct {
 	ID                     sharedUtils.Optional[uint]
+	RoleID                 uint32
 	Username               string
 	Email                  string
 	Name                   sharedUtils.Optional[string]

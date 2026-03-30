@@ -15,6 +15,7 @@ var requestHandlers = map[string]RequestHandler{
 	"create_sd_type":           handlers.CreateSDType,
 	"delete_sd_type":           handlers.DeleteSDType,
 	"get_sd_instances":         handlers.GetSDInstances,
+	"get_sd_instances_by_type": handlers.GetSDInstancesByType,
 	"update_sd_instance":       handlers.UpdateSDInstance,
 	"get_kpi_definitions":      handlers.GetKPIDefinitions,
 	"get_kpi_definition":       handlers.GetKPIDefinition,
@@ -35,19 +36,29 @@ var requestHandlers = map[string]RequestHandler{
 	"create_api_key":           handlers.CreateAPIKey,
 	"update_api_key":           handlers.UpdateAPIKey,
 	"delete_api_key":           handlers.DeleteAPIKey,
+	"get_user_roles":           handlers.GetRoles,
+	"get_user_role":            handlers.GetUserRole,
+	"get_my_user_role":         handlers.GetMyRole,
+	"update_user_role":         handlers.AssignRoleToUser,
 }
 
 func RouteMessage() func(h *connection.Hub, c *connection.Client, msg sharedModel.WebSocketMessage) {
 	return func(h *connection.Hub, c *connection.Client, msg sharedModel.WebSocketMessage) {
 		switch msg.Type {
 		case sharedModel.MessageSubscribe:
-			if principle := handlers.AuthorizeOperation(c, msg, auth.ResourceEvents, auth.OperationSubscribe); principle == nil {
+			if principle := handlers.AuthorizeOperation(c, msg, auth.ResourceSDTypes, auth.OperationSubscribe); principle == nil {
+				return
+			}
+			if principle := handlers.AuthorizeOperation(c, msg, auth.ResourceKPIResults, auth.OperationSubscribe); principle == nil {
 				return
 			}
 			c.Subscriptions[msg.Topic] = true
 
 		case sharedModel.MessageUnsubscribe:
-			if principle := handlers.AuthorizeOperation(c, msg, auth.ResourceEvents, auth.OperationSubscribe); principle == nil {
+			if principle := handlers.AuthorizeOperation(c, msg, auth.ResourceSDTypes, auth.OperationSubscribe); principle == nil {
+				return
+			}
+			if principle := handlers.AuthorizeOperation(c, msg, auth.ResourceKPIResults, auth.OperationSubscribe); principle == nil {
 				return
 			}
 			delete(c.Subscriptions, msg.Topic)

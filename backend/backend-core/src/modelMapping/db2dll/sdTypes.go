@@ -11,10 +11,12 @@ import (
 func ToDLLModelSDType(sdTypeEntity dbModel.SDTypeEntity) dllModel.SDType {
 	return dllModel.SDType{
 		ID:         sharedUtils.NewOptionalOf[uint32](sdTypeEntity.ID),
+		Label:      sdTypeEntity.Label,
 		Denotation: sdTypeEntity.Denotation,
 		Parameters: sharedUtils.Map(sdTypeEntity.Parameters, func(sdParameterEntity dbModel.SDParameterEntity) dllModel.SDParameter {
 			return dllModel.SDParameter{
 				ID:         sharedUtils.NewOptionalOf[uint32](sdParameterEntity.ID),
+				Label:      sdParameterEntity.Label,
 				Denotation: sdParameterEntity.Denotation,
 				Type: func(sdParameterType string) dllModel.SDParameterType {
 					switch sdParameterType {

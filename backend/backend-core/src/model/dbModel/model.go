@@ -8,7 +8,8 @@ import (
 
 type KPIDefinitionEntity struct {
 	ID                                         uint32                                      `gorm:"column:id;primaryKey"`
-	UserID                                     uint32                                      `gorm:"column:userID;not null"`
+	Label                                      string                                      `gorm:"column:label;not null"`
+	UserID                                     uint32                                      `gorm:"column:user_id;not null"`
 	UserIdentifier                             string                                      `gorm:"column:user_identifier;not null"`
 	RootNodeID                                 *uint32                                     `gorm:"column:root_node_id;not null"`
 	RootNode                                   *KPINodeEntity                              `gorm:"foreignKey:RootNodeID"`
@@ -60,6 +61,7 @@ func (AtomKPINodeEntity) TableName() string {
 
 type SDTypeEntity struct {
 	ID         uint32              `gorm:"column:id;primaryKey;not null"`
+	Label      string              `gorm:"column:label;not null"`
 	Denotation string              `gorm:"column:denotation;not null;index"` // Denotation is a separately indexed field
 	Parameters []SDParameterEntity `gorm:"foreignKey:SDTypeID;constraint:OnDelete:CASCADE"`
 	Commands   []SDCommandEntity   `gorm:"foreignKey:SDTypeID;constraint:OnDelete:CASCADE"`
@@ -72,6 +74,7 @@ func (SDTypeEntity) TableName() string {
 type SDParameterEntity struct {
 	ID         uint32 `gorm:"column:id;primaryKey;not null"`
 	SDTypeID   uint32 `gorm:"column:sd_type_id;not null"`
+	Label      string `gorm:"column:label;not null"`
 	Denotation string `gorm:"column:denotation;not null"`
 	Type       string `gorm:"column:type;not null"`
 	Role       string `gorm:"column:role;not null"`
@@ -84,6 +87,7 @@ func (SDParameterEntity) TableName() string {
 type SDInstanceEntity struct {
 	ID                                         uint32                                      `gorm:"column:id;primaryKey;not null"`
 	UID                                        string                                      `gorm:"column:uid;not null;index"` // UID is a separately indexed field
+	Label                                      string                                      `gorm:"column:label;not null"`
 	ConfirmedByUser                            bool                                        `gorm:"column:confirmed_by_user;not null"`
 	UserIdentifier                             string                                      `gorm:"column:user_identifier;not null"`
 	SDTypeID                                   uint32                                      `gorm:"column:sd_type_id"`
@@ -110,6 +114,7 @@ func (KPIFulfillmentCheckResultEntity) TableName() string {
 
 type SDInstanceGroupEntity struct {
 	ID                     uint32                            `gorm:"column:id;primaryKey;not null"`
+	Label                  string                            `gorm:"column:label;not null"`
 	UserIdentifier         string                            `gorm:"column:user_identifier;not null"`
 	GroupMembershipRecords []SDInstanceGroupMembershipEntity `gorm:"foreignKey:SDInstanceGroupID;constraint:OnDelete:CASCADE"`
 }
@@ -143,10 +148,10 @@ type UserEntity struct {
 	OAuth2Provider         *string                     `gorm:"column:oauth2_provider;uniqueIndex:idx_oauth,priority:1"`
 	OAuth2ProviderIssuedID *string                     `gorm:"column:oauth2_provider_issued_id;uniqueIndex:idx_oauth,priority:2"`
 	LastLoginAt            *time.Time                  `gorm:"column:last_login_at"`
-	Sessions               []UserSessionEntity         `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
-	Invocations            []SDCommandInvocationEntity `gorm:"foreignKey:UserId;constraint:OnDelete:CASCADE"`
-	UserConfig             UserConfigEntity            `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
-	RoleID                 uint32                      `gorm:"column:role_id;not null"`
+	Sessions               []UserSessionEntity         `gorm:"foreignKey:user_id;references:ID;constraint:OnDelete:CASCADE"`
+	Invocations            []SDCommandInvocationEntity `gorm:"foreignKey:user_id;constraint:OnDelete:CASCADE"`
+	UserConfig             UserConfigEntity            `gorm:"foreignKey:user_id;references:ID;constraint:OnDelete:CASCADE"`
+	RoleID                 uint                        `gorm:"column:role_id;not null"`
 	Role                   RoleEntity                  `gorm:"foreignKey:RoleID"`
 	CreatedAt              time.Time                   `gorm:"foreignKey:createdAt"`
 	UpdatedAt              time.Time                   `gorm:"foreignKey:updatedAt"`
@@ -172,8 +177,8 @@ type UserEntity struct {
 	   // Additional Metadata
 	   LastLoginAt time.Time                   // Timestamp of the last login
 	   IsActive    bool                        `gorm:"default:true"` // Whether the user's account is active
-	   Invocations []SDCommandInvocationEntity `gorm:"foreignKey:UserId;constraint:OnDelete:CASCADE"`
-	   UserConfig  UserConfigEntity            `gorm:"foreignKey:UserId;constraint:OnDelete:CASCADE"`
+	   Invocations []SDCommandInvocationEntity `gorm:"foreignKey:user_id;constraint:OnDelete:CASCADE"`
+	   UserConfig  UserConfigEntity            `gorm:"foreignKey:user_id;constraint:OnDelete:CASCADE"`
 	*/
 }
 

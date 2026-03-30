@@ -16,10 +16,10 @@ import (
 )
 
 var (
-	allowedOrigins = sharedUtils.NewSetFromSlice(strings.Split(sharedUtils.GetEnvironmentVariableValue("ALLOWED_ORIGINS").GetPayloadOrDefault("http://localhost:8080,http://localhost:1234"), ","))
-	rootAdminEmail = sharedUtils.GetEnvironmentVariableValue("ROOT_ADMIN_EMAIL").GetPayloadOrDefault("")
-	AdminRoleID    uint32
-	UserRoleID     uint32
+	allowedOrigins        = sharedUtils.NewSetFromSlice(strings.Split(sharedUtils.GetEnvironmentVariableValue("ALLOWED_ORIGINS").GetPayloadOrDefault("http://localhost:8080,http://localhost:1234"), ","))
+	rootAdminEmail        = sharedUtils.GetEnvironmentVariableValue("ROOT_ADMIN_EMAIL").GetPayloadOrDefault("")
+	AdminRoleID    uint32 = 0
+	UserRoleID     uint32 = 0
 )
 
 // ----- types -----
@@ -71,8 +71,13 @@ func handleUserRecordUpsert(userData idTokenData, newRefreshToken string) shared
 	if userLoadResult.IsFailure() {
 		return sharedUtils.NewFailureResult[dllModel.User](fmt.Errorf("user record upsert failure - failed to load user record: %s", userLoadResult.GetError().Error()))
 	}
+	role, err := resolveRoleID(userData.email)
+	if err != nil {
+		return sharedUtils.NewFailureResult[dllModel.User](fmt.Errorf("user record upsert failure - failed to load role: %s", err.Error()))
+	}
 	user := userLoadResult.GetPayload().GetPayloadOrDefault(dllModel.User{
 		ID:                     sharedUtils.NewEmptyOptional[uint](),
+		RoleID:                 role,
 		Username:               fmt.Sprintf("google-user-%s", userData.oauth2ProviderIssuedID),
 		OAuth2Provider:         sharedUtils.NewOptionalOf("google"),
 		OAuth2ProviderIssuedID: sharedUtils.NewOptionalOf(userData.oauth2ProviderIssuedID),
@@ -81,24 +86,28 @@ func handleUserRecordUpsert(userData idTokenData, newRefreshToken string) shared
 	user.Name = userData.name
 	user.ProfileImageURL = userData.profileImageURL
 	user.LastLoginAt = sharedUtils.NewOptionalOf(time.Now())
-
-	user.Sessions = append(user.Sessions, dllModel.UserSession{ // TODO: simply adding a new session... is that optimal?
-		ID:               sharedUtils.NewEmptyOptional[uint](),
-		UserID:           user.ID.GetPayloadOrDefault(0),
-		RefreshTokenHash: sharedUtils.GenerateHexHash(newRefreshToken),
-		ExpiresAt:        time.Now().Add(time.Hour * 24 * 30),
-		Revoked:          false,
-		IPAddress:        "", // TODO: plug these fields in... or get rid of them if proven unnecessary
-		UserAgent:        "",
-	})
 	persistResult := dbClientInstance.PersistUser(user)
 	if persistResult.IsFailure() {
 		return sharedUtils.NewFailureResult[dllModel.User](fmt.Errorf("user record upsert failure - failed to persist user record: %s", persistResult.GetError().Error()))
 	}
-	userID := uint32(persistResult.GetPayload())
-	setRole(userID, user.Email)
-	user.ID = sharedUtils.NewOptionalOf(persistResult.GetPayload())
-	return sharedUtils.NewSuccessResult(user)
+	session := dllModel.UserSession{
+		ID:               sharedUtils.NewEmptyOptional[uint](),
+		UserID:           persistResult.GetPayload(),
+		RefreshTokenHash: sharedUtils.GenerateHexHash(newRefreshToken),
+		ExpiresAt:        time.Now().Add(time.Hour * 24 * 30),
+		Revoked:          false,
+	}
+	sessionResult := dbClientInstance.PersistUserSession(session)
+	if sessionResult.IsFailure() {
+		return sharedUtils.NewFailureResult[dllModel.User](fmt.Errorf("failed to persist user session: %s", sessionResult.GetError().Error()))
+	}
+	reload := dbClientInstance.LoadUserBasedOnOAuth2ProviderIssuedID(userData.oauth2ProviderIssuedID)
+	if reload.IsFailure() || reload.GetPayload().IsEmpty() {
+		return sharedUtils.NewFailureResult[dllModel.User](fmt.Errorf("failed to reload user after insert"))
+	}
+	reloadedUser := reload.GetPayload().GetPayload()
+	reloadedUser.Sessions = []dllModel.UserSession{session}
+	return sharedUtils.NewSuccessResult(reloadedUser)
 }
 
 func extractIDTokenData(idTokenPayload *idtoken.Payload) sharedUtils.Result[idTokenData] {
@@ -124,28 +133,23 @@ func generateRefreshToken() string {
 	return sharedUtils.GenerateRandomAlphanumericString(16)
 }
 
-func setRole(userID uint32, email string) error {
-	roleResult := domainLogicLayer.LoadUserRole(userID)
-	if roleResult.IsFailure() {
-		if AdminRoleID == 0 {
-			adminRoleResult := domainLogicLayer.LoadRolesByLabels([]string{"Admin"})
-			if adminRoleResult.IsFailure() {
-				return fmt.Errorf("failed to load 'Admin' role from the database: %w", adminRoleResult.GetError())
-			}
-			AdminRoleID = adminRoleResult.GetPayload()[0].ID
+func resolveRoleID(email string) (uint32, error) {
+	if AdminRoleID == 0 {
+		adminRoleResult := domainLogicLayer.LoadRolesByLabels([]string{RoleAdmin})
+		if adminRoleResult.IsFailure() {
+			return 0, adminRoleResult.GetError()
 		}
-		if UserRoleID == 0 {
-			userRoleResult := domainLogicLayer.LoadRolesByLabels([]string{"User"})
-			if userRoleResult.IsFailure() {
-				return fmt.Errorf("failed to load 'User' role from the database: %w", userRoleResult.GetError())
-			}
-			UserRoleID = userRoleResult.GetPayload()[0].ID
-		}
-		if email == rootAdminEmail {
-			domainLogicLayer.AssignRoleToUser(userID, AdminRoleID)
-		} else {
-			domainLogicLayer.AssignRoleToUser(userID, UserRoleID)
-		}
+		AdminRoleID = adminRoleResult.GetPayload()[0].ID
 	}
-	return nil
+	if UserRoleID == 0 {
+		userRoleResult := domainLogicLayer.LoadRolesByLabels([]string{RoleUser})
+		if userRoleResult.IsFailure() {
+			return 0, userRoleResult.GetError()
+		}
+		UserRoleID = userRoleResult.GetPayload()[0].ID
+	}
+	if email == rootAdminEmail {
+		return AdminRoleID, nil
+	}
+	return UserRoleID, nil
 }

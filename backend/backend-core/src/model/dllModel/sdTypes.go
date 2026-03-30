@@ -19,6 +19,7 @@ const (
 
 type SDParameter struct {
 	ID         sharedUtils.Optional[uint32]
+	Label      string
 	Denotation string
 	Type       SDParameterType
 	Role       SDParameterRole
@@ -26,6 +27,7 @@ type SDParameter struct {
 
 type SDType struct {
 	ID         sharedUtils.Optional[uint32]
+	Label      string
 	Denotation string
 	Parameters []SDParameter
 }

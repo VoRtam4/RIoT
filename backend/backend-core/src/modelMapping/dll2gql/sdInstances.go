@@ -9,6 +9,7 @@ func ToGraphQLModelSDInstance(sdInstance dllModel.SDInstance) graphQLModel.SDIns
 	return graphQLModel.SDInstance{
 		ID:              sdInstance.ID.GetPayload(),
 		UID:             sdInstance.UID,
+		Label:           sdInstance.Label,
 		ConfirmedByUser: sdInstance.ConfirmedByUser,
 		UserIdentifier:  sdInstance.UserIdentifier,
 		Type:            ToGraphQLModelSDType(sdInstance.SDType),

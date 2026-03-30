@@ -8,6 +8,14 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 )
 
+func GetSDInstancesByType(sdTypeID uint32) sharedUtils.Result[[]graphQLModel.SDInstance] {
+	loadResult := dbClient.GetRelationalDatabaseClientInstance().LoadSDInstancesByType(sdTypeID)
+	if loadResult.IsFailure() {
+		return sharedUtils.NewFailureResult[[]graphQLModel.SDInstance](loadResult.GetError())
+	}
+	return sharedUtils.NewSuccessResult(sharedUtils.Map(loadResult.GetPayload(), dll2gql.ToGraphQLModelSDInstance))
+}
+
 func GetSDInstances() sharedUtils.Result[[]graphQLModel.SDInstance] {
 	loadResult := dbClient.GetRelationalDatabaseClientInstance().LoadSDInstances()
 	if loadResult.IsFailure() {

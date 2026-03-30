@@ -111,6 +111,7 @@ func ToGraphQLModelKPIDefinition(kpiDefinition sharedModel.KPIDefinition) graphQ
 	nodes := processKPINode(kpiDefinition.RootNode, sharedUtils.SequentialNumberGenerator(), nil)
 	return graphQLModel.KPIDefinition{
 		ID:                     sharedUtils.NewOptionalFromPointer(kpiDefinition.ID).GetPayload(),
+		Label:                  kpiDefinition.Label,
 		SdTypeID:               kpiDefinition.SDTypeID,
 		SdTypeSpecification:    kpiDefinition.SDTypeSpecification,
 		UserIdentifier:         kpiDefinition.UserIdentifier,

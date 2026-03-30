@@ -22,6 +22,32 @@ func GetSDInstances(c *connection.Client, msg sharedModel.WebSocketMessage) {
 	sendSuccess(c, msg.ID, result.GetPayload())
 }
 
+func GetSDInstancesByType(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceSDInstances, auth.OperationRead); principal == nil {
+		return
+	}
+
+	payload, ok := msg.Payload.(map[string]any)
+	if !ok {
+		sendError(c, msg.ID, "invalid payload")
+		return
+	}
+
+	id, ok := parseID(payload)
+	if !ok {
+		sendError(c, msg.ID, "invalid id")
+		return
+	}
+
+	result := domainLogicLayer.GetSDInstancesByType(id)
+	if result.IsFailure() {
+		sendError(c, msg.ID, result.GetError().Error())
+		return
+	}
+
+	sendSuccess(c, msg.ID, result.GetPayload())
+}
+
 func UpdateSDInstance(c *connection.Client, msg sharedModel.WebSocketMessage) {
 	if principal := AuthorizeOperation(c, msg, auth.ResourceSDInstances, auth.OperationUpdate); principal == nil {
 		return

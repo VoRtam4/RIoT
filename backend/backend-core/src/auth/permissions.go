@@ -6,11 +6,10 @@ const (
 )
 
 const (
-	OperationRead   = "read"
-	OperationCreate = "create"
-	OperationUpdate = "update"
-	OperationDelete = "delete"
-
+	OperationRead      = "read"
+	OperationCreate    = "create"
+	OperationUpdate    = "update"
+	OperationDelete    = "delete"
 	OperationSubscribe = "subscribe"
 )
 
@@ -21,8 +20,6 @@ const (
 	ResourceKPIResults     = "kpi_results"
 	ResourceUserConfig     = "user_config"
 
-	ResourceEvents = "events"
-
 	ResourceStatistics = "statistics"
 
 	ResourceTimeSeries = "time_series"
@@ -32,9 +29,10 @@ const (
 
 var RolePermissions = map[string]map[string]bool{
 	RoleAdmin: {
-		ResourceSDTypes + "." + OperationRead:   true,
-		ResourceSDTypes + "." + OperationCreate: true,
-		ResourceSDTypes + "." + OperationDelete: true,
+		ResourceSDTypes + "." + OperationRead:      true,
+		ResourceSDTypes + "." + OperationCreate:    true,
+		ResourceSDTypes + "." + OperationDelete:    true,
+		ResourceSDTypes + "." + OperationSubscribe: true,
 
 		ResourceSDInstances + "." + OperationRead:   true,
 		ResourceSDInstances + "." + OperationUpdate: true,
@@ -44,13 +42,12 @@ var RolePermissions = map[string]map[string]bool{
 		ResourceKPIDefinitions + "." + OperationUpdate: true,
 		ResourceKPIDefinitions + "." + OperationDelete: true,
 
-		ResourceKPIResults + "." + OperationRead: true,
+		ResourceKPIResults + "." + OperationRead:      true,
+		ResourceKPIResults + "." + OperationSubscribe: true,
 
 		ResourceUserConfig + "." + OperationRead:   true,
 		ResourceUserConfig + "." + OperationUpdate: true,
 		ResourceUserConfig + "." + OperationDelete: true,
-
-		ResourceEvents + "." + OperationSubscribe: true,
 
 		ResourceTimeSeries + "." + OperationRead: true,
 
@@ -61,17 +58,18 @@ var RolePermissions = map[string]map[string]bool{
 	},
 
 	RoleUser: {
-		ResourceSDTypes + "." + OperationRead: true,
+		ResourceSDTypes + "." + OperationRead:      true,
+		ResourceSDTypes + "." + OperationSubscribe: true,
 
 		ResourceSDInstances + "." + OperationRead: true,
 
 		ResourceKPIDefinitions + "." + OperationRead: true,
-		ResourceKPIResults + "." + OperationRead:     true,
+
+		ResourceKPIResults + "." + OperationRead:      true,
+		ResourceKPIResults + "." + OperationSubscribe: true,
 
 		ResourceUserConfig + "." + OperationRead:   true,
 		ResourceUserConfig + "." + OperationUpdate: true,
-
-		ResourceEvents + "." + OperationSubscribe: true,
 
 		ResourceTimeSeries + "." + OperationRead: true,
 

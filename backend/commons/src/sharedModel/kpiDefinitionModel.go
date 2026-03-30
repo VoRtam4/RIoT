@@ -32,6 +32,7 @@ const (
 
 type KPIDefinition struct {
 	ID                     *uint32        `json:"id,omitempty"`
+	Label                  string         `json:"label"`
 	UserID                 *uint32        `json:"userID,omitempty"`
 	SDTypeID               uint32         `json:"sdTypeID"`
 	SDTypeSpecification    string         `json:"sdTypeSpecification"`

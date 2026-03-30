@@ -77,6 +77,7 @@ type InputData struct {
 
 type KPIDefinition struct {
 	ID                     uint32         `json:"id"`
+	Label                  string         `json:"label"`
 	SdTypeID               uint32         `json:"sdTypeID"`
 	SdTypeSpecification    string         `json:"sdTypeSpecification"`
 	UserIdentifier         string         `json:"userIdentifier"`
@@ -86,6 +87,7 @@ type KPIDefinition struct {
 }
 
 type KPIDefinitionInput struct {
+	Label                  string         `json:"label"`
 	SdTypeID               uint32         `json:"sdTypeID"`
 	SdTypeSpecification    string         `json:"sdTypeSpecification"`
 	UserIdentifier         string         `json:"userIdentifier"`
@@ -255,6 +257,7 @@ type Role struct {
 type SDInstance struct {
 	ID              uint32 `json:"id"`
 	UID             string `json:"uid"`
+	Label           string `json:"label"`
 	ConfirmedByUser bool   `json:"confirmedByUser"`
 	UserIdentifier  string `json:"userIdentifier"`
 	Type            SDType `json:"type"`
@@ -262,28 +265,33 @@ type SDInstance struct {
 
 type SDInstanceGroup struct {
 	ID             uint32   `json:"id"`
+	Label          string   `json:"label"`
 	UserIdentifier string   `json:"userIdentifier"`
 	SdInstanceIDs  []uint32 `json:"sdInstanceIDs"`
 }
 
 type SDInstanceGroupInput struct {
+	Label          string   `json:"label"`
 	UserIdentifier string   `json:"userIdentifier"`
 	SdInstanceIDs  []uint32 `json:"sdInstanceIDs"`
 }
 
 type SDInstanceUpdateInput struct {
+	Label           *string `json:"label,omitempty"`
 	UserIdentifier  *string `json:"userIdentifier,omitempty"`
 	ConfirmedByUser *bool   `json:"confirmedByUser,omitempty"`
 }
 
 type SDParameter struct {
 	ID         uint32          `json:"id"`
+	Label      string          `json:"label"`
 	Denotation string          `json:"denotation"`
 	Type       SDParameterType `json:"type"`
 	Role       SDParameterRole `json:"role"`
 }
 
 type SDParameterInput struct {
+	Label      string          `json:"label"`
 	Denotation string          `json:"denotation"`
 	Type       SDParameterType `json:"type"`
 	Role       SDParameterRole `json:"role"`
@@ -291,11 +299,13 @@ type SDParameterInput struct {
 
 type SDType struct {
 	ID         uint32        `json:"id"`
+	Label      string        `json:"label"`
 	Denotation string        `json:"denotation"`
 	Parameters []SDParameter `json:"parameters"`
 }
 
 type SDTypeInput struct {
+	Label      string             `json:"label"`
 	Denotation string             `json:"denotation"`
 	Parameters []SDParameterInput `json:"parameters"`
 }

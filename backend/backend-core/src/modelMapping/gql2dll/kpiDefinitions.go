@@ -148,6 +148,7 @@ func ToDLLModelKPIDefinition(kpiDefinitionInput graphQLModel.KPIDefinitionInput)
 	}
 	return sharedUtils.NewSuccessResult[sharedModel.KPIDefinition](sharedModel.KPIDefinition{
 		ID:                     nil,
+		Label:                  kpiDefinitionInput.Label,
 		SDTypeID:               kpiDefinitionInput.SdTypeID,
 		SDTypeSpecification:    kpiDefinitionInput.SdTypeSpecification,
 		UserIdentifier:         kpiDefinitionInput.UserIdentifier,

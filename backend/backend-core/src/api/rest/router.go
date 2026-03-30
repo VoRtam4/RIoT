@@ -17,6 +17,7 @@ func SetupRouter(r chi.Router) {
 
 		r.Get("/sd-instances", handlers.GetSDInstances)
 		r.Patch("/sd-instances/{id}", handlers.UpdateSDInstance)
+		r.Get("/sd-instances/type/{id}", handlers.GetSDInstancesByType)
 
 		r.Get("/kpi-definitions", handlers.GetKPIDefinitions)
 		r.Get("/kpi-definitions/{id}", handlers.GetKPIDefinition)
@@ -35,6 +36,11 @@ func SetupRouter(r chi.Router) {
 		r.Get("/user-config", handlers.GetUserConfig)
 		r.Post("/user-config", handlers.UpdateUserConfig)
 		r.Delete("/user-config", handlers.DeleteUserConfig)
+
+		r.Get("/user-roles", handlers.GetRoles)
+		r.Get("/user-roles/user", handlers.GetMyRole)
+		r.Get("/user-roles/user/{id}", handlers.GetUserRole)
+		r.Put("/user-roles/user", handlers.AssignRoleToUser)
 
 		r.Get("/api-keys", handlers.GetAPIKeys)
 		r.Get("/api-keys/{id}", handlers.GetAPIKey)

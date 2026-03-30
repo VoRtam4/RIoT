@@ -43,7 +43,20 @@ func GetUserRole(c *connection.Client, msg sharedModel.WebSocketMessage) {
 	sendSuccess(c, msg.ID, result.GetPayload())
 }
 
-func AssignRoleToUserWS(c *connection.Client, msg sharedModel.WebSocketMessage) {
+func GetMyRole(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	principal := AuthorizeOperation(c, msg, auth.ResourceAPIKeys, auth.OperationRead)
+	if principal == nil {
+		return
+	}
+	result := domainLogicLayer.LoadUserRole(principal.UserID)
+	if result.IsFailure() {
+		sendError(c, msg.ID, result.GetError().Error())
+		return
+	}
+	sendSuccess(c, msg.ID, result.GetPayload())
+}
+
+func AssignRoleToUser(c *connection.Client, msg sharedModel.WebSocketMessage) {
 	if principal := AuthorizeOperation(c, msg, auth.ResourceUserConfig, auth.OperationUpdate); principal == nil {
 		return
 	}

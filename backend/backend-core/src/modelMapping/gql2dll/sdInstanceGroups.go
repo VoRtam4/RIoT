@@ -9,6 +9,7 @@ import (
 func ToDLLModelSDInstanceGroup(sdInstanceGroupInput graphQLModel.SDInstanceGroupInput) dllModel.SDInstanceGroup {
 	return dllModel.SDInstanceGroup{
 		ID:             sharedUtils.NewEmptyOptional[uint32](),
+		Label:          sdInstanceGroupInput.Label,
 		UserIdentifier: sdInstanceGroupInput.UserIdentifier,
 		SDInstanceIDs:  sdInstanceGroupInput.SdInstanceIDs,
 	}

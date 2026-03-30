@@ -110,8 +110,7 @@ func CallbackHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "random state mismatch (request-cookie)", http.StatusBadRequest)
 		return
 	}
-
-	token, err := GoogleOAuth2Config.Exchange(context.Background(), authorizationCode)
+	token, err := GoogleOAuth2Config.Exchange(context.Background(), authorizationCode, oauth2.SetAuthURLParam("redirect_uri", GoogleOAuth2Config.RedirectURL))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to exchange authorization code for token: %s", err.Error()), http.StatusInternalServerError)
 		return
@@ -139,13 +138,14 @@ func CallbackHandler(w http.ResponseWriter, r *http.Request) {
 	userRecordUpsertResult := handleUserRecordUpsert(userData, refreshToken)
 	if userRecordUpsertResult.IsFailure() {
 		http.Error(w, userRecordUpsertResult.GetError().Error(), http.StatusInternalServerError)
-	}
-	user := userRecordUpsertResult.GetPayload()
-	userID := uint32(user.ID.GetPayload())
-	if err = setRole(userID, user.Email); err != nil {
-		http.Error(w, fmt.Sprintf("failed to set user role: %s", err.Error()), http.StatusInternalServerError)
 		return
 	}
+	user := userRecordUpsertResult.GetPayload()
+	if user.ID.IsEmpty() {
+		http.Error(w, "user ID missing after upsert", http.StatusInternalServerError)
+		return
+	}
+	userID := uint32(user.ID.GetPayload())
 	sessionJWT, err := createSessionJWT(fmt.Sprintf("%d", userID))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to create session JWT: %s", err.Error()), http.StatusInternalServerError)
@@ -158,6 +158,5 @@ func CallbackHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	setupRefreshTokenCookie(w, refreshToken, time.Until(user.Sessions[len(user.Sessions)-1].ExpiresAt))
-
 	http.Redirect(w, r, oauth2OIDCFlowStateObject.RedirectUrl, http.StatusTemporaryRedirect)
 }

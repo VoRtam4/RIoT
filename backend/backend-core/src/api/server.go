@@ -22,7 +22,11 @@ func StartServer() {
 
 	r.Use(cors.New(cors.Options{
 		AllowedOrigins:   allowedOrigins,
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
+		MaxAge:           300,
 	}).Handler)
 
 	r.Get("/auth/login", auth.LoginHandler)

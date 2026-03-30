@@ -11,7 +11,10 @@ import (
 )
 
 func EventsStream(w http.ResponseWriter, r *http.Request) {
-	if principal := authorizeOperation(w, r, auth.ResourceEvents, auth.OperationSubscribe); principal == nil {
+	if principal := authorizeOperation(w, r, auth.ResourceSDTypes, auth.OperationSubscribe); principal == nil {
+		return
+	}
+	if principal := authorizeOperation(w, r, auth.ResourceKPIResults, auth.OperationSubscribe); principal == nil {
 		return
 	}
 	w.Header().Set("Content-Type", "text/event-stream")

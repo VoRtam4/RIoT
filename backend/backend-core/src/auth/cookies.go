@@ -17,16 +17,25 @@ const (
 	CallbackPath = "/auth/callback"
 )
 
-var secureCookies = sharedUtils.GetFlagEnvironmentVariableValue("SECURE_COOKIES").GetPayloadOrDefault(false) // TODO: Ensure this variable evaluates to 'true' in production (requires HTTPS)
+var (
+	secureCookies = sharedUtils.GetFlagEnvironmentVariableValue("SECURE_COOKIES").GetPayloadOrDefault(false) // TODO: Ensure this variable evaluates to 'true' in production (requires HTTPS)
+	env           = sharedUtils.GetEnvironmentVariableValue("APP_ENV").GetPayloadOrDefault("dev")
+)
 
 func setupHttpOnlyCookie(w http.ResponseWriter, identifier string, value string, path string, expiresIn time.Duration) {
+	sameSite := http.SameSiteNoneMode
+	secure := true
+	if env == "dev" {
+		sameSite = http.SameSiteLaxMode
+		secure = false
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     identifier,
 		Value:    value,
 		Path:     path,
 		HttpOnly: true,
-		Secure:   secureCookies,
-		SameSite: http.SameSiteDefaultMode,
+		Secure:   secure,
+		SameSite: sameSite,
 		Expires:  time.Now().Add(expiresIn),
 		MaxAge:   int(expiresIn.Seconds()),
 	})

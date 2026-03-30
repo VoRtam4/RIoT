@@ -11,6 +11,7 @@ import (
 func ToDLLModelUser(userEntity dbModel.UserEntity) dllModel.User {
 	return dllModel.User{
 		ID:                     sharedUtils.NewOptionalOf[uint](userEntity.Model.ID),
+		RoleID:                 uint32(userEntity.RoleID),
 		Username:               userEntity.Username,
 		Email:                  userEntity.Email,
 		Name:                   sharedUtils.NewOptionalFromPointer[string](userEntity.Name),

@@ -4,6 +4,7 @@ import "github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 
 type SDInstanceGroup struct {
 	ID             sharedUtils.Optional[uint32]
+	Label          string
 	UserIdentifier string
 	SDInstanceIDs  []uint32
 }

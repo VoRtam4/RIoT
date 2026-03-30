@@ -11,10 +11,12 @@ import (
 func ToDLLModelSDType(sdTypeInput graphQLModel.SDTypeInput) dllModel.SDType {
 	return dllModel.SDType{
 		ID:         sharedUtils.NewEmptyOptional[uint32](),
+		Label:      sdTypeInput.Label,
 		Denotation: sdTypeInput.Denotation,
 		Parameters: sharedUtils.Map(sdTypeInput.Parameters, func(sdParameterInput graphQLModel.SDParameterInput) dllModel.SDParameter {
 			return dllModel.SDParameter{
 				ID:         sharedUtils.NewEmptyOptional[uint32](),
+				Label:      sdParameterInput.Label,
 				Denotation: sdParameterInput.Denotation,
 				Type: func(sdParameterType graphQLModel.SDParameterType) dllModel.SDParameterType {
 					switch sdParameterType {

@@ -142,6 +142,17 @@ func (r *mutationResolver) DeleteUserConfig(ctx context.Context, userID uint32) 
 	return true, nil
 }
 
+func (r *mutationResolver) AssignRoleToUser(ctx context.Context, input graphQLModel.AssignRoleInput) (bool, error) {
+	if _, err := authorizeOperation(ctx, auth.ResourceAPIKeys, auth.OperationUpdate); err != nil {
+		return false, err
+	}
+	err := domainLogicLayer.AssignRoleToUser(input.UserID, input.RoleID)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func (r *mutationResolver) CreateMyAPIKey(ctx context.Context, input graphQLModel.APIKeyInput) (string, error) {
 	principal, err := authorizeOperation(ctx, auth.ResourceAPIKeys, auth.OperationCreate)
 	if err != nil {
@@ -209,6 +220,17 @@ func (r *queryResolver) SdInstances(ctx context.Context) ([]graphQLModel.SDInsta
 		log.Printf("Error occurred (get SD instances): %s\n", getSDInstancesResult.GetError().Error())
 	}
 	return getSDInstancesResult.Unwrap()
+}
+
+func (r *queryResolver) SdInstancesByType(ctx context.Context, sdTypeID uint32) ([]graphQLModel.SDInstance, error) {
+	if _, err := authorizeOperation(ctx, auth.ResourceSDInstances, auth.OperationRead); err != nil {
+		return nil, err
+	}
+	result := domainLogicLayer.GetSDInstancesByType(sdTypeID)
+	if result.IsFailure() {
+		log.Printf("Error occurred (get SD instances by type): %s\n", result.GetError().Error())
+	}
+	return result.Unwrap()
 }
 
 func (r *queryResolver) KpiDefinition(ctx context.Context, id uint32) (graphQLModel.KPIDefinition, error) {
@@ -311,6 +333,43 @@ func (r *queryResolver) MyUserConfig(ctx context.Context) (graphQLModel.UserConf
 	return domainLogicLayer.GetUserConfig(principal.UserID).Unwrap()
 }
 
+func (r *queryResolver) Roles(ctx context.Context) ([]graphQLModel.Role, error) {
+	if _, err := authorizeOperation(ctx, auth.ResourceAPIKeys, auth.OperationRead); err != nil {
+		return nil, err
+	}
+	labels := auth.GetAllRoleLabels()
+	result := domainLogicLayer.LoadRolesByLabels(labels)
+	if result.IsFailure() {
+		return nil, result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
+func (r *queryResolver) UserRole(ctx context.Context, userID uint32) (*graphQLModel.Role, error) {
+	if _, err := authorizeOperation(ctx, auth.ResourceAPIKeys, auth.OperationRead); err != nil {
+		return nil, err
+	}
+	result := domainLogicLayer.LoadUserRole(userID)
+	if result.IsFailure() {
+		return nil, result.GetError()
+	}
+	role := result.GetPayload()
+	return &role, nil
+}
+
+func (r *queryResolver) MyRole(ctx context.Context) (*graphQLModel.Role, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceAPIKeys, auth.OperationRead)
+	if err != nil {
+		return nil, err
+	}
+	result := domainLogicLayer.LoadUserRole(principal.UserID)
+	if result.IsFailure() {
+		return nil, result.GetError()
+	}
+	role := result.GetPayload()
+	return &role, nil
+}
+
 func (r *queryResolver) MyAPIKeys(ctx context.Context) ([]graphQLModel.APIKey, error) {
 	principal, err := authorizeOperation(ctx, auth.ResourceAPIKeys, auth.OperationRead)
 	if err != nil {
@@ -336,10 +395,7 @@ func (r *queryResolver) MyAPIKey(ctx context.Context, id uint32) (graphQLModel.A
 }
 
 func (r *subscriptionResolver) OnSDInstanceRegistered(ctx context.Context) (<-chan graphQLModel.SDInstance, error) {
-	if _, err := authorizeOperation(ctx, auth.ResourceEvents, auth.OperationSubscribe); err != nil {
-		return nil, err
-	}
-	if _, err := authorizeOperation(ctx, auth.ResourceSDInstances, auth.OperationRead); err != nil {
+	if _, err := authorizeOperation(ctx, auth.ResourceSDInstances, auth.OperationSubscribe); err != nil {
 		return nil, err
 	}
 	output := make(chan graphQLModel.SDInstance, 16)
@@ -371,10 +427,7 @@ func (r *subscriptionResolver) OnSDInstanceRegistered(ctx context.Context) (<-ch
 }
 
 func (r *subscriptionResolver) OnKPIFulfillmentChecked(ctx context.Context) (<-chan graphQLModel.KPIFulfillmentCheckResultTuple, error) {
-	if _, err := authorizeOperation(ctx, auth.ResourceEvents, auth.OperationSubscribe); err != nil {
-		return nil, err
-	}
-	if _, err := authorizeOperation(ctx, auth.ResourceKPIResults, auth.OperationRead); err != nil {
+	if _, err := authorizeOperation(ctx, auth.ResourceKPIResults, auth.OperationSubscribe); err != nil {
 		return nil, err
 	}
 	output := make(chan graphQLModel.KPIFulfillmentCheckResultTuple, 16)

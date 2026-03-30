@@ -10,6 +10,7 @@ func ToDLLModelSDInstance(sdInstanceEntity dbModel.SDInstanceEntity) dllModel.SD
 	return dllModel.SDInstance{
 		ID:              sharedUtils.NewOptionalOf[uint32](sdInstanceEntity.ID),
 		UID:             sdInstanceEntity.UID,
+		Label:           sdInstanceEntity.Label,
 		ConfirmedByUser: sdInstanceEntity.ConfirmedByUser,
 		UserIdentifier:  sdInstanceEntity.UserIdentifier,
 		SDType:          ToDLLModelSDType(sdInstanceEntity.SDType),

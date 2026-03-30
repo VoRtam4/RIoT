@@ -93,6 +93,7 @@ func ToDLLModelKPIDefinition(kpiDefinitionEntity dbModel.KPIDefinitionEntity, kp
 	kpiDefinitionRootOptional := sharedUtils.NewOptionalOf(reconstructKPINodeTree(*kpiDefinitionEntity.RootNodeID, prepareKPINodeParentChildrenMap(kpiNodeEntities), logicalOperationKPINodeEntities, atomKPINodeEntities))
 	return sharedModel.KPIDefinition{
 		ID:                  &kpiDefinitionEntity.ID,
+		Label:               kpiDefinitionEntity.Label,
 		SDTypeID:            kpiDefinitionEntity.SDTypeID,
 		SDTypeSpecification: kpiDefinitionEntity.SDType.Denotation,
 		UserIdentifier:      kpiDefinitionEntity.UserIdentifier,

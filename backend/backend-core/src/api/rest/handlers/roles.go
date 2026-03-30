@@ -38,6 +38,19 @@ func GetUserRole(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result.GetPayload())
 }
 
+func GetMyRole(w http.ResponseWriter, r *http.Request) {
+	principal := authorizeOperation(w, r, auth.ResourceAPIKeys, auth.OperationRead)
+	if principal == nil {
+		return
+	}
+	result := domainLogicLayer.LoadUserRole(principal.UserID)
+	if result.IsFailure() {
+		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(result.GetPayload())
+}
+
 func AssignRoleToUser(w http.ResponseWriter, r *http.Request) {
 	if principal := authorizeOperation(w, r, auth.ResourceAPIKeys, auth.OperationUpdate); principal == nil {
 		return

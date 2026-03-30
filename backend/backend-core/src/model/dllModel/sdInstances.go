@@ -5,6 +5,7 @@ import "github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 type SDInstance struct {
 	ID              sharedUtils.Optional[uint32]
 	UID             string
+	Label           string
 	ConfirmedByUser bool
 	UserIdentifier  string
 	SDType          SDType

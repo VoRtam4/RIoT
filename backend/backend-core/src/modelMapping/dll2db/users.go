@@ -9,7 +9,7 @@ import (
 
 func ToDBModelEntityUser(user dllModel.User) dbModel.UserEntity {
 	id := user.ID.GetPayloadOrDefault(0)
-	return dbModel.UserEntity{
+	model := dbModel.UserEntity{
 		Model: gorm.Model{
 			ID: id,
 		},
@@ -27,6 +27,10 @@ func ToDBModelEntityUser(user dllModel.User) dbModel.UserEntity {
 			Config: "{}",
 		},
 	}
+	if user.RoleID != 0 {
+		model.RoleID = uint(user.RoleID)
+	}
+	return model
 }
 
 func ToDBModelEntityUserSession(userSession dllModel.UserSession) dbModel.UserSessionEntity {

@@ -9,6 +9,7 @@ func ToDBModelEntitySDInstance(sdInstance dllModel.SDInstance) dbModel.SDInstanc
 	return dbModel.SDInstanceEntity{
 		ID:              sdInstance.ID.GetPayloadOrDefault(0),
 		UID:             sdInstance.UID,
+		Label:           sdInstance.Label,
 		ConfirmedByUser: sdInstance.ConfirmedByUser,
 		UserIdentifier:  sdInstance.UserIdentifier,
 		SDTypeID:        sdInstance.SDType.ID.GetPayloadOrDefault(0),
