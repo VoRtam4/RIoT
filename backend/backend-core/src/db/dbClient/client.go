@@ -37,6 +37,7 @@ type RelationalDatabaseClient interface {
 	UpsertSDType(sdType dllModel.SDType) sharedUtils.Result[dllModel.SDType]
 	LoadSDType(id uint32) sharedUtils.Result[dllModel.SDType]
 	LoadSDInstancesByType(sdTypeID uint32) sharedUtils.Result[[]dllModel.SDInstance]
+	LoadSDInstancesByKpiDefinition(kpiDefinitionID uint32) sharedUtils.Result[[]dllModel.SDInstance]
 	LoadSDTypeBasedOnDenotation(denotation string) sharedUtils.Result[dllModel.SDType]
 	LoadSDTypes() sharedUtils.Result[[]dllModel.SDType]
 	DeleteSDType(id uint32) error
@@ -238,6 +239,12 @@ func (r *relationalDatabaseClientImpl) PersistKPIDefinition(userID uint32, kpiDe
 		return sharedUtils.NewFailureResult[uint32](err)
 	}
 
+	if kpiDefinitionID != 0 {
+		if err := dbUtil.DeleteEntitiesBasedOnWhereClauses[dbModel.SDInstanceKPIDefinitionRelationshipEntity](r.db, dbUtil.Where("kpi_definition_id = ?", kpiDefinitionID)); err != nil {
+			return sharedUtils.NewFailureResult[uint32](err)
+		}
+	}
+
 	sdInstanceRelations := sharedUtils.Map(referencedSDInstances, func(sdInstance dbModel.SDInstanceEntity) dbModel.SDInstanceKPIDefinitionRelationshipEntity {
 		return dbModel.SDInstanceKPIDefinitionRelationshipEntity{
 			KPIDefinitionID: kpiDefinitionEntity.ID,
@@ -267,52 +274,95 @@ func (r *relationalDatabaseClientImpl) PersistKPIDefinition(userID uint32, kpiDe
 func (r *relationalDatabaseClientImpl) LoadKPIDefinition(userID uint32, id uint32) sharedUtils.Result[sharedModel.KPIDefinition] {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
-	result := dbUtil.LoadEntitiesFromDB[dbModel.KPIDefinitionEntity](r.db, dbUtil.Where("id = ? AND user_id = ?", id, userID), dbUtil.Preload("SDType"), dbUtil.Preload("SDInstanceKPIDefinitionRelationshipRecords"), dbUtil.Preload("InstanceGroups"))
-
+	result := dbUtil.LoadEntitiesFromDB[dbModel.KPIDefinitionEntity](r.db, dbUtil.Where("id = ? AND user_id = ?", id, userID), dbUtil.Preload("SDType"), dbUtil.Preload("SDInstanceKPIDefinitionRelationshipRecords"))
 	if result.IsFailure() {
 		return sharedUtils.NewFailureResult[sharedModel.KPIDefinition](result.GetError())
 	}
-
 	entities := result.GetPayload()
 	if len(entities) == 0 {
 		return sharedUtils.NewFailureResult[sharedModel.KPIDefinition](errors.New("not found"))
 	}
-
 	entity := entities[0]
+	idsResult := dbModel.GetIDsOfKPINodeEntitiesFormingTheKPIDefinition(r.db, entity.ID)
+	if idsResult.IsFailure() {
+		return sharedUtils.NewFailureResult[sharedModel.KPIDefinition](idsResult.GetError())
+	}
+	nodeIDs := idsResult.GetPayload()
+	kpiNodesResult := dbUtil.LoadEntitiesFromDB[dbModel.KPINodeEntity](
+		r.db,
+		dbUtil.Where("id IN (?)", nodeIDs),
+	)
+	if kpiNodesResult.IsFailure() {
+		return sharedUtils.NewFailureResult[sharedModel.KPIDefinition](kpiNodesResult.GetError())
+	}
+	kpiNodes := kpiNodesResult.GetPayload()
 
-	kpiNodes, _ := dbUtil.LoadEntitiesFromDB[dbModel.KPINodeEntity](r.db).Unwrap()
-	logicalNodes, _ := dbUtil.LoadEntitiesFromDB[dbModel.LogicalOperationKPINodeEntity](r.db).Unwrap()
-	atomNodes, _ := dbUtil.LoadEntitiesFromDB[dbModel.AtomKPINodeEntity](r.db, dbUtil.Preload("SDParameter")).Unwrap()
+	logicalNodesResult := dbUtil.LoadEntitiesFromDB[dbModel.LogicalOperationKPINodeEntity](
+		r.db,
+		dbUtil.Where("node_id IN (?)", nodeIDs),
+	)
+	if logicalNodesResult.IsFailure() {
+		return sharedUtils.NewFailureResult[sharedModel.KPIDefinition](logicalNodesResult.GetError())
+	}
+	logicalNodes := logicalNodesResult.GetPayload()
 
+	atomNodesResult := dbUtil.LoadEntitiesFromDB[dbModel.AtomKPINodeEntity](
+		r.db,
+		dbUtil.Where("node_id IN (?)", nodeIDs),
+		dbUtil.Preload("SDParameter"),
+	)
+	if atomNodesResult.IsFailure() {
+		return sharedUtils.NewFailureResult[sharedModel.KPIDefinition](atomNodesResult.GetError())
+	}
+	atomNodes := atomNodesResult.GetPayload()
 	kpi := db2dll.ToDLLModelKPIDefinition(entity, kpiNodes, logicalNodes, atomNodes)
-
 	return sharedUtils.NewSuccessResult(kpi)
 }
 
 func (r *relationalDatabaseClientImpl) LoadKPIDefinitions(userID uint32) sharedUtils.Result[[]sharedModel.KPIDefinition] {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
-	result := dbUtil.LoadEntitiesFromDB[dbModel.KPIDefinitionEntity](r.db, dbUtil.Where("user_id = ?", userID), dbUtil.Preload("SDType"), dbUtil.Preload("SDInstanceKPIDefinitionRelationshipRecords"), dbUtil.Preload("InstanceGroups"))
-
+	result := dbUtil.LoadEntitiesFromDB[dbModel.KPIDefinitionEntity](r.db, dbUtil.Where("user_id = ?", userID), dbUtil.Preload("SDType"), dbUtil.Preload("SDInstanceKPIDefinitionRelationshipRecords"))
 	if result.IsFailure() {
 		return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](result.GetError())
 	}
-
 	entities := result.GetPayload()
+	allNodeIDs := make([]uint32, 0)
+	for _, entity := range entities {
+		idsResult := dbModel.GetIDsOfKPINodeEntitiesFormingTheKPIDefinition(r.db, entity.ID)
+		if idsResult.IsFailure() {
+			return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](idsResult.GetError())
+		}
+		allNodeIDs = append(allNodeIDs, idsResult.GetPayload()...)
+	}
+	kpiNodesResult := dbUtil.LoadEntitiesFromDB[dbModel.KPINodeEntity](
+		r.db,
+		dbUtil.Where("id IN (?)", allNodeIDs),
+	)
+	if kpiNodesResult.IsFailure() {
+		return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](kpiNodesResult.GetError())
+	}
+	kpiNodes := kpiNodesResult.GetPayload()
 
-	kpiNodes, _ := dbUtil.LoadEntitiesFromDB[dbModel.KPINodeEntity](r.db).Unwrap()
-	logicalNodes, _ := dbUtil.LoadEntitiesFromDB[dbModel.LogicalOperationKPINodeEntity](r.db).Unwrap()
-	atomNodes, _ := dbUtil.LoadEntitiesFromDB[dbModel.AtomKPINodeEntity](r.db, dbUtil.Preload("SDParameter")).Unwrap()
+	logicalNodesResult := dbUtil.LoadEntitiesFromDB[dbModel.LogicalOperationKPINodeEntity](
+		r.db,
+		dbUtil.Where("node_id IN (?)", allNodeIDs),
+	)
+	if logicalNodesResult.IsFailure() {
+		return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](logicalNodesResult.GetError())
+	}
+	logicalNodes := logicalNodesResult.GetPayload()
 
+	atomNodesResult := dbUtil.LoadEntitiesFromDB[dbModel.AtomKPINodeEntity](r.db, dbUtil.Where("node_id IN (?)", allNodeIDs), dbUtil.Preload("SDParameter"))
+	if atomNodesResult.IsFailure() {
+		return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](atomNodesResult.GetError())
+	}
+	atomNodes := atomNodesResult.GetPayload()
 	kpis := make([]sharedModel.KPIDefinition, 0)
-
 	for _, entity := range entities {
 		kpi := db2dll.ToDLLModelKPIDefinition(entity, kpiNodes, logicalNodes, atomNodes)
 		kpis = append(kpis, kpi)
 	}
-
 	return sharedUtils.NewSuccessResult(kpis)
 }
 
@@ -320,7 +370,7 @@ func (r *relationalDatabaseClientImpl) LoadAllKPIDefinitions() sharedUtils.Resul
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	kpiDefinitionEntitiesLoadResult := dbUtil.LoadEntitiesFromDB[dbModel.KPIDefinitionEntity](r.db, dbUtil.Preload("SDType", "SDInstanceKPIDefinitionRelationshipRecords"), dbUtil.Preload("InstanceGroups"))
+	kpiDefinitionEntitiesLoadResult := dbUtil.LoadEntitiesFromDB[dbModel.KPIDefinitionEntity](r.db, dbUtil.Preload("SDType", "SDInstanceKPIDefinitionRelationshipRecords"))
 	if kpiDefinitionEntitiesLoadResult.IsFailure() {
 		err := fmt.Errorf("failed to load KPI definition entities from the database: %w", kpiDefinitionEntitiesLoadResult.GetError())
 		return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](err)
@@ -427,16 +477,6 @@ func (r *relationalDatabaseClientImpl) UpsertSDType(sdType dllModel.SDType) shar
 		return sharedUtils.NewFailureResult[dllModel.SDType](updated.GetError())
 	}
 	return updated
-}
-
-func (r *relationalDatabaseClientImpl) LoadSDInstancesByType(sdTypeID uint32) sharedUtils.Result[[]dllModel.SDInstance] {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	result := dbUtil.LoadEntitiesFromDB[dbModel.SDInstanceEntity](r.db, dbUtil.Preload("SDType"), dbUtil.Where("sd_type_id = ?", sdTypeID))
-	if result.IsFailure() {
-		return sharedUtils.NewFailureResult[[]dllModel.SDInstance](result.GetError())
-	}
-	return sharedUtils.NewSuccessResult(sharedUtils.Map(result.GetPayload(), db2dll.ToDLLModelSDInstance))
 }
 
 func loadSDType(g *gorm.DB, whereClause dbUtil.WhereClause) sharedUtils.Result[dllModel.SDType] {

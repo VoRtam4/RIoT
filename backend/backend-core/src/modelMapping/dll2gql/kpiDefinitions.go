@@ -20,6 +20,31 @@ func toGraphQLModelKPINode(kpiNode sharedModel.KPINode, id uint32, parentNodeID 
 			SdParameterSpecification: typedKPINode.SDParameterSpecification,
 			StringReferenceValue:     typedKPINode.ReferenceValue,
 		}
+	case *sharedModel.StringNEQAtomKPINode:
+		return graphQLModel.StringNEQAtomKPINode{
+			ID:                       id,
+			ParentNodeID:             parentNodeID,
+			NodeType:                 graphQLModel.KPINodeTypeStringNEQAtom,
+			SdParameterID:            typedKPINode.SDParameterID,
+			SdParameterSpecification: typedKPINode.SDParameterSpecification,
+			StringReferenceValue:     typedKPINode.ReferenceValue,
+		}
+	case *sharedModel.StringExistsAtomKPINode:
+		return graphQLModel.StringExistsAtomKPINode{
+			ID:                       id,
+			ParentNodeID:             parentNodeID,
+			NodeType:                 graphQLModel.KPINodeTypeStringExistsAtom,
+			SdParameterID:            typedKPINode.SDParameterID,
+			SdParameterSpecification: typedKPINode.SDParameterSpecification,
+		}
+	case *sharedModel.StringNotExistsAtomKPINode:
+		return graphQLModel.StringNotExistsAtomKPINode{
+			ID:                       id,
+			ParentNodeID:             parentNodeID,
+			NodeType:                 graphQLModel.KPINodeTypeStringNotExistsAtom,
+			SdParameterID:            typedKPINode.SDParameterID,
+			SdParameterSpecification: typedKPINode.SDParameterSpecification,
+		}
 	case *sharedModel.BooleanEQAtomKPINode:
 		return graphQLModel.BooleanEQAtomKPINode{
 			ID:                       id,
@@ -29,11 +54,45 @@ func toGraphQLModelKPINode(kpiNode sharedModel.KPINode, id uint32, parentNodeID 
 			SdParameterSpecification: typedKPINode.SDParameterSpecification,
 			BooleanReferenceValue:    typedKPINode.ReferenceValue,
 		}
+	case *sharedModel.BooleanNEQAtomKPINode:
+		return graphQLModel.BooleanNEQAtomKPINode{
+			ID:                       id,
+			ParentNodeID:             parentNodeID,
+			NodeType:                 graphQLModel.KPINodeTypeBooleanNEQAtom,
+			SdParameterID:            typedKPINode.SDParameterID,
+			SdParameterSpecification: typedKPINode.SDParameterSpecification,
+			BooleanReferenceValue:    typedKPINode.ReferenceValue,
+		}
+	case *sharedModel.BooleanExistsAtomKPINode:
+		return graphQLModel.BooleanExistsAtomKPINode{
+			ID:                       id,
+			ParentNodeID:             parentNodeID,
+			NodeType:                 graphQLModel.KPINodeTypeBooleanExistsAtom,
+			SdParameterID:            typedKPINode.SDParameterID,
+			SdParameterSpecification: typedKPINode.SDParameterSpecification,
+		}
+	case *sharedModel.BooleanNotExistsAtomKPINode:
+		return graphQLModel.BooleanNotExistsAtomKPINode{
+			ID:                       id,
+			ParentNodeID:             parentNodeID,
+			NodeType:                 graphQLModel.KPINodeTypeBooleanNotExistsAtom,
+			SdParameterID:            typedKPINode.SDParameterID,
+			SdParameterSpecification: typedKPINode.SDParameterSpecification,
+		}
 	case *sharedModel.NumericEQAtomKPINode:
 		return graphQLModel.NumericEQAtomKPINode{
 			ID:                       id,
 			ParentNodeID:             parentNodeID,
 			NodeType:                 graphQLModel.KPINodeTypeNumericEQAtom,
+			SdParameterID:            typedKPINode.SDParameterID,
+			SdParameterSpecification: typedKPINode.SDParameterSpecification,
+			NumericReferenceValue:    typedKPINode.ReferenceValue,
+		}
+	case *sharedModel.NumericNEQAtomKPINode:
+		return graphQLModel.NumericNEQAtomKPINode{
+			ID:                       id,
+			ParentNodeID:             parentNodeID,
+			NodeType:                 graphQLModel.KPINodeTypeNumericNEQAtom,
 			SdParameterID:            typedKPINode.SDParameterID,
 			SdParameterSpecification: typedKPINode.SDParameterSpecification,
 			NumericReferenceValue:    typedKPINode.ReferenceValue,
@@ -74,6 +133,22 @@ func toGraphQLModelKPINode(kpiNode sharedModel.KPINode, id uint32, parentNodeID 
 			SdParameterSpecification: typedKPINode.SDParameterSpecification,
 			NumericReferenceValue:    typedKPINode.ReferenceValue,
 		}
+	case *sharedModel.NumericExistsAtomKPINode:
+		return graphQLModel.NumericExistsAtomKPINode{
+			ID:                       id,
+			ParentNodeID:             parentNodeID,
+			NodeType:                 graphQLModel.KPINodeTypeNumericExistsAtom,
+			SdParameterID:            typedKPINode.SDParameterID,
+			SdParameterSpecification: typedKPINode.SDParameterSpecification,
+		}
+	case *sharedModel.NumericNotExistsAtomKPINode:
+		return graphQLModel.NumericNotExistsAtomKPINode{
+			ID:                       id,
+			ParentNodeID:             parentNodeID,
+			NodeType:                 graphQLModel.KPINodeTypeNumericNotExistsAtom,
+			SdParameterID:            typedKPINode.SDParameterID,
+			SdParameterSpecification: typedKPINode.SDParameterSpecification,
+		}
 	case *sharedModel.LogicalOperationKPINode:
 		return graphQLModel.LogicalOperationKPINode{
 			ID:           id,
@@ -87,6 +162,8 @@ func toGraphQLModelKPINode(kpiNode sharedModel.KPINode, id uint32, parentNodeID 
 					return graphQLModel.LogicalOperationTypeOr
 				case sharedModel.NOR:
 					return graphQLModel.LogicalOperationTypeNor
+				case sharedModel.NOT:
+					return graphQLModel.LogicalOperationTypeNot
 				}
 				panic(fmt.Errorf("unpexted model mapping failure – shouldn't happen"))
 			}(typedKPINode.Type),

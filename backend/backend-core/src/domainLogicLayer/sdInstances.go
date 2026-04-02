@@ -8,6 +8,14 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 )
 
+func GetSDInstances() sharedUtils.Result[[]graphQLModel.SDInstance] {
+	loadResult := dbClient.GetRelationalDatabaseClientInstance().LoadSDInstances()
+	if loadResult.IsFailure() {
+		return sharedUtils.NewFailureResult[[]graphQLModel.SDInstance](loadResult.GetError())
+	}
+	return sharedUtils.NewSuccessResult[[]graphQLModel.SDInstance](sharedUtils.Map(loadResult.GetPayload(), dll2gql.ToGraphQLModelSDInstance))
+}
+
 func GetSDInstancesByType(sdTypeID uint32) sharedUtils.Result[[]graphQLModel.SDInstance] {
 	loadResult := dbClient.GetRelationalDatabaseClientInstance().LoadSDInstancesByType(sdTypeID)
 	if loadResult.IsFailure() {
@@ -16,12 +24,12 @@ func GetSDInstancesByType(sdTypeID uint32) sharedUtils.Result[[]graphQLModel.SDI
 	return sharedUtils.NewSuccessResult(sharedUtils.Map(loadResult.GetPayload(), dll2gql.ToGraphQLModelSDInstance))
 }
 
-func GetSDInstances() sharedUtils.Result[[]graphQLModel.SDInstance] {
-	loadResult := dbClient.GetRelationalDatabaseClientInstance().LoadSDInstances()
-	if loadResult.IsFailure() {
-		return sharedUtils.NewFailureResult[[]graphQLModel.SDInstance](loadResult.GetError())
+func GetSDInstancesByKpiDefinition(kpiDefinitionID uint32) sharedUtils.Result[[]graphQLModel.SDInstance] {
+	result := dbClient.GetRelationalDatabaseClientInstance().LoadSDInstancesByKpiDefinition(kpiDefinitionID)
+	if result.IsFailure() {
+		return sharedUtils.NewFailureResult[[]graphQLModel.SDInstance](result.GetError())
 	}
-	return sharedUtils.NewSuccessResult[[]graphQLModel.SDInstance](sharedUtils.Map(loadResult.GetPayload(), dll2gql.ToGraphQLModelSDInstance))
+	return sharedUtils.NewSuccessResult(sharedUtils.Map(result.GetPayload(), dll2gql.ToGraphQLModelSDInstance))
 }
 
 func UpdateSDInstance(id uint32, sdInstanceUpdateInput graphQLModel.SDInstanceUpdateInput) sharedUtils.Result[graphQLModel.SDInstance] {

@@ -30,6 +30,25 @@ func transformKPIDefinitionTree(node sharedModel.KPINode, parentKPINodeEntity *d
 			Type:                 "string_eq",
 			StringReferenceValue: &typedNode.ReferenceValue,
 		})
+	case *sharedModel.StringNEQAtomKPINode:
+		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
+			Node:                 currentNodeEntity,
+			SDParameterID:        typedNode.SDParameterID,
+			Type:                 "string_neq",
+			StringReferenceValue: &typedNode.ReferenceValue,
+		})
+	case *sharedModel.StringExistsAtomKPINode:
+		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
+			Node:          currentNodeEntity,
+			SDParameterID: typedNode.SDParameterID,
+			Type:          "string_exists",
+		})
+	case *sharedModel.StringNotExistsAtomKPINode:
+		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
+			Node:          currentNodeEntity,
+			SDParameterID: typedNode.SDParameterID,
+			Type:          "string_not_exists",
+		})
 	case *sharedModel.BooleanEQAtomKPINode:
 		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
 			Node:                  currentNodeEntity,
@@ -37,11 +56,37 @@ func transformKPIDefinitionTree(node sharedModel.KPINode, parentKPINodeEntity *d
 			Type:                  "boolean_eq",
 			BooleanReferenceValue: &typedNode.ReferenceValue,
 		})
+	case *sharedModel.BooleanNEQAtomKPINode:
+		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
+			Node:                  currentNodeEntity,
+			SDParameterID:         typedNode.SDParameterID,
+			Type:                  "boolean_neq",
+			BooleanReferenceValue: &typedNode.ReferenceValue,
+		})
+	case *sharedModel.BooleanExistsAtomKPINode:
+		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
+			Node:          currentNodeEntity,
+			SDParameterID: typedNode.SDParameterID,
+			Type:          "boolean_exists",
+		})
+	case *sharedModel.BooleanNotExistsAtomKPINode:
+		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
+			Node:          currentNodeEntity,
+			SDParameterID: typedNode.SDParameterID,
+			Type:          "boolean_not_exists",
+		})
 	case *sharedModel.NumericEQAtomKPINode:
 		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
 			Node:                  currentNodeEntity,
 			SDParameterID:         typedNode.SDParameterID,
 			Type:                  "numeric_eq",
+			NumericReferenceValue: &typedNode.ReferenceValue,
+		})
+	case *sharedModel.NumericNEQAtomKPINode:
+		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
+			Node:                  currentNodeEntity,
+			SDParameterID:         typedNode.SDParameterID,
+			Type:                  "numeric_neq",
 			NumericReferenceValue: &typedNode.ReferenceValue,
 		})
 	case *sharedModel.NumericLTAtomKPINode:
@@ -71,6 +116,18 @@ func transformKPIDefinitionTree(node sharedModel.KPINode, parentKPINodeEntity *d
 			SDParameterID:         typedNode.SDParameterID,
 			Type:                  "numeric_geq",
 			NumericReferenceValue: &typedNode.ReferenceValue,
+		})
+	case *sharedModel.NumericExistsAtomKPINode:
+		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
+			Node:          currentNodeEntity,
+			SDParameterID: typedNode.SDParameterID,
+			Type:          "numeric_exists",
+		})
+	case *sharedModel.NumericNotExistsAtomKPINode:
+		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
+			Node:          currentNodeEntity,
+			SDParameterID: typedNode.SDParameterID,
+			Type:          "numeric_not_exists",
 		})
 	}
 	return currentNodeEntity, kpiNodeEntities, logicalOperationNodeEntities, atomNodeEntities

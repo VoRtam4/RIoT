@@ -29,6 +29,8 @@ func kpiNodeInputToKPINode(kpiNodeInput graphQLModel.KPINodeInput) sharedUtils.R
 					return sharedModel.OR
 				case graphQLModel.LogicalOperationTypeNor:
 					return sharedModel.NOR
+				case graphQLModel.LogicalOperationTypeNot:
+					return sharedModel.NOT
 				}
 				panic(fmt.Errorf("unpexted model mapping failure – shouldn't happen"))
 			}(logicalOperationTypeOptional.GetPayload()),
@@ -45,7 +47,8 @@ func kpiNodeInputToKPINode(kpiNodeInput graphQLModel.KPINodeInput) sharedUtils.R
 			return failureResultDueToMissingInputProperty()
 		}
 		sdParameterSpecification := sdParameterSpecificationOptional.GetPayload()
-		if nodeType == graphQLModel.KPINodeTypeStringEQAtom {
+		switch nodeType {
+		case graphQLModel.KPINodeTypeStringEQAtom:
 			referenceValueOptional := sharedUtils.NewOptionalFromPointer[string](kpiNodeInput.StringReferenceValue)
 			if referenceValueOptional.IsEmpty() {
 				return failureResultDueToMissingInputProperty()
@@ -55,7 +58,27 @@ func kpiNodeInputToKPINode(kpiNodeInput graphQLModel.KPINodeInput) sharedUtils.R
 				SDParameterSpecification: sdParameterSpecification,
 				ReferenceValue:           referenceValueOptional.GetPayload(),
 			})
-		} else if nodeType == graphQLModel.KPINodeTypeBooleanEQAtom {
+		case graphQLModel.KPINodeTypeStringNEQAtom:
+			referenceValueOptional := sharedUtils.NewOptionalFromPointer[string](kpiNodeInput.StringReferenceValue)
+			if referenceValueOptional.IsEmpty() {
+				return failureResultDueToMissingInputProperty()
+			}
+			return sharedUtils.NewSuccessResult[sharedModel.KPINode](&sharedModel.StringNEQAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterSpecification,
+				ReferenceValue:           referenceValueOptional.GetPayload(),
+			})
+		case graphQLModel.KPINodeTypeStringExistsAtom:
+			return sharedUtils.NewSuccessResult[sharedModel.KPINode](&sharedModel.StringExistsAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterSpecification,
+			})
+		case graphQLModel.KPINodeTypeStringNotExistsAtom:
+			return sharedUtils.NewSuccessResult[sharedModel.KPINode](&sharedModel.StringNotExistsAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterSpecification,
+			})
+		case graphQLModel.KPINodeTypeBooleanEQAtom:
 			referenceValueOptional := sharedUtils.NewOptionalFromPointer[bool](kpiNodeInput.BooleanReferenceValue)
 			if referenceValueOptional.IsEmpty() {
 				return failureResultDueToMissingInputProperty()
@@ -65,44 +88,96 @@ func kpiNodeInputToKPINode(kpiNodeInput graphQLModel.KPINodeInput) sharedUtils.R
 				SDParameterSpecification: sharedUtils.NewOptionalFromPointer[string](kpiNodeInput.SdParameterSpecification).GetPayload(),
 				ReferenceValue:           referenceValueOptional.GetPayload(),
 			})
-		} else {
+		case graphQLModel.KPINodeTypeBooleanNEQAtom:
+			referenceValueOptional := sharedUtils.NewOptionalFromPointer[bool](kpiNodeInput.BooleanReferenceValue)
+			if referenceValueOptional.IsEmpty() {
+				return failureResultDueToMissingInputProperty()
+			}
+			return sharedUtils.NewSuccessResult[sharedModel.KPINode](&sharedModel.BooleanNEQAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterSpecification,
+				ReferenceValue:           referenceValueOptional.GetPayload(),
+			})
+		case graphQLModel.KPINodeTypeNumericEQAtom:
 			referenceValueOptional := sharedUtils.NewOptionalFromPointer[float64](kpiNodeInput.NumericReferenceValue)
 			if referenceValueOptional.IsEmpty() {
 				return failureResultDueToMissingInputProperty()
 			}
-			referenceValue := referenceValueOptional.GetPayload()
-			switch nodeType {
-			case graphQLModel.KPINodeTypeNumericEQAtom:
-				return sharedUtils.NewSuccessResult[sharedModel.KPINode](&sharedModel.NumericEQAtomKPINode{
-					SDParameterID:            sdParameterID,
-					SDParameterSpecification: sdParameterSpecification,
-					ReferenceValue:           referenceValue,
-				})
-			case graphQLModel.KPINodeTypeNumericLTAtom:
-				return sharedUtils.NewSuccessResult[sharedModel.KPINode](&sharedModel.NumericLTAtomKPINode{
-					SDParameterID:            sdParameterID,
-					SDParameterSpecification: sdParameterSpecification,
-					ReferenceValue:           referenceValue,
-				})
-			case graphQLModel.KPINodeTypeNumericLEQAtom:
-				return sharedUtils.NewSuccessResult[sharedModel.KPINode](&sharedModel.NumericLEQAtomKPINode{
-					SDParameterID:            sdParameterID,
-					SDParameterSpecification: sdParameterSpecification,
-					ReferenceValue:           referenceValue,
-				})
-			case graphQLModel.KPINodeTypeNumericGTAtom:
-				return sharedUtils.NewSuccessResult[sharedModel.KPINode](&sharedModel.NumericGTAtomKPINode{
-					SDParameterID:            sdParameterID,
-					SDParameterSpecification: sdParameterSpecification,
-					ReferenceValue:           referenceValue,
-				})
-			case graphQLModel.KPINodeTypeNumericGEQAtom:
-				return sharedUtils.NewSuccessResult[sharedModel.KPINode](&sharedModel.NumericGEQAtomKPINode{
-					SDParameterID:            sdParameterID,
-					SDParameterSpecification: sdParameterSpecification,
-					ReferenceValue:           referenceValue,
-				})
+			return sharedUtils.NewSuccessResult[sharedModel.KPINode](&sharedModel.NumericEQAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterSpecification,
+				ReferenceValue:           referenceValueOptional.GetPayload(),
+			})
+		case graphQLModel.KPINodeTypeNumericNEQAtom:
+			referenceValueOptional := sharedUtils.NewOptionalFromPointer[float64](kpiNodeInput.NumericReferenceValue)
+			if referenceValueOptional.IsEmpty() {
+				return failureResultDueToMissingInputProperty()
 			}
+			return sharedUtils.NewSuccessResult[sharedModel.KPINode](&sharedModel.NumericNEQAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterSpecification,
+				ReferenceValue:           referenceValueOptional.GetPayload(),
+			})
+		case graphQLModel.KPINodeTypeNumericExistsAtom:
+			return sharedUtils.NewSuccessResult[sharedModel.KPINode](&sharedModel.NumericExistsAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterSpecification,
+			})
+		case graphQLModel.KPINodeTypeNumericNotExistsAtom:
+			return sharedUtils.NewSuccessResult[sharedModel.KPINode](&sharedModel.NumericNotExistsAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterSpecification,
+			})
+		case graphQLModel.KPINodeTypeNumericLTAtom:
+			referenceValueOptional := sharedUtils.NewOptionalFromPointer[float64](kpiNodeInput.NumericReferenceValue)
+			if referenceValueOptional.IsEmpty() {
+				return failureResultDueToMissingInputProperty()
+			}
+			return sharedUtils.NewSuccessResult[sharedModel.KPINode](&sharedModel.NumericLTAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterSpecification,
+				ReferenceValue:           referenceValueOptional.GetPayload(),
+			})
+		case graphQLModel.KPINodeTypeNumericLEQAtom:
+			referenceValueOptional := sharedUtils.NewOptionalFromPointer[float64](kpiNodeInput.NumericReferenceValue)
+			if referenceValueOptional.IsEmpty() {
+				return failureResultDueToMissingInputProperty()
+			}
+			return sharedUtils.NewSuccessResult[sharedModel.KPINode](&sharedModel.NumericLEQAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterSpecification,
+				ReferenceValue:           referenceValueOptional.GetPayload(),
+			})
+		case graphQLModel.KPINodeTypeNumericGTAtom:
+			referenceValueOptional := sharedUtils.NewOptionalFromPointer[float64](kpiNodeInput.NumericReferenceValue)
+			if referenceValueOptional.IsEmpty() {
+				return failureResultDueToMissingInputProperty()
+			}
+			return sharedUtils.NewSuccessResult[sharedModel.KPINode](&sharedModel.NumericGTAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterSpecification,
+				ReferenceValue:           referenceValueOptional.GetPayload(),
+			})
+		case graphQLModel.KPINodeTypeNumericGEQAtom:
+			referenceValueOptional := sharedUtils.NewOptionalFromPointer[float64](kpiNodeInput.NumericReferenceValue)
+			if referenceValueOptional.IsEmpty() {
+				return failureResultDueToMissingInputProperty()
+			}
+			return sharedUtils.NewSuccessResult[sharedModel.KPINode](&sharedModel.NumericGEQAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterSpecification,
+				ReferenceValue:           referenceValueOptional.GetPayload(),
+			})
+		case graphQLModel.KPINodeTypeBooleanExistsAtom:
+			return sharedUtils.NewSuccessResult[sharedModel.KPINode](&sharedModel.BooleanExistsAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterSpecification,
+			})
+		case graphQLModel.KPINodeTypeBooleanNotExistsAtom:
+			return sharedUtils.NewSuccessResult[sharedModel.KPINode](&sharedModel.BooleanNotExistsAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterSpecification,
+			})
 		}
 	}
 	panic(fmt.Errorf("unpexted model mapping failure – shouldn't happen"))

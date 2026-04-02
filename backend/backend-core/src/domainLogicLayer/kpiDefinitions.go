@@ -1,7 +1,6 @@
 package domainLogicLayer
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -89,7 +88,7 @@ func GetKPIDefinition(userID uint32, id uint32) sharedUtils.Result[graphQLModel.
 		return *kpiDefinition.ID == id
 	})
 	if targetKPIDefinitionOptional.IsEmpty() {
-		return sharedUtils.NewFailureResult[graphQLModel.KPIDefinition](errors.New(fmt.Sprintf("couldn't find KPI definition for id: %d", id)))
+		return sharedUtils.NewFailureResult[graphQLModel.KPIDefinition](fmt.Errorf("couldn't find KPI definition for id: %d", id))
 	}
 	return sharedUtils.NewSuccessResult[graphQLModel.KPIDefinition](dll2gql.ToGraphQLModelKPIDefinition(targetKPIDefinitionOptional.GetPayload()))
 }

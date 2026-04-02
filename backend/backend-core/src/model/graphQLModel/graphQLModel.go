@@ -68,6 +68,83 @@ func (this BooleanEQAtomKPINode) GetSdParameterSpecification() string {
 	return this.SdParameterSpecification
 }
 
+type BooleanExistsAtomKPINode struct {
+	ID                       uint32      `json:"id"`
+	ParentNodeID             *uint32     `json:"parentNodeID,omitempty"`
+	NodeType                 KPINodeType `json:"nodeType"`
+	SdParameterID            uint32      `json:"sdParameterID"`
+	SdParameterSpecification string      `json:"sdParameterSpecification"`
+}
+
+func (BooleanExistsAtomKPINode) IsKPINode()                    {}
+func (this BooleanExistsAtomKPINode) GetID() uint32            { return this.ID }
+func (this BooleanExistsAtomKPINode) GetParentNodeID() *uint32 { return this.ParentNodeID }
+func (this BooleanExistsAtomKPINode) GetNodeType() KPINodeType { return this.NodeType }
+
+func (BooleanExistsAtomKPINode) IsAtomKPINode() {}
+
+func (this BooleanExistsAtomKPINode) GetSdParameterID() uint32 { return this.SdParameterID }
+func (this BooleanExistsAtomKPINode) GetSdParameterSpecification() string {
+	return this.SdParameterSpecification
+}
+
+type BooleanNEQAtomKPINode struct {
+	ID                       uint32      `json:"id"`
+	ParentNodeID             *uint32     `json:"parentNodeID,omitempty"`
+	NodeType                 KPINodeType `json:"nodeType"`
+	SdParameterID            uint32      `json:"sdParameterID"`
+	SdParameterSpecification string      `json:"sdParameterSpecification"`
+	BooleanReferenceValue    bool        `json:"booleanReferenceValue"`
+}
+
+func (BooleanNEQAtomKPINode) IsKPINode()                    {}
+func (this BooleanNEQAtomKPINode) GetID() uint32            { return this.ID }
+func (this BooleanNEQAtomKPINode) GetParentNodeID() *uint32 { return this.ParentNodeID }
+func (this BooleanNEQAtomKPINode) GetNodeType() KPINodeType { return this.NodeType }
+
+func (BooleanNEQAtomKPINode) IsAtomKPINode() {}
+
+func (this BooleanNEQAtomKPINode) GetSdParameterID() uint32 { return this.SdParameterID }
+func (this BooleanNEQAtomKPINode) GetSdParameterSpecification() string {
+	return this.SdParameterSpecification
+}
+
+type BooleanNotExistsAtomKPINode struct {
+	ID                       uint32      `json:"id"`
+	ParentNodeID             *uint32     `json:"parentNodeID,omitempty"`
+	NodeType                 KPINodeType `json:"nodeType"`
+	SdParameterID            uint32      `json:"sdParameterID"`
+	SdParameterSpecification string      `json:"sdParameterSpecification"`
+}
+
+func (BooleanNotExistsAtomKPINode) IsKPINode()                    {}
+func (this BooleanNotExistsAtomKPINode) GetID() uint32            { return this.ID }
+func (this BooleanNotExistsAtomKPINode) GetParentNodeID() *uint32 { return this.ParentNodeID }
+func (this BooleanNotExistsAtomKPINode) GetNodeType() KPINodeType { return this.NodeType }
+
+func (BooleanNotExistsAtomKPINode) IsAtomKPINode() {}
+
+func (this BooleanNotExistsAtomKPINode) GetSdParameterID() uint32 { return this.SdParameterID }
+func (this BooleanNotExistsAtomKPINode) GetSdParameterSpecification() string {
+	return this.SdParameterSpecification
+}
+
+type FilterNodeInput struct {
+	Type     FilterNodeType    `json:"type"`
+	Operator *LogicalOperator  `json:"operator,omitempty"`
+	Not      *bool             `json:"not,omitempty"`
+	Rules    []FilterNodeInput `json:"rules,omitempty"`
+	Rule     *FilterRuleInput  `json:"rule,omitempty"`
+}
+
+type FilterRuleInput struct {
+	Field     string           `json:"field"`
+	Target    FilterTargetType `json:"target"`
+	Operator  FilterOperator   `json:"operator"`
+	Value     *string          `json:"value,omitempty"`
+	ValueType FilterValueType  `json:"valueType"`
+}
+
 type InputData struct {
 	Time       string  `json:"time"`
 	DeviceID   string  `json:"deviceId"`
@@ -154,6 +231,26 @@ func (this NumericEQAtomKPINode) GetSdParameterSpecification() string {
 	return this.SdParameterSpecification
 }
 
+type NumericExistsAtomKPINode struct {
+	ID                       uint32      `json:"id"`
+	ParentNodeID             *uint32     `json:"parentNodeID,omitempty"`
+	NodeType                 KPINodeType `json:"nodeType"`
+	SdParameterID            uint32      `json:"sdParameterID"`
+	SdParameterSpecification string      `json:"sdParameterSpecification"`
+}
+
+func (NumericExistsAtomKPINode) IsKPINode()                    {}
+func (this NumericExistsAtomKPINode) GetID() uint32            { return this.ID }
+func (this NumericExistsAtomKPINode) GetParentNodeID() *uint32 { return this.ParentNodeID }
+func (this NumericExistsAtomKPINode) GetNodeType() KPINodeType { return this.NodeType }
+
+func (NumericExistsAtomKPINode) IsAtomKPINode() {}
+
+func (this NumericExistsAtomKPINode) GetSdParameterID() uint32 { return this.SdParameterID }
+func (this NumericExistsAtomKPINode) GetSdParameterSpecification() string {
+	return this.SdParameterSpecification
+}
+
 type NumericGEQAtomKPINode struct {
 	ID                       uint32      `json:"id"`
 	ParentNodeID             *uint32     `json:"parentNodeID,omitempty"`
@@ -235,6 +332,47 @@ func (NumericLTAtomKPINode) IsAtomKPINode() {}
 
 func (this NumericLTAtomKPINode) GetSdParameterID() uint32 { return this.SdParameterID }
 func (this NumericLTAtomKPINode) GetSdParameterSpecification() string {
+	return this.SdParameterSpecification
+}
+
+type NumericNEQAtomKPINode struct {
+	ID                       uint32      `json:"id"`
+	ParentNodeID             *uint32     `json:"parentNodeID,omitempty"`
+	NodeType                 KPINodeType `json:"nodeType"`
+	SdParameterID            uint32      `json:"sdParameterID"`
+	SdParameterSpecification string      `json:"sdParameterSpecification"`
+	NumericReferenceValue    float64     `json:"numericReferenceValue"`
+}
+
+func (NumericNEQAtomKPINode) IsKPINode()                    {}
+func (this NumericNEQAtomKPINode) GetID() uint32            { return this.ID }
+func (this NumericNEQAtomKPINode) GetParentNodeID() *uint32 { return this.ParentNodeID }
+func (this NumericNEQAtomKPINode) GetNodeType() KPINodeType { return this.NodeType }
+
+func (NumericNEQAtomKPINode) IsAtomKPINode() {}
+
+func (this NumericNEQAtomKPINode) GetSdParameterID() uint32 { return this.SdParameterID }
+func (this NumericNEQAtomKPINode) GetSdParameterSpecification() string {
+	return this.SdParameterSpecification
+}
+
+type NumericNotExistsAtomKPINode struct {
+	ID                       uint32      `json:"id"`
+	ParentNodeID             *uint32     `json:"parentNodeID,omitempty"`
+	NodeType                 KPINodeType `json:"nodeType"`
+	SdParameterID            uint32      `json:"sdParameterID"`
+	SdParameterSpecification string      `json:"sdParameterSpecification"`
+}
+
+func (NumericNotExistsAtomKPINode) IsKPINode()                    {}
+func (this NumericNotExistsAtomKPINode) GetID() uint32            { return this.ID }
+func (this NumericNotExistsAtomKPINode) GetParentNodeID() *uint32 { return this.ParentNodeID }
+func (this NumericNotExistsAtomKPINode) GetNodeType() KPINodeType { return this.NodeType }
+
+func (NumericNotExistsAtomKPINode) IsAtomKPINode() {}
+
+func (this NumericNotExistsAtomKPINode) GetSdParameterID() uint32 { return this.SdParameterID }
+func (this NumericNotExistsAtomKPINode) GetSdParameterSpecification() string {
 	return this.SdParameterSpecification
 }
 
@@ -362,6 +500,67 @@ func (this StringEQAtomKPINode) GetSdParameterSpecification() string {
 	return this.SdParameterSpecification
 }
 
+type StringExistsAtomKPINode struct {
+	ID                       uint32      `json:"id"`
+	ParentNodeID             *uint32     `json:"parentNodeID,omitempty"`
+	NodeType                 KPINodeType `json:"nodeType"`
+	SdParameterID            uint32      `json:"sdParameterID"`
+	SdParameterSpecification string      `json:"sdParameterSpecification"`
+}
+
+func (StringExistsAtomKPINode) IsKPINode()                    {}
+func (this StringExistsAtomKPINode) GetID() uint32            { return this.ID }
+func (this StringExistsAtomKPINode) GetParentNodeID() *uint32 { return this.ParentNodeID }
+func (this StringExistsAtomKPINode) GetNodeType() KPINodeType { return this.NodeType }
+
+func (StringExistsAtomKPINode) IsAtomKPINode() {}
+
+func (this StringExistsAtomKPINode) GetSdParameterID() uint32 { return this.SdParameterID }
+func (this StringExistsAtomKPINode) GetSdParameterSpecification() string {
+	return this.SdParameterSpecification
+}
+
+type StringNEQAtomKPINode struct {
+	ID                       uint32      `json:"id"`
+	ParentNodeID             *uint32     `json:"parentNodeID,omitempty"`
+	NodeType                 KPINodeType `json:"nodeType"`
+	SdParameterID            uint32      `json:"sdParameterID"`
+	SdParameterSpecification string      `json:"sdParameterSpecification"`
+	StringReferenceValue     string      `json:"stringReferenceValue"`
+}
+
+func (StringNEQAtomKPINode) IsKPINode()                    {}
+func (this StringNEQAtomKPINode) GetID() uint32            { return this.ID }
+func (this StringNEQAtomKPINode) GetParentNodeID() *uint32 { return this.ParentNodeID }
+func (this StringNEQAtomKPINode) GetNodeType() KPINodeType { return this.NodeType }
+
+func (StringNEQAtomKPINode) IsAtomKPINode() {}
+
+func (this StringNEQAtomKPINode) GetSdParameterID() uint32 { return this.SdParameterID }
+func (this StringNEQAtomKPINode) GetSdParameterSpecification() string {
+	return this.SdParameterSpecification
+}
+
+type StringNotExistsAtomKPINode struct {
+	ID                       uint32      `json:"id"`
+	ParentNodeID             *uint32     `json:"parentNodeID,omitempty"`
+	NodeType                 KPINodeType `json:"nodeType"`
+	SdParameterID            uint32      `json:"sdParameterID"`
+	SdParameterSpecification string      `json:"sdParameterSpecification"`
+}
+
+func (StringNotExistsAtomKPINode) IsKPINode()                    {}
+func (this StringNotExistsAtomKPINode) GetID() uint32            { return this.ID }
+func (this StringNotExistsAtomKPINode) GetParentNodeID() *uint32 { return this.ParentNodeID }
+func (this StringNotExistsAtomKPINode) GetNodeType() KPINodeType { return this.NodeType }
+
+func (StringNotExistsAtomKPINode) IsAtomKPINode() {}
+
+func (this StringNotExistsAtomKPINode) GetSdParameterID() uint32 { return this.SdParameterID }
+func (this StringNotExistsAtomKPINode) GetSdParameterSpecification() string {
+	return this.SdParameterSpecification
+}
+
 type Subscription struct {
 }
 
@@ -377,30 +576,48 @@ type UserConfigInput struct {
 type KPINodeType string
 
 const (
-	KPINodeTypeStringEQAtom     KPINodeType = "StringEQAtom"
-	KPINodeTypeBooleanEQAtom    KPINodeType = "BooleanEQAtom"
-	KPINodeTypeNumericEQAtom    KPINodeType = "NumericEQAtom"
-	KPINodeTypeNumericGTAtom    KPINodeType = "NumericGTAtom"
-	KPINodeTypeNumericGEQAtom   KPINodeType = "NumericGEQAtom"
-	KPINodeTypeNumericLTAtom    KPINodeType = "NumericLTAtom"
-	KPINodeTypeNumericLEQAtom   KPINodeType = "NumericLEQAtom"
-	KPINodeTypeLogicalOperation KPINodeType = "LogicalOperation"
+	KPINodeTypeStringEQAtom         KPINodeType = "StringEQAtom"
+	KPINodeTypeStringNEQAtom        KPINodeType = "StringNEQAtom"
+	KPINodeTypeStringExistsAtom     KPINodeType = "StringExistsAtom"
+	KPINodeTypeStringNotExistsAtom  KPINodeType = "StringNotExistsAtom"
+	KPINodeTypeBooleanEQAtom        KPINodeType = "BooleanEQAtom"
+	KPINodeTypeBooleanNEQAtom       KPINodeType = "BooleanNEQAtom"
+	KPINodeTypeBooleanExistsAtom    KPINodeType = "BooleanExistsAtom"
+	KPINodeTypeBooleanNotExistsAtom KPINodeType = "BooleanNotExistsAtom"
+	KPINodeTypeNumericEQAtom        KPINodeType = "NumericEQAtom"
+	KPINodeTypeNumericNEQAtom       KPINodeType = "NumericNEQAtom"
+	KPINodeTypeNumericGTAtom        KPINodeType = "NumericGTAtom"
+	KPINodeTypeNumericGEQAtom       KPINodeType = "NumericGEQAtom"
+	KPINodeTypeNumericLTAtom        KPINodeType = "NumericLTAtom"
+	KPINodeTypeNumericLEQAtom       KPINodeType = "NumericLEQAtom"
+	KPINodeTypeNumericExistsAtom    KPINodeType = "NumericExistsAtom"
+	KPINodeTypeNumericNotExistsAtom KPINodeType = "NumericNotExistsAtom"
+	KPINodeTypeLogicalOperation     KPINodeType = "LogicalOperation"
 )
 
 var AllKPINodeType = []KPINodeType{
 	KPINodeTypeStringEQAtom,
+	KPINodeTypeStringNEQAtom,
+	KPINodeTypeStringExistsAtom,
+	KPINodeTypeStringNotExistsAtom,
 	KPINodeTypeBooleanEQAtom,
+	KPINodeTypeBooleanNEQAtom,
+	KPINodeTypeBooleanExistsAtom,
+	KPINodeTypeBooleanNotExistsAtom,
 	KPINodeTypeNumericEQAtom,
+	KPINodeTypeNumericNEQAtom,
 	KPINodeTypeNumericGTAtom,
 	KPINodeTypeNumericGEQAtom,
 	KPINodeTypeNumericLTAtom,
 	KPINodeTypeNumericLEQAtom,
+	KPINodeTypeNumericExistsAtom,
+	KPINodeTypeNumericNotExistsAtom,
 	KPINodeTypeLogicalOperation,
 }
 
 func (e KPINodeType) IsValid() bool {
 	switch e {
-	case KPINodeTypeStringEQAtom, KPINodeTypeBooleanEQAtom, KPINodeTypeNumericEQAtom, KPINodeTypeNumericGTAtom, KPINodeTypeNumericGEQAtom, KPINodeTypeNumericLTAtom, KPINodeTypeNumericLEQAtom, KPINodeTypeLogicalOperation:
+	case KPINodeTypeStringEQAtom, KPINodeTypeStringNEQAtom, KPINodeTypeStringExistsAtom, KPINodeTypeStringNotExistsAtom, KPINodeTypeBooleanEQAtom, KPINodeTypeBooleanNEQAtom, KPINodeTypeBooleanExistsAtom, KPINodeTypeBooleanNotExistsAtom, KPINodeTypeNumericEQAtom, KPINodeTypeNumericNEQAtom, KPINodeTypeNumericGTAtom, KPINodeTypeNumericGEQAtom, KPINodeTypeNumericLTAtom, KPINodeTypeNumericLEQAtom, KPINodeTypeNumericExistsAtom, KPINodeTypeNumericNotExistsAtom, KPINodeTypeLogicalOperation:
 		return true
 	}
 	return false
@@ -433,17 +650,19 @@ const (
 	LogicalOperationTypeAnd LogicalOperationType = "AND"
 	LogicalOperationTypeOr  LogicalOperationType = "OR"
 	LogicalOperationTypeNor LogicalOperationType = "NOR"
+	LogicalOperationTypeNot LogicalOperationType = "NOT"
 )
 
 var AllLogicalOperationType = []LogicalOperationType{
 	LogicalOperationTypeAnd,
 	LogicalOperationTypeOr,
 	LogicalOperationTypeNor,
+	LogicalOperationTypeNot,
 }
 
 func (e LogicalOperationType) IsValid() bool {
 	switch e {
-	case LogicalOperationTypeAnd, LogicalOperationTypeOr, LogicalOperationTypeNor:
+	case LogicalOperationTypeAnd, LogicalOperationTypeOr, LogicalOperationTypeNor, LogicalOperationTypeNot:
 		return true
 	}
 	return false
@@ -467,6 +686,92 @@ func (e *LogicalOperationType) UnmarshalGQL(v any) error {
 }
 
 func (e LogicalOperationType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type LogicalOperator string
+
+const (
+	LogicalOperatorAnd LogicalOperator = "AND"
+	LogicalOperatorOr  LogicalOperator = "OR"
+	LogicalOperatorNot LogicalOperator = "NOT"
+)
+
+var AllLogicalOperator = []LogicalOperator{
+	LogicalOperatorAnd,
+	LogicalOperatorOr,
+	LogicalOperatorNot,
+}
+
+func (e LogicalOperator) IsValid() bool {
+	switch e {
+	case LogicalOperatorAnd, LogicalOperatorOr, LogicalOperatorNot:
+		return true
+	}
+	return false
+}
+
+func (e LogicalOperator) String() string {
+	return string(e)
+}
+
+func (e *LogicalOperator) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = LogicalOperator(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid LogicalOperator", str)
+	}
+	return nil
+}
+
+func (e LogicalOperator) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type ParameterType string
+
+const (
+	ParameterTypeBase  ParameterType = "BASE"
+	ParameterTypeTag   ParameterType = "TAG"
+	ParameterTypeField ParameterType = "FIELD"
+)
+
+var AllParameterType = []ParameterType{
+	ParameterTypeBase,
+	ParameterTypeTag,
+	ParameterTypeField,
+}
+
+func (e ParameterType) IsValid() bool {
+	switch e {
+	case ParameterTypeBase, ParameterTypeTag, ParameterTypeField:
+		return true
+	}
+	return false
+}
+
+func (e ParameterType) String() string {
+	return string(e)
+}
+
+func (e *ParameterType) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ParameterType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ParameterType", str)
+	}
+	return nil
+}
+
+func (e ParameterType) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

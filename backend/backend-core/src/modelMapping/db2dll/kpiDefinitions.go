@@ -38,14 +38,52 @@ func reconstructKPINodeTree(currentKPINodeID uint32, kpiNodeParentChildrenMap ma
 				SDParameterSpecification: sdParameterDenotation,
 				ReferenceValue:           sharedUtils.NewOptionalFromPointer(atomKPINodeEntity.StringReferenceValue).GetPayload(),
 			}
+		case "string_neq":
+			return &sharedModel.StringNEQAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterDenotation,
+				ReferenceValue:           sharedUtils.NewOptionalFromPointer(atomKPINodeEntity.StringReferenceValue).GetPayload(),
+			}
+		case "string_exists":
+			return &sharedModel.StringExistsAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterDenotation,
+			}
+		case "string_not_exists":
+			return &sharedModel.StringNotExistsAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterDenotation,
+			}
 		case "boolean_eq":
 			return &sharedModel.BooleanEQAtomKPINode{
 				SDParameterID:            sdParameterID,
 				SDParameterSpecification: sdParameterDenotation,
 				ReferenceValue:           sharedUtils.NewOptionalFromPointer(atomKPINodeEntity.BooleanReferenceValue).GetPayload(),
 			}
+		case "boolean_neq":
+			return &sharedModel.BooleanNEQAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterDenotation,
+				ReferenceValue:           sharedUtils.NewOptionalFromPointer(atomKPINodeEntity.BooleanReferenceValue).GetPayload(),
+			}
+		case "boolean_exists":
+			return &sharedModel.BooleanExistsAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterDenotation,
+			}
+		case "boolean_not_exists":
+			return &sharedModel.BooleanNotExistsAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterDenotation,
+			}
 		case "numeric_eq":
 			return &sharedModel.NumericEQAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterDenotation,
+				ReferenceValue:           sharedUtils.NewOptionalFromPointer(atomKPINodeEntity.NumericReferenceValue).GetPayload(),
+			}
+		case "numeric_neq":
+			return &sharedModel.NumericNEQAtomKPINode{
 				SDParameterID:            sdParameterID,
 				SDParameterSpecification: sdParameterDenotation,
 				ReferenceValue:           sharedUtils.NewOptionalFromPointer(atomKPINodeEntity.NumericReferenceValue).GetPayload(),
@@ -73,6 +111,16 @@ func reconstructKPINodeTree(currentKPINodeID uint32, kpiNodeParentChildrenMap ma
 				SDParameterID:            sdParameterID,
 				SDParameterSpecification: sdParameterDenotation,
 				ReferenceValue:           sharedUtils.NewOptionalFromPointer(atomKPINodeEntity.NumericReferenceValue).GetPayload(),
+			}
+		case "numeric_exists":
+			return &sharedModel.NumericExistsAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterDenotation,
+			}
+		case "numeric_not_exists":
+			return &sharedModel.NumericNotExistsAtomKPINode{
+				SDParameterID:            sdParameterID,
+				SDParameterSpecification: sdParameterDenotation,
 			}
 		}
 	}

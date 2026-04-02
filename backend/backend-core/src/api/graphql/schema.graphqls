@@ -82,6 +82,7 @@ enum LogicalOperationType {
   AND
   OR
   NOR
+  NOT
 }
 
 type LogicalOperationKPINode implements KPINode {
@@ -108,6 +109,31 @@ type StringEQAtomKPINode implements KPINode & AtomKPINode {
   stringReferenceValue: String!
 }
 
+type StringNEQAtomKPINode implements KPINode & AtomKPINode {
+  id: ID!
+  parentNodeID: ID
+  nodeType: KPINodeType!
+  sdParameterID: ID!
+  sdParameterSpecification: String!
+  stringReferenceValue: String!
+}
+
+type StringExistsAtomKPINode implements KPINode & AtomKPINode {
+  id: ID!
+  parentNodeID: ID
+  nodeType: KPINodeType!
+  sdParameterID: ID!
+  sdParameterSpecification: String!
+}
+
+type StringNotExistsAtomKPINode implements KPINode & AtomKPINode {
+  id: ID!
+  parentNodeID: ID
+  nodeType: KPINodeType!
+  sdParameterID: ID!
+  sdParameterSpecification: String!
+}
+
 type BooleanEQAtomKPINode implements KPINode & AtomKPINode {
   id: ID!
   parentNodeID: ID
@@ -117,7 +143,41 @@ type BooleanEQAtomKPINode implements KPINode & AtomKPINode {
   booleanReferenceValue: Boolean!
 }
 
+type BooleanNEQAtomKPINode implements KPINode & AtomKPINode {
+  id: ID!
+  parentNodeID: ID
+  nodeType: KPINodeType!
+  sdParameterID: ID!
+  sdParameterSpecification: String!
+  booleanReferenceValue: Boolean!
+}
+
+type BooleanExistsAtomKPINode implements KPINode & AtomKPINode {
+  id: ID!
+  parentNodeID: ID
+  nodeType: KPINodeType!
+  sdParameterID: ID!
+  sdParameterSpecification: String!
+}
+
+type BooleanNotExistsAtomKPINode implements KPINode & AtomKPINode {
+  id: ID!
+  parentNodeID: ID
+  nodeType: KPINodeType!
+  sdParameterID: ID!
+  sdParameterSpecification: String!
+}
+
 type NumericEQAtomKPINode implements KPINode & AtomKPINode {
+  id: ID!
+  parentNodeID: ID
+  nodeType: KPINodeType!
+  sdParameterID: ID!
+  sdParameterSpecification: String!
+  numericReferenceValue: Float!
+}
+
+type NumericNEQAtomKPINode implements KPINode & AtomKPINode {
   id: ID!
   parentNodeID: ID
   nodeType: KPINodeType!
@@ -162,6 +222,22 @@ type NumericLEQAtomKPINode implements KPINode & AtomKPINode {
   numericReferenceValue: Float!
 }
 
+type NumericExistsAtomKPINode implements KPINode & AtomKPINode {
+  id: ID!
+  parentNodeID: ID
+  nodeType: KPINodeType!
+  sdParameterID: ID!
+  sdParameterSpecification: String!
+}
+
+type NumericNotExistsAtomKPINode implements KPINode & AtomKPINode {
+  id: ID!
+  parentNodeID: ID
+  nodeType: KPINodeType!
+  sdParameterID: ID!
+  sdParameterSpecification: String!
+}
+
 input KPIDefinitionInput {
   label: String!
   sdTypeID: ID!
@@ -174,12 +250,21 @@ input KPIDefinitionInput {
 
 enum KPINodeType {
   StringEQAtom,
+  StringNEQAtom,
+  StringExistsAtom,
+  StringNotExistsAtom,
   BooleanEQAtom,
+  BooleanNEQAtom,
+  BooleanExistsAtom,
+  BooleanNotExistsAtom,
   NumericEQAtom,
+  NumericNEQAtom,
   NumericGTAtom,
   NumericGEQAtom,
   NumericLTAtom,
   NumericLEQAtom,
+  NumericExistsAtom,
+  NumericNotExistsAtom,
   LogicalOperation
 }
 
