@@ -1,0 +1,29 @@
+query SdTypes {
+  sdTypes {
+    id
+    uid
+    label
+    parameters {
+      id
+      label
+      denotation
+      type
+      role
+    }
+  }
+}
+
+query SdTypeById($id: ID!) {
+  sdType(id: $id) {
+    id
+    uid
+    label
+    parameters {
+      id
+      label
+      denotation
+      type
+      role
+    }
+  }
+}

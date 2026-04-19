@@ -1,0 +1,51 @@
+query TimeSeriesRead($request: TimeSeriesReadInput!) {
+  timeSeriesRead(request: $request) {
+    base
+    data {
+      time
+      tags
+      data
+    }
+    parameters {
+      denotation
+      label
+      role
+    }
+    hasMoreBatches
+    hasMoreData
+    nextCursor {
+      time
+      sdInstanceUID
+      kpiDefinitionID
+    }
+    error
+  }
+}
+
+mutation StartTimeSeriesExport($input: TimeSeriesReadInput!) {
+  startTimeSeriesExport(input: $input)
+}
+
+query TimeSeriesReadAggregateKpi($request: TimeSeriesReadAggregateKPIInput!) {
+  timeSeriesReadAggregateKPI(request: $request) {
+    parameters {
+      denotation
+      label
+      role
+    }
+    base
+    data {
+      time
+      tags
+      data
+    }
+    hasMoreBatches
+    hasMoreData
+    nextCursor {
+      time
+      sdInstanceUID
+      kpiDefinitionID
+    }
+    error
+  }
+}

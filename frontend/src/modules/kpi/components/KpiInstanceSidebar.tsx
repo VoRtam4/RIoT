@@ -1,0 +1,145 @@
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import Select, { type SingleValue } from "react-select";
+import { matchesSearchText } from "../../../utils/reactSelectSearch";
+import { virtualizedSelectProps } from "../../../utils/reactSelectVirtualized";
+
+import Box from "@mui/material/Box";
+
+import KpiInstanceCard from "./KpiInstanceCard";
+import VirtualizedList from "../../../components/virtualization/VirtualizedList";
+
+type Instance = {
+  id: string;
+  label?: string | null;
+  uid?: string | null;
+};
+
+type Props = {
+  instances?: Instance[];
+  selectedInstanceId?: string | null;
+  loading?: any;
+  onSelect: (id: string) => void;
+};
+
+type SortOption = {
+  value: "label_asc" | "label_desc";
+  label: string;
+};
+
+export default function KpiInstanceSidebar({
+  instances = [],
+  selectedInstanceId,
+  loading,
+  onSelect,
+}: Props) {
+  const navigate = useNavigate();
+
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<SortOption["value"]>("label_asc");
+
+  const sortOptions: SortOption[] = [
+    { value: "label_asc", label: "Name ↑" },
+    { value: "label_desc", label: "Name ↓" },
+  ];
+
+  const selectedSortOption =
+    sortOptions.find((o) => o.value === sort) ?? sortOptions[0];
+
+  const filtered = useMemo(() => {
+    if (!instances || instances.length === 0) return [];
+
+    let result = [...instances];
+
+    if (search.trim()) {
+      result = result.filter((i) => {
+        return matchesSearchText(search, i.label, i.uid);
+      });
+    }
+
+    result.sort((a, b) => {
+      const aLabel = (a.label ?? a.uid ?? "").toLowerCase();
+      const bLabel = (b.label ?? b.uid ?? "").toLowerCase();
+
+      if (sort === "label_asc") return aLabel.localeCompare(bLabel);
+      if (sort === "label_desc") return bLabel.localeCompare(aLabel);
+
+      return 0;
+    });
+
+    return result;
+  }, [instances, search, sort]);
+
+  if (loading) {
+    return (
+      <div className="d-flex h-100 justify-content-center align-items-center">
+        <div className="spinner-border text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="card p-3 d-flex flex-column"
+      style={{ height: "100%", minHeight: 0 }}
+    >
+      <h5 className="mb-3">Devices</h5>
+      {/* SORT */}
+      <div className="mb-3">
+        <label className="form-label">Sort</label>
+        <Select<SortOption, false>
+          classNamePrefix="react-select"
+          options={sortOptions}
+          value={selectedSortOption}
+          onChange={(v: SingleValue<SortOption>) => {
+            if (!v) return;
+            setSort(v.value);
+          }}
+          isClearable={false}
+          {...virtualizedSelectProps}
+        />
+      </div>
+
+      {/* SEARCH */}
+      <div className="mb-3">
+        <label className="form-label">Search</label>
+        <input
+          className="form-control"
+          placeholder="Search..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
+      {/* LIST */}
+      <Box sx={{ flex: 1, minHeight: 0 }}>
+        <VirtualizedList
+          items={filtered}
+          rowHeight={84}
+          style={{ height: "100%" }}
+          emptyState={<div className="text-muted small form-label">No results</div>}
+          renderItem={(inst) => (
+            <KpiInstanceCard
+              key={inst.id}
+              instance={inst}
+              selected={String(inst.id) === String(selectedInstanceId)}
+              onClick={() => onSelect(String(inst.id))}
+            />
+          )}
+        />
+      </Box>
+
+      {/* BUTTON */}
+      <button
+        className="btn btn-outline-light mt-3 w-100"
+        disabled={!selectedInstanceId}
+        onClick={() => {
+          if (!selectedInstanceId) return;
+          navigate(`/sd-instance/${selectedInstanceId}`);
+        }}
+      >
+        Device detail
+      </button>
+    </div>
+  );
+}

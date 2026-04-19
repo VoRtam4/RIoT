@@ -1,0 +1,65 @@
+query SdInstances {
+  sdInstances {
+    id
+    uid
+    label
+  }
+}
+
+query SdInstancesByType($id: ID!) {
+  sdInstancesByType(id: $id) {
+    id
+    uid
+    label
+    type {
+      id
+    }
+  }
+}
+
+query SdInstancesByKpiDefinition($id: ID!) {
+  sdInstancesByKpiDefinition(id: $id) {
+    id
+    uid
+    label
+  }
+}
+
+query RawDataPoint($id: ID!) {
+  rawDataPoint(id: $id) {
+    sdInstanceID
+    payload
+    eventTime
+  }
+}
+
+subscription OnRawDataPointArrived($filter: RawDataPointArrivedFilter) {
+  onRawDataPointArrived(filter: $filter) {
+    sdTypeID
+    sdInstanceID
+    payload
+    eventTime
+  }
+}
+
+query SdInstance($id: ID!) {
+  sdInstance(id: $id) {
+    id
+    uid
+    label
+    confirmedByUser
+    userIdentifier
+    type {
+      id
+      uid
+      label
+      parameters {
+        id
+        label
+        denotation
+        type
+        role
+      }
+    }
+  }
+}

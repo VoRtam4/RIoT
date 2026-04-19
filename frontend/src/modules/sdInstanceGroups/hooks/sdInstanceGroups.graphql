@@ -1,0 +1,6 @@
+query SdInstanceGroups {
+  sdInstanceGroups {
+    id
+    label
+  }
+}

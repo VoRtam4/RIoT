@@ -1,0 +1,175 @@
+query KpiDefinitions {
+  kpiDefinitions {
+    id
+    label
+    sdTypeID
+    sdTypeUID
+    sdInstanceMode
+  }
+}
+
+query KpiDefinitionsBySdType($id: ID!) {
+  kpiDefinitionsBySdType(id: $id) {
+    id
+    label
+    sdTypeID
+  }
+}
+
+mutation CreateKpiDefinition($input: KPIDefinitionInput!) {
+  createKPIDefinition(input: $input) {
+    id
+    label
+  }
+}
+
+mutation UpdateKpiDefinition($id: ID!, $input: KPIDefinitionInput!) {
+  updateKPIDefinition(id: $id, input: $input) {
+    id
+    label
+  }
+}
+
+query KpiResult($request: KPIFulfillmentCheckResultRequest!) {
+  kpiResult(request: $request) {
+    kpiDefinitionID
+    sdInstanceID
+    eventTime
+    fulfilled
+  }
+}
+
+subscription OnKPIFulfillmentChecked($filter: KPIFulfillmentCheckedFilter) {
+  onKPIFulfillmentChecked(filter: $filter) {
+    sdTypeID
+    sdInstanceID
+    kpiDefinitionID
+    eventTime
+    fulfilled
+  }
+}
+
+query KpiDefinitionsBySdInstance($id: ID!) {
+  kpiDefinitionsBySdInstance(id: $id) {
+    id
+    label
+    sdTypeID
+    sdTypeUID
+    sdInstanceMode
+  }
+}
+
+mutation DeleteKpiDefinition($id: ID!) {
+  deleteKPIDefinition(id: $id)
+}
+
+query KpiDefinition($id: ID!) {
+  kpiDefinition(id: $id) {
+    id
+    label
+    sdTypeID
+    sdTypeUID
+    userIdentifier
+    sdInstanceMode
+    selectedSDInstanceIDs
+    nodes {
+      id
+      parentNodeID
+      nodeType
+
+      ... on LogicalOperationKPINode {
+        type
+      }
+
+      ... on StringEQAtomKPINode {
+        sdParameterID
+        sdParameterSpecification
+        stringReferenceValue
+      }
+
+      ... on StringNEQAtomKPINode {
+        sdParameterID
+        sdParameterSpecification
+        stringReferenceValue
+      }
+
+      ... on StringExistsAtomKPINode {
+        sdParameterID
+        sdParameterSpecification
+      }
+
+      ... on StringNotExistsAtomKPINode {
+        sdParameterID
+        sdParameterSpecification
+      }
+
+      ... on BooleanEQAtomKPINode {
+        sdParameterID
+        sdParameterSpecification
+        booleanReferenceValue
+      }
+
+      ... on BooleanNEQAtomKPINode {
+        sdParameterID
+        sdParameterSpecification
+        booleanReferenceValue
+      }
+
+      ... on BooleanExistsAtomKPINode {
+        sdParameterID
+        sdParameterSpecification
+      }
+
+      ... on BooleanNotExistsAtomKPINode {
+        sdParameterID
+        sdParameterSpecification
+      }
+
+      ... on NumericEQAtomKPINode {
+        sdParameterID
+        sdParameterSpecification
+        numericReferenceValue
+      }
+
+      ... on NumericNEQAtomKPINode {
+        sdParameterID
+        sdParameterSpecification
+        numericReferenceValue
+      }
+
+      ... on NumericGTAtomKPINode {
+        sdParameterID
+        sdParameterSpecification
+        numericReferenceValue
+      }
+
+      ... on NumericGEQAtomKPINode {
+        sdParameterID
+        sdParameterSpecification
+        numericReferenceValue
+      }
+
+      ... on NumericLTAtomKPINode {
+        sdParameterID
+        sdParameterSpecification
+        numericReferenceValue
+      }
+
+      ... on NumericLEQAtomKPINode {
+        sdParameterID
+        sdParameterSpecification
+        numericReferenceValue
+      }
+
+      ... on NumericExistsAtomKPINode {
+        sdParameterID
+        sdParameterSpecification
+      }
+
+      ... on NumericNotExistsAtomKPINode {
+        sdParameterID
+        sdParameterSpecification
+      }
+    }
+  }
+}

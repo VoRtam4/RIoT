@@ -1,0 +1,22 @@
+query ApiKeys {
+  apiKeys {
+    id
+    label
+    revoked
+    expiresAt
+    permissions
+    ipRestrictions
+  }
+}
+
+mutation CreateApiKey($input: APIKeyInput!) {
+  createAPIKey(input: $input)
+}
+
+mutation UpdateApiKey($id: ID!, $input: APIKeyInput!) {
+  updateAPIKey(id: $id, input: $input)
+}
+
+mutation DeleteApiKey($id: ID!) {
+  deleteAPIKey(id: $id)
+}

@@ -1,0 +1,22 @@
+query UserConfig {
+  userConfig {
+    userID
+    config
+  }
+}
+
+mutation UpdateUserConfig($input: UserConfigInput!) {
+  updateUserConfig(input: $input) {
+    userID
+    config
+  }
+}
+
+query Role {
+  role {
+    permissions {
+      uid
+      label
+    }
+  }
+}
