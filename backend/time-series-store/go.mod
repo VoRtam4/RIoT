@@ -1,6 +1,6 @@
 module github.com/xjohnp00/jiap/backend/shared/time-series-store
 
-go 1.24.1
+go 1.23.0
 
 require (
 	github.com/MichalBures-OG/bp-bures-RIoT-commons v0.0.0-00010101000000-000000000000
@@ -14,8 +14,10 @@ require (
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dchest/uniuri v1.2.0 // indirect
+	github.com/fxamacker/cbor/v2 v2.9.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/influxdata/line-protocol v0.0.0-20210922203350-b1ad95c89adf // indirect
 	github.com/oapi-codegen/runtime v1.1.1 // indirect
+	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/net v0.37.0 // indirect
 )

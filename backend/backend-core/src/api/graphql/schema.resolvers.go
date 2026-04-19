@@ -192,6 +192,22 @@ func (r *mutationResolver) DeleteAPIKey(ctx context.Context, id uint32) (bool, e
 	return true, nil
 }
 
+func (r *mutationResolver) StartTimeSeriesExport(ctx context.Context, input graphQLModel.TimeSeriesReadInput) (string, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceTimeSeries, auth.OperationRead)
+	if err != nil {
+		return "", err
+	}
+	return domainLogicLayer.StartTimeSeriesExport(principal.UserID, input)
+}
+
+func (r *mutationResolver) StartTimeSeriesExportAggregateKpi(ctx context.Context, input graphQLModel.TimeSeriesReadAggregateKPIInput) (string, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceTimeSeries, auth.OperationRead)
+	if err != nil {
+		return "", err
+	}
+	return domainLogicLayer.StartTimeSeriesExportAggregateKPI(principal.UserID, input)
+}
+
 func (r *queryResolver) SdType(ctx context.Context, id uint32) (graphQLModel.SDType, error) {
 	if _, err := authorizeOperation(ctx, auth.ResourceSDTypes, auth.OperationRead); err != nil {
 		return graphQLModel.SDType{}, err
@@ -495,8 +511,70 @@ func (r *queryResolver) APIKey(ctx context.Context, id uint32) (graphQLModel.API
 	return result.GetPayload(), nil
 }
 
-func (r *subscriptionResolver) OnSDInstanceRegistered(ctx context.Context) (<-chan graphQLModel.SDInstance, error) {
-	if _, err := authorizeOperation(ctx, auth.ResourceSDInstances, auth.OperationSubscribe); err != nil {
+func (r *queryResolver) TimeSeriesRead(ctx context.Context, request graphQLModel.TimeSeriesReadInput) (graphQLModel.TimeSeriesReadResponse, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceTimeSeries, auth.OperationRead)
+	if err != nil {
+		return graphQLModel.TimeSeriesReadResponse{}, err
+	}
+	result := domainLogicLayer.ReadTimeSeries(principal.UserID, request)
+	if result.IsFailure() {
+		return graphQLModel.TimeSeriesReadResponse{}, result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
+func (r *queryResolver) TimeSeriesReadAggregateKpi(ctx context.Context, request graphQLModel.TimeSeriesReadAggregateKPIInput) (graphQLModel.TimeSeriesReadResponse, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceTimeSeries, auth.OperationRead)
+	if err != nil {
+		return graphQLModel.TimeSeriesReadResponse{}, err
+	}
+	result := domainLogicLayer.ReadTimeSeriesAggregateKPI(principal.UserID, request)
+	if result.IsFailure() {
+		return graphQLModel.TimeSeriesReadResponse{}, result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
+func (r *queryResolver) TimeSeriesDistinctTagValues(ctx context.Context, request graphQLModel.TimeSeriesDistinctTagValuesInput) (graphQLModel.TimeSeriesDistinctTagValuesResponse, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceTimeSeries, auth.OperationRead)
+	if err != nil {
+		return graphQLModel.TimeSeriesDistinctTagValuesResponse{}, err
+	}
+	result := domainLogicLayer.DistinctTimeSeriesTagValues(principal.UserID, request)
+	if result.IsFailure() {
+		return graphQLModel.TimeSeriesDistinctTagValuesResponse{}, result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
+func (r *subscriptionResolver) OnSDInstanceRegistered(ctx context.Context, filter *graphQLModel.SDInstanceRegisteredFilter) (<-chan graphQLModel.SDInstance, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceSDInstances, auth.OperationSubscribe)
+	if err != nil {
+		return nil, err
+	}
+	sub, err := events.SubscribeSDInstanceRegistered(ctx, filter, principal.UserID)
+	if err != nil {
+		return nil, err
+	}
+	return sub.Channel, nil
+}
+
+func (r *subscriptionResolver) OnRawDataPointArrived(ctx context.Context, filter *graphQLModel.RawDataPointArrivedFilter) (<-chan []graphQLModel.RawDataPoint, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceRawData, auth.OperationSubscribe)
+	if err != nil {
+		return nil, err
+	}
+	sub, err := events.SubscribeRawDataPointArrived(ctx, filter, principal.UserID)
+	if err != nil {
+		log.Println("SUB ERROR:", err)
+		return nil, err
+	}
+	return sub.Channel, nil
+}
+
+func (r *subscriptionResolver) OnKPIFulfillmentChecked(ctx context.Context, filter *graphQLModel.KPIFulfillmentCheckedFilter) (<-chan []graphQLModel.KPIFulfillmentCheckResult, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceKPIResults, auth.OperationSubscribe)
+	if err != nil {
 		return nil, err
 	}
 	sub, err := events.SubscribeKPIFulfillmentChecked(ctx, filter, principal.UserID)

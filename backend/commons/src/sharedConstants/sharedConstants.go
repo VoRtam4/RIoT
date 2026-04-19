@@ -14,8 +14,12 @@ const (
 	TimeSeriesKPIResultQueueName                          = "time-series-kpi-results"
 	TimeSeriesReadRequestQueueName                        = "time-series-read-request"
 	TimeSeriesReadResponseQueueName                       = "time-series-read-response"
+	TimeSeriesDistinctTagValuesRequestQueueName           = "time-series-distinct-tag-values-request"
+	TimeSeriesDistinctTagValuesResponseQueueName          = "time-series-distinct-tag-values-response"
 	TimeSeriesReprocessReadRequestQueueName               = "time-series-reprocess-read-request"
 	TimeSeriesReprocessReadResponseQueueName              = "time-series-reprocess-read-response"
 	KPIReprocessRequestQueueName                          = "kpi-reprocess-requests"
-	TimeSeriesDeleteRequestQueueName                      = "time-series-delete-requests"
+	TSDBDeleteQueueName                                   = "time-series-delete-requests-tsdb"
+	MPUDeleteQueueName                                    = "time-series-delete-requests-mpu"
+	KPIConfigUpdateQueueName                              = "kpi-config-update"
 )
