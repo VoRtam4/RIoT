@@ -21,19 +21,7 @@ func kpiNodeInputToKPINode(kpiNodeInput graphQLModel.KPINodeInput) sharedUtils.R
 			return failureResultDueToMissingInputProperty()
 		}
 		return sharedUtils.NewSuccessResult[sharedModel.KPINode](&sharedModel.LogicalOperationKPINode{
-			Type: func(logicalOperationNodeType graphQLModel.LogicalOperationType) sharedModel.LogicalOperationNodeType {
-				switch logicalOperationNodeType {
-				case graphQLModel.LogicalOperationTypeAnd:
-					return sharedModel.AND
-				case graphQLModel.LogicalOperationTypeOr:
-					return sharedModel.OR
-				case graphQLModel.LogicalOperationTypeNor:
-					return sharedModel.NOR
-				case graphQLModel.LogicalOperationTypeNot:
-					return sharedModel.NOT
-				}
-				panic(fmt.Errorf("unpexted model mapping failure – shouldn't happen"))
-			}(logicalOperationTypeOptional.GetPayload()),
+			Type:       sharedModel.LogicalOperationNodeType(logicalOperationTypeOptional.GetPayload()),
 			ChildNodes: make([]sharedModel.KPINode, 0),
 		})
 	} else {
@@ -222,13 +210,13 @@ func ToDLLModelKPIDefinition(kpiDefinitionInput graphQLModel.KPIDefinitionInput)
 		return sharedUtils.NewFailureResult[sharedModel.KPIDefinition](fmt.Errorf("model mapping failure – couldn't find root node ID"))
 	}
 	return sharedUtils.NewSuccessResult[sharedModel.KPIDefinition](sharedModel.KPIDefinition{
-		ID:                     nil,
-		Label:                  kpiDefinitionInput.Label,
-		SDTypeID:               kpiDefinitionInput.SdTypeID,
-		SDTypeSpecification:    kpiDefinitionInput.SdTypeSpecification,
-		UserIdentifier:         kpiDefinitionInput.UserIdentifier,
-		RootNode:               kpiNodeByIDMap[rootNodeIDOptional.GetPayload()],
-		SDInstanceMode:         sharedModel.SDInstanceMode(strings.ToLower(string(kpiDefinitionInput.SdInstanceMode))),
-		SelectedSDInstanceUIDs: kpiDefinitionInput.SelectedSDInstanceUIDs,
+		ID:                    nil,
+		Label:                 kpiDefinitionInput.Label,
+		SDTypeID:              kpiDefinitionInput.SdTypeID,
+		SDTypeSpecification:   kpiDefinitionInput.SdTypeUID,
+		UserIdentifier:        kpiDefinitionInput.UserIdentifier,
+		RootNode:              kpiNodeByIDMap[rootNodeIDOptional.GetPayload()],
+		SDInstanceMode:        sharedModel.SDInstanceMode(strings.ToLower(string(kpiDefinitionInput.SdInstanceMode))),
+		SelectedSDInstanceIDs: kpiDefinitionInput.SelectedSDInstanceIDs,
 	})
 }

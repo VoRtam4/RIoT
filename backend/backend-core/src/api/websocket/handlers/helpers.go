@@ -63,3 +63,16 @@ func parseID(payload map[string]any) (uint32, bool) {
 	}
 	return uint32(idFloat), true
 }
+
+func streamToClient[T any](c *connection.Client, topic string, subID string, ch <-chan T) {
+	go func() {
+		for payload := range ch {
+			c.SafeSend(sharedModel.WebSocketMessage{
+				Type:    sharedModel.MessageEvent,
+				Topic:   topic,
+				ID:      subID,
+				Payload: payload,
+			})
+		}
+	}()
+}

@@ -2,6 +2,7 @@ package rabbitmq
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
+	"github.com/rabbitmq/amqp091-go"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -47,18 +49,19 @@ func (c *connectionManager) connect() {
 
 func (c *connectionManager) release() {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.clientCount--
-	if c.clientCount == 0 && c.conn != nil {
-		sharedUtils.LogPossibleErrorThenProceed(c.conn.Close(), "[RabbitMQ client] Failed to close RabbitMQ connection")
-		c.conn = nil
-	}
+	defer c.mu.Unlock() /*
+		c.clientCount--
+		if c.clientCount == 0 && c.conn != nil {
+			sharedUtils.LogPossibleErrorThenProceed(c.conn.Close(), "[RabbitMQ client] Failed to close RabbitMQ connection")
+			c.conn = nil
+		}*/
 }
 
 type Client interface {
 	GetChannel() *amqp.Channel
 	PublishJSONMessage(exchangeNameOptional sharedUtils.Optional[string], routingKeyOptional sharedUtils.Optional[string], messagePayload []byte) error
 	PublishJSONMessageRPC(exchangeNameOptional sharedUtils.Optional[string], routingKeyOptional sharedUtils.Optional[string], messagePayload []byte, correlationId string, replyTo sharedUtils.Optional[string]) error
+	PublishJSONMessageWithReplyTo(exchangeNameOptional sharedUtils.Optional[string], routingKeyOptional sharedUtils.Optional[string], messagePayload []byte, correlationId string, replyToOptional sharedUtils.Optional[string]) error
 	DeclareQueue(queueName string) error
 	SetupMessageConsumption(queueName string, messageConsumerFunction func(message amqp.Delivery) error) error
 	SetupMessageConsumptionWithCorrelationId(queueName string, correlationId string, messageConsumerFunction func(message amqp.Delivery) error) error
@@ -108,6 +111,60 @@ func (c *ClientImpl) PublishJSONMessageRPC(exchangeNameOptional sharedUtils.Opti
 		ReplyTo:       replyTo,
 		Expiration:    expiration,
 	})
+}
+
+func (c *ClientImpl) PublishJSONMessageWithReplyTo(exchangeNameOptional sharedUtils.Optional[string], routingKeyOptional sharedUtils.Optional[string], messagePayload []byte, correlationId string, replyToOptional sharedUtils.Optional[string]) error {
+	ctx, cancelFunction := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelFunction()
+	exchangeName := exchangeNameOptional.GetPayloadOrDefault("")
+	routingKey := routingKeyOptional.GetPayloadOrDefault("")
+	replyTo := replyToOptional.GetPayloadOrDefault("")
+	return c.channel.PublishWithContext(ctx, exchangeName, routingKey, false, false, amqp.Publishing{
+		ContentType:   "application/json",
+		Body:          messagePayload,
+		CorrelationId: correlationId,
+		ReplyTo:       replyTo,
+	})
+}
+
+func ConsumeRPCStream[T any](msgs <-chan amqp091.Delivery, correlationID string, timeout time.Duration, handle func(resp T, msg amqp091.Delivery) (done bool, err error)) error {
+	var timer *time.Timer
+	var timeoutCh <-chan time.Time
+	if timeout > 0 {
+		timer = time.NewTimer(timeout)
+		defer timer.Stop()
+		timeoutCh = timer.C
+	}
+	for {
+		select {
+		case msg, ok := <-msgs:
+			if !ok {
+				return fmt.Errorf("channel closed")
+			}
+			if msg.CorrelationId != correlationID {
+				_ = msg.Nack(false, false)
+				continue
+			}
+			var resp T
+			if err := json.Unmarshal(msg.Body, &resp); err != nil {
+				_ = msg.Nack(false, false)
+				return err
+			}
+			done, err := handle(resp, msg)
+			if err != nil {
+				_ = msg.Nack(false, false)
+				return err
+			}
+			if err := msg.Ack(false); err != nil {
+				return err
+			}
+			if done {
+				return nil
+			}
+		case <-timeoutCh:
+			return fmt.Errorf("timeout waiting for response")
+		}
+	}
 }
 
 func (c *ClientImpl) DeclareQueue(queueName string) error {

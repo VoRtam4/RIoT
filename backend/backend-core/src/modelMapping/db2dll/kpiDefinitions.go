@@ -143,12 +143,12 @@ func ToDLLModelKPIDefinition(kpiDefinitionEntity dbModel.KPIDefinitionEntity, kp
 		ID:                  &kpiDefinitionEntity.ID,
 		Label:               kpiDefinitionEntity.Label,
 		SDTypeID:            kpiDefinitionEntity.SDTypeID,
-		SDTypeSpecification: kpiDefinitionEntity.SDType.Denotation,
+		SDTypeSpecification: kpiDefinitionEntity.SDType.UID,
 		UserIdentifier:      kpiDefinitionEntity.UserIdentifier,
 		RootNode:            kpiDefinitionRootOptional.GetPayload(),
 		SDInstanceMode:      sharedModel.SDInstanceMode(kpiDefinitionEntity.SDInstanceMode),
-		SelectedSDInstanceUIDs: sharedUtils.Map(kpiDefinitionEntity.SDInstanceKPIDefinitionRelationshipRecords, func(sdInstanceKPIDefinitionRelationshipEntity dbModel.SDInstanceKPIDefinitionRelationshipEntity) string {
-			return sdInstanceKPIDefinitionRelationshipEntity.SDInstanceUID
+		SelectedSDInstanceIDs: sharedUtils.Map(kpiDefinitionEntity.SDInstanceKPIDefinitionRelationshipRecords, func(sdInstanceKPIDefinitionRelationshipEntity dbModel.SDInstanceKPIDefinitionRelationshipEntity) uint32 {
+			return sdInstanceKPIDefinitionRelationshipEntity.SDInstanceID
 		}),
 	}
 }

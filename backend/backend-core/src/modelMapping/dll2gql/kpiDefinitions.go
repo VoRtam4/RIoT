@@ -154,19 +154,7 @@ func toGraphQLModelKPINode(kpiNode sharedModel.KPINode, id uint32, parentNodeID 
 			ID:           id,
 			ParentNodeID: parentNodeID,
 			NodeType:     graphQLModel.KPINodeTypeLogicalOperation,
-			Type: func(logicalOperationNodeType sharedModel.LogicalOperationNodeType) graphQLModel.LogicalOperationType {
-				switch logicalOperationNodeType {
-				case sharedModel.AND:
-					return graphQLModel.LogicalOperationTypeAnd
-				case sharedModel.OR:
-					return graphQLModel.LogicalOperationTypeOr
-				case sharedModel.NOR:
-					return graphQLModel.LogicalOperationTypeNor
-				case sharedModel.NOT:
-					return graphQLModel.LogicalOperationTypeNot
-				}
-				panic(fmt.Errorf("unpexted model mapping failure – shouldn't happen"))
-			}(typedKPINode.Type),
+			Type:         graphQLModel.LogicalOperationType(typedKPINode.Type),
 		}
 	}
 	panic(fmt.Errorf("unpexted model mapping failure – shouldn't happen"))
@@ -187,13 +175,13 @@ func processKPINode(node sharedModel.KPINode, generateNextNumber func() uint32, 
 func ToGraphQLModelKPIDefinition(kpiDefinition sharedModel.KPIDefinition) graphQLModel.KPIDefinition {
 	nodes := processKPINode(kpiDefinition.RootNode, sharedUtils.SequentialNumberGenerator(), nil)
 	return graphQLModel.KPIDefinition{
-		ID:                     sharedUtils.NewOptionalFromPointer(kpiDefinition.ID).GetPayload(),
-		Label:                  kpiDefinition.Label,
-		SdTypeID:               kpiDefinition.SDTypeID,
-		SdTypeSpecification:    kpiDefinition.SDTypeSpecification,
-		UserIdentifier:         kpiDefinition.UserIdentifier,
-		Nodes:                  nodes,
-		SdInstanceMode:         graphQLModel.SDInstanceMode(strings.ToUpper(string(kpiDefinition.SDInstanceMode))),
-		SelectedSDInstanceUIDs: kpiDefinition.SelectedSDInstanceUIDs,
+		ID:                    sharedUtils.NewOptionalFromPointer(kpiDefinition.ID).GetPayload(),
+		Label:                 kpiDefinition.Label,
+		SdTypeID:              kpiDefinition.SDTypeID,
+		SdTypeUID:             kpiDefinition.SDTypeSpecification,
+		UserIdentifier:        kpiDefinition.UserIdentifier,
+		Nodes:                 nodes,
+		SdInstanceMode:        graphQLModel.SDInstanceMode(strings.ToUpper(string(kpiDefinition.SDInstanceMode))),
+		SelectedSDInstanceIDs: kpiDefinition.SelectedSDInstanceIDs,
 	}
 }

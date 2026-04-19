@@ -23,7 +23,7 @@ func GetAPIKeys(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetAPIKey(w http.ResponseWriter, r *http.Request) {
-	principal := authorizeOperation(w, r, auth.ResourceAPIKeys, auth.OperationCreate)
+	principal := authorizeOperation(w, r, auth.ResourceAPIKeys, auth.OperationRead)
 	if principal == nil {
 		return
 	}

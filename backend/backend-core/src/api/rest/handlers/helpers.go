@@ -14,7 +14,7 @@ func authorizeOperation(w http.ResponseWriter, r *http.Request, operation string
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return nil
 	}
-	if !auth.CanAccessOperation(principal, auth.ResourceUserConfig, auth.OperationRead) {
+	if !auth.CanAccessOperation(principal, operation, opType) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return nil
 	}

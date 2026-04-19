@@ -27,7 +27,7 @@ type SDParameter struct {
 
 type SDType struct {
 	ID         sharedUtils.Optional[uint32]
+	UID        string
 	Label      string
-	Denotation string
 	Parameters []SDParameter
 }

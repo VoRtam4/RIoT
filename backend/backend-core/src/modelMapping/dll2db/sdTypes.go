@@ -8,9 +8,9 @@ import (
 
 func ToDBModelEntitySDType(sdType dllModel.SDType) dbModel.SDTypeEntity {
 	return dbModel.SDTypeEntity{
-		ID:         sdType.ID.GetPayloadOrDefault(0),
-		Label:      sdType.Label,
-		Denotation: sdType.Denotation,
+		ID:    sdType.ID.GetPayloadOrDefault(0),
+		Label: sdType.Label,
+		UID:   sdType.UID,
 		Parameters: sharedUtils.Map(sdType.Parameters, func(sdParameter dllModel.SDParameter) dbModel.SDParameterEntity {
 			return dbModel.SDParameterEntity{
 				ID:         sdParameter.ID.GetPayloadOrDefault(0),

@@ -10,8 +10,11 @@ func ToDLLModelRole(role dbModel.RoleEntity) dllModel.Role {
 	return dllModel.Role{
 		ID:    role.ID,
 		Label: role.Label,
-		Permissions: sharedUtils.Map(role.Permissions, func(p dbModel.PermissionEntity) string {
-			return p.Label
+		Permissions: sharedUtils.Map(role.Permissions, func(p dbModel.PermissionEntity) dllModel.Permission {
+			return dllModel.Permission{
+				UID:   p.UID,
+				Label: p.Label,
+			}
 		}),
 	}
 }

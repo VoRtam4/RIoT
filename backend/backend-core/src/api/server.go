@@ -23,7 +23,7 @@ func StartServer() {
 	r.Use(cors.New(cors.Options{
 		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-API-Key"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
 		MaxAge:           300,
@@ -35,12 +35,9 @@ func StartServer() {
 
 	rest.SetupRouter(r)
 
-	hub := connection.NewHub()
-	go hub.StartEventListener(websocket.EventListener())
-	r.Get("/ws", websocket.ServeWebSocket(hub))
+	r.Get("/ws", websocket.ServeWebSocket(connection.NewHub()))
 
 	r.Handle("/graphql", graphql.GetHandler())
-
-	log.Println("Server running on :9090")
+	log.Printf("Server running on :9090")
 	log.Fatal(http.ListenAndServe(":9090", r))
 }

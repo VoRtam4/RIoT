@@ -135,14 +135,14 @@ func generateRefreshToken() string {
 
 func resolveRoleID(email string) (uint32, error) {
 	if AdminRoleID == 0 {
-		adminRoleResult := domainLogicLayer.LoadRolesByLabels([]string{RoleAdmin})
+		adminRoleResult := domainLogicLayer.LoadRolesByUIDs([]string{RoleAdmin})
 		if adminRoleResult.IsFailure() {
 			return 0, adminRoleResult.GetError()
 		}
 		AdminRoleID = adminRoleResult.GetPayload()[0].ID
 	}
 	if UserRoleID == 0 {
-		userRoleResult := domainLogicLayer.LoadRolesByLabels([]string{RoleUser})
+		userRoleResult := domainLogicLayer.LoadRolesByUIDs([]string{RoleUser})
 		if userRoleResult.IsFailure() {
 			return 0, userRoleResult.GetError()
 		}

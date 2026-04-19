@@ -17,6 +17,7 @@ type PrincipalType string
 const (
 	PrincipalUserSession PrincipalType = "user_session"
 	PrincipalAPIKey      PrincipalType = "api_key"
+	PrincipalGuest       PrincipalType = "guest"
 )
 
 type Principal struct {
@@ -56,7 +57,8 @@ func AuthenticatePrincipal(w http.ResponseWriter, r *http.Request) (*Principal, 
 	}
 	authResult := AuthenticateRequest(r)
 	if authResult.IsFailure() {
-		return nil, authResult.GetError()
+		return nil, fmt.Errorf("not authenticated")
+		//return buildGuestPrincipal(clientIP)
 	}
 	if err := ApplyAuthenticationResult(w, authResult.GetPayload()); err != nil {
 		return nil, err
@@ -89,16 +91,20 @@ func buildAPIKeyPrincipal(apiKey dllModel.APIKey, clientIP string) (*Principal, 
 	if !isIPAllowed(clientIP, apiKey.IPRestrictions) {
 		return nil, fmt.Errorf("ip not allowed")
 	}
-	allowed := make(map[string]bool, len(apiKey.Permissions))
-	for _, p := range apiKey.Permissions {
-		allowed[p] = true
-	}
 	if apiKey.ID.IsEmpty() {
 		return nil, fmt.Errorf("api key missing id")
 	}
+	if apiKey.UserID == nil {
+		return nil, fmt.Errorf("api key missing user id")
+	}
 	id := apiKey.ID.GetPayload()
+	allowed, err := buildAllowedOperationsForAPIKey(*apiKey.UserID, apiKey.Permissions)
+	if err != nil {
+		return nil, err
+	}
 	return &Principal{
 		Type:              PrincipalAPIKey,
+		UserID:            *apiKey.UserID,
 		APIKeyID:          &id,
 		AllowedOperations: allowed,
 		SynchronizedAt:    time.Now(),
@@ -113,13 +119,23 @@ func buildUserPrincipal(userID uint32, clientIP string) (*Principal, error) {
 	}
 	allowed := make(map[string]bool)
 	for _, p := range permsResult.GetPayload().Permissions {
-		allowed[p] = true
+		allowed[p.UID] = true
 	}
 	return &Principal{
 		Type:              PrincipalUserSession,
 		UserID:            userID,
 		AllowedOperations: allowed,
 		APIKeyID:          nil,
+		SynchronizedAt:    time.Now(),
+		ClientIP:          clientIP,
+	}, nil
+}
+
+func buildGuestPrincipal(clientIP string) (*Principal, error) {
+	return &Principal{
+		Type:              PrincipalGuest,
+		UserID:            0,
+		AllowedOperations: RolePermissions[RoleGuest],
 		SynchronizedAt:    time.Now(),
 		ClientIP:          clientIP,
 	}, nil
@@ -146,25 +162,48 @@ func refreshPrincipalPermissions(principal *Principal) error {
 			return result.GetError()
 		}
 		apiKeyResult := result.GetPayload()
-		end, err := time.Parse(time.RFC1123, *apiKeyResult.ExpiresAt)
-		if err != nil {
-			return fmt.Errorf("time conversion failed")
-		}
-		if apiKeyResult.ExpiresAt != nil && end.Before(time.Now()) {
-			return fmt.Errorf("api key expired")
+		if apiKeyResult.ExpiresAt != nil {
+			end, err := time.Parse(time.RFC3339Nano, *apiKeyResult.ExpiresAt)
+			if err != nil {
+				return fmt.Errorf("time conversion failed")
+			}
+			if end.Before(time.Now()) {
+				return fmt.Errorf("api key expired")
+			}
 		}
 		if !isIPAllowed(principal.ClientIP, apiKeyResult.IPRestrictions) {
 			return fmt.Errorf("ip not allowed")
 		}
-		allowed := make(map[string]bool)
-		for _, p := range apiKeyResult.Permissions {
-			allowed[p] = true
+		allowed, err := buildAllowedOperationsForAPIKey(principal.UserID, apiKeyResult.Permissions)
+		if err != nil {
+			return err
 		}
 		principal.AllowedOperations = allowed
 		principal.SynchronizedAt = time.Now()
 		return nil
 
+	case PrincipalGuest:
+		return nil
+
 	default:
 		return fmt.Errorf("unsupported principal type")
 	}
+}
+
+func buildAllowedOperationsForAPIKey(userID uint32, keyPermissions []string) (map[string]bool, error) {
+	roleResult := domainLogicLayer.LoadUserRole(userID)
+	if roleResult.IsFailure() {
+		return nil, roleResult.GetError()
+	}
+	rolePermissions := make(map[string]bool, len(roleResult.GetPayload().Permissions))
+	for _, permission := range roleResult.GetPayload().Permissions {
+		rolePermissions[permission.UID] = true
+	}
+	allowed := make(map[string]bool, len(keyPermissions))
+	for _, permission := range keyPermissions {
+		if rolePermissions[permission] {
+			allowed[permission] = true
+		}
+	}
+	return allowed, nil
 }

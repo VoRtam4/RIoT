@@ -5,11 +5,12 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dllModel"
 )
 
-func ToDLLModelKPIFulfillmentCheckResult(kpiFulfillmentCheckResultEntity dbModel.KPIFulfillmentCheckResultEntity) dllModel.KPIFulfillmentCheckResult {
+func ToDLLModelKPIFulfillmentCheckResult(row dbModel.KPIFulfillmentCheckResultEntity) dllModel.KPIFulfillmentCheckResult {
 	return dllModel.KPIFulfillmentCheckResult{
-		KPIDefinitionID: kpiFulfillmentCheckResultEntity.KPIDefinitionID,
-		SDInstanceID:    kpiFulfillmentCheckResultEntity.SDInstanceID,
-		Fulfilled:       kpiFulfillmentCheckResultEntity.Fulfilled,
-		EventTime:       kpiFulfillmentCheckResultEntity.EventTime,
+		SDTypeID:        row.SDInstance.SDTypeID,
+		SDInstanceID:    row.SDInstanceID,
+		KPIDefinitionID: row.KPIDefinitionID,
+		Fulfilled:       row.Fulfilled,
+		EventTime:       row.EventTime,
 	}
 }

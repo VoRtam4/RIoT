@@ -1,8 +1,6 @@
 package db2dll
 
 import (
-	"fmt"
-
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dbModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dllModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
@@ -10,34 +8,16 @@ import (
 
 func ToDLLModelSDType(sdTypeEntity dbModel.SDTypeEntity) dllModel.SDType {
 	return dllModel.SDType{
-		ID:         sharedUtils.NewOptionalOf[uint32](sdTypeEntity.ID),
-		Label:      sdTypeEntity.Label,
-		Denotation: sdTypeEntity.Denotation,
+		ID:    sharedUtils.NewOptionalOf[uint32](sdTypeEntity.ID),
+		UID:   sdTypeEntity.UID,
+		Label: sdTypeEntity.Label,
 		Parameters: sharedUtils.Map(sdTypeEntity.Parameters, func(sdParameterEntity dbModel.SDParameterEntity) dllModel.SDParameter {
 			return dllModel.SDParameter{
 				ID:         sharedUtils.NewOptionalOf[uint32](sdParameterEntity.ID),
 				Label:      sdParameterEntity.Label,
 				Denotation: sdParameterEntity.Denotation,
-				Type: func(sdParameterType string) dllModel.SDParameterType {
-					switch sdParameterType {
-					case "string":
-						return dllModel.SDParameterTypeString
-					case "number":
-						return dllModel.SDParameterTypeNumber
-					case "boolean":
-						return dllModel.SDParameterTypeBoolean
-					}
-					panic(fmt.Errorf("unpexted model mapping failure – shouldn't happen"))
-				}(sdParameterEntity.Type),
-				Role: func(sdParameterRole string) dllModel.SDParameterRole {
-					switch sdParameterRole {
-					case "tag":
-						return dllModel.SDParameterRoleTag
-					case "field":
-						return dllModel.SDParameterRoleField
-					}
-					panic(fmt.Errorf("unpexted model mapping failure – shouldn't happen"))
-				}(sdParameterEntity.Role),
+				Type:       dllModel.SDParameterType(sdParameterEntity.Type),
+				Role:       dllModel.SDParameterRole(sdParameterEntity.Role),
 			}
 		}),
 	}

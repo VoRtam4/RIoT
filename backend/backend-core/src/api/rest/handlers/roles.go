@@ -10,11 +10,10 @@ import (
 )
 
 func GetRoles(w http.ResponseWriter, r *http.Request) {
-	if principal := authorizeOperation(w, r, auth.ResourceAPIKeys, auth.OperationRead); principal == nil {
+	if principal := authorizeOperation(w, r, auth.ResourceRoles, auth.OperationRead); principal == nil {
 		return
 	}
-	labels := auth.GetAllRoleLabels()
-	result := domainLogicLayer.LoadRolesByLabels(labels)
+	result := domainLogicLayer.LoadRoles()
 	if result.IsFailure() {
 		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
 		return
@@ -23,7 +22,7 @@ func GetRoles(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetUserRole(w http.ResponseWriter, r *http.Request) {
-	if principal := authorizeOperation(w, r, auth.ResourceAPIKeys, auth.OperationRead); principal == nil {
+	if principal := authorizeOperation(w, r, auth.ResourceRoles, auth.OperationRead); principal == nil {
 		return
 	}
 	userID, ok := parseID(w, r)
@@ -38,8 +37,8 @@ func GetUserRole(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result.GetPayload())
 }
 
-func GetMyRole(w http.ResponseWriter, r *http.Request) {
-	principal := authorizeOperation(w, r, auth.ResourceAPIKeys, auth.OperationRead)
+func GetRole(w http.ResponseWriter, r *http.Request) {
+	principal := authorizeOperation(w, r, auth.ResourceRoles, auth.OperationRead)
 	if principal == nil {
 		return
 	}
@@ -52,7 +51,7 @@ func GetMyRole(w http.ResponseWriter, r *http.Request) {
 }
 
 func AssignRoleToUser(w http.ResponseWriter, r *http.Request) {
-	if principal := authorizeOperation(w, r, auth.ResourceAPIKeys, auth.OperationUpdate); principal == nil {
+	if principal := authorizeOperation(w, r, auth.ResourceRoles, auth.OperationUpdate); principal == nil {
 		return
 	}
 	var req graphQLModel.AssignRoleInput

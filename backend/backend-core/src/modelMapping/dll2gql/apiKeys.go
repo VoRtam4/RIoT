@@ -10,7 +10,7 @@ import (
 func ToGraphQLModelAPIKey(k dllModel.APIKey) graphQLModel.APIKey {
 	var expiresAt *string
 	if k.ExpiresAt != nil {
-		s := k.ExpiresAt.Format(time.RFC3339)
+		s := k.ExpiresAt.Format(time.RFC3339Nano)
 		expiresAt = &s
 	}
 	return graphQLModel.APIKey{

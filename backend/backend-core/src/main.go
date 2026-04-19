@@ -33,10 +33,10 @@ func kickstartISC() {
 	isc.SetupRabbitMQInfrastructureForISC(rabbitMQClient)
 	isc.EnqueueMessageRepresentingCurrentSDTypeConfiguration(rabbitMQClient)
 	isc.EnqueueMessageRepresentingCurrentSDInstanceConfiguration(rabbitMQClient)
-	//isc.EnqueueMessageRepresentingCurrentKPIDefinitionConfiguration(rabbitMQClient)
 	go isc.ProcessIncomingMessageProcessingUnitConnectionNotifications()
 	go isc.ProcessIncomingSDTypeRegistrationRequests()
 	go isc.ProcessIncomingSDInstanceRegistrationRequests()
+	go isc.ProcessIncomingRawDataPoints()
 	go isc.ProcessIncomingKPIFulfillmentCheckResults()
 }
 
@@ -45,7 +45,7 @@ func main() {
 	log.Println("Waiting for dependencies...")
 	waitForDependencies()
 	log.Println("Dependencies ready...")
-	err := dbClient.GetRelationalDatabaseClientInstance().PerformOnStartupOperations(auth.RolePermissions)
+	err := dbClient.GetRelationalDatabaseClientInstance().PerformOnStartupOperations(auth.RolePermissions, auth.FormatPermissionLabel)
 	sharedUtils.TerminateOnError(err, "Unable to perform on-startup database operations")
 	//sharedUtils.StartLoggingProfilingInformationPeriodically(time.Minute)
 	kickstartISC()

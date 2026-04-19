@@ -39,6 +39,40 @@ func GetKPIDefinition(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result.GetPayload())
 }
 
+func GetKPIDefinitionsBySDType(w http.ResponseWriter, r *http.Request) {
+	principal := authorizeOperation(w, r, auth.ResourceKPIDefinitions, auth.OperationRead)
+	if principal == nil {
+		return
+	}
+	sdTypeID, ok := parseID(w, r)
+	if !ok {
+		return
+	}
+	result := domainLogicLayer.GetKPIDefinitionsBySDType(principal.UserID, sdTypeID)
+	if result.IsFailure() {
+		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(result.GetPayload())
+}
+
+func GetKPIDefinitionsBySDInstace(w http.ResponseWriter, r *http.Request) {
+	principal := authorizeOperation(w, r, auth.ResourceKPIDefinitions, auth.OperationRead)
+	if principal == nil {
+		return
+	}
+	sdInstanceID, ok := parseID(w, r)
+	if !ok {
+		return
+	}
+	result := domainLogicLayer.GetKPIDefinitionsBySDInstance(principal.UserID, sdInstanceID)
+	if result.IsFailure() {
+		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(result.GetPayload())
+}
+
 func CreateKPIDefinition(w http.ResponseWriter, r *http.Request) {
 	principal := authorizeOperation(w, r, auth.ResourceKPIDefinitions, auth.OperationCreate)
 	if principal == nil {

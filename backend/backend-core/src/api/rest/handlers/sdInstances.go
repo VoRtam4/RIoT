@@ -9,6 +9,22 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
 )
 
+func GetSDInstance(w http.ResponseWriter, r *http.Request) {
+	if principal := authorizeOperation(w, r, auth.ResourceSDInstances, auth.OperationRead); principal == nil {
+		return
+	}
+	id, ok := parseID(w, r)
+	if !ok {
+		return
+	}
+	result := domainLogicLayer.GetSDInstance(id)
+	if result.IsFailure() {
+		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(result.GetPayload())
+}
+
 func GetSDInstances(w http.ResponseWriter, r *http.Request) {
 	if principal := authorizeOperation(w, r, auth.ResourceSDInstances, auth.OperationRead); principal == nil {
 		return
@@ -30,6 +46,22 @@ func GetSDInstancesByType(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result := domainLogicLayer.GetSDInstancesByType(sdTypeID)
+	if result.IsFailure() {
+		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(result.GetPayload())
+}
+
+func GetSDInstancesByKpiDefinition(w http.ResponseWriter, r *http.Request) {
+	if principal := authorizeOperation(w, r, auth.ResourceSDInstances, auth.OperationRead); principal == nil {
+		return
+	}
+	kpiDefinitionID, ok := parseID(w, r)
+	if !ok {
+		return
+	}
+	result := domainLogicLayer.GetSDInstancesByKpiDefinition(kpiDefinitionID)
 	if result.IsFailure() {
 		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
 		return

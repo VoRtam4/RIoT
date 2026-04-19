@@ -9,11 +9,10 @@ import (
 )
 
 func GetRoles(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	if principal := AuthorizeOperation(c, msg, auth.ResourceAPIKeys, auth.OperationRead); principal == nil {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceRoles, auth.OperationRead); principal == nil {
 		return
 	}
-	labels := auth.GetAllRoleLabels()
-	result := domainLogicLayer.LoadRolesByLabels(labels)
+	result := domainLogicLayer.LoadRoles()
 	if result.IsFailure() {
 		sendError(c, msg.ID, result.GetError().Error())
 		return
@@ -22,7 +21,7 @@ func GetRoles(c *connection.Client, msg sharedModel.WebSocketMessage) {
 }
 
 func GetUserRole(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	if principal := AuthorizeOperation(c, msg, auth.ResourceAPIKeys, auth.OperationRead); principal == nil {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceRoles, auth.OperationRead); principal == nil {
 		return
 	}
 	payload, ok := msg.Payload.(map[string]any)
@@ -43,8 +42,8 @@ func GetUserRole(c *connection.Client, msg sharedModel.WebSocketMessage) {
 	sendSuccess(c, msg.ID, result.GetPayload())
 }
 
-func GetMyRole(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	principal := AuthorizeOperation(c, msg, auth.ResourceAPIKeys, auth.OperationRead)
+func GetRole(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	principal := AuthorizeOperation(c, msg, auth.ResourceRoles, auth.OperationRead)
 	if principal == nil {
 		return
 	}
@@ -57,7 +56,7 @@ func GetMyRole(c *connection.Client, msg sharedModel.WebSocketMessage) {
 }
 
 func AssignRoleToUser(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	if principal := AuthorizeOperation(c, msg, auth.ResourceUserConfig, auth.OperationUpdate); principal == nil {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceRoles, auth.OperationUpdate); principal == nil {
 		return
 	}
 	req, err := parsePayload[graphQLModel.AssignRoleInput](msg)
@@ -65,12 +64,10 @@ func AssignRoleToUser(c *connection.Client, msg sharedModel.WebSocketMessage) {
 		sendError(c, msg.ID, "invalid payload")
 		return
 	}
-
 	err = domainLogicLayer.AssignRoleToUser(req.UserID, req.RoleID)
 	if err != nil {
 		sendError(c, msg.ID, err.Error())
 		return
 	}
-
 	sendSuccess(c, msg.ID, nil)
 }

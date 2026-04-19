@@ -41,8 +41,8 @@ func TestPersistSDType(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows(sharedUtils.SliceOf("id")).AddRow(1).AddRow(2))
 	mock.ExpectCommit()
 	sdType := dllModel.SDType{
-		ID:         sharedUtils.NewEmptyOptional[uint32](),
-		Denotation: "shelly1pro",
+		ID:  sharedUtils.NewEmptyOptional[uint32](),
+		UID: "shelly1pro",
 		Parameters: []dllModel.SDParameter{{
 			ID:         sharedUtils.NewEmptyOptional[uint32](),
 			Denotation: "relay_0_temperature",

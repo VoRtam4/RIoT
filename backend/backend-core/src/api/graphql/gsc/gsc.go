@@ -61,36 +61,49 @@ type MutationResolver interface {
 	UpdateSDInstanceGroup(ctx context.Context, id uint32, input graphQLModel.SDInstanceGroupInput) (graphQLModel.SDInstanceGroup, error)
 	DeleteSDInstanceGroup(ctx context.Context, id uint32) (bool, error)
 	StatisticsMutate(ctx context.Context, inputData graphQLModel.InputData) (bool, error)
-	UpdateUserConfig(ctx context.Context, userID uint32, input graphQLModel.UserConfigInput) (graphQLModel.UserConfig, error)
-	DeleteUserConfig(ctx context.Context, userID uint32) (bool, error)
+	UpdateUserConfig(ctx context.Context, input graphQLModel.UserConfigInput) (graphQLModel.UserConfig, error)
+	DeleteUserConfig(ctx context.Context) (bool, error)
 	AssignRoleToUser(ctx context.Context, input graphQLModel.AssignRoleInput) (bool, error)
-	CreateMyAPIKey(ctx context.Context, input graphQLModel.APIKeyInput) (string, error)
-	UpdateMyAPIKey(ctx context.Context, id uint32, input graphQLModel.APIKeyInput) (bool, error)
-	DeleteMyAPIKey(ctx context.Context, id uint32) (bool, error)
+	CreateAPIKey(ctx context.Context, input graphQLModel.APIKeyInput) (string, error)
+	UpdateAPIKey(ctx context.Context, id uint32, input graphQLModel.APIKeyInput) (bool, error)
+	DeleteAPIKey(ctx context.Context, id uint32) (bool, error)
+	StartTimeSeriesExport(ctx context.Context, input graphQLModel.TimeSeriesReadInput) (string, error)
+	StartTimeSeriesExportAggregateKpi(ctx context.Context, input graphQLModel.TimeSeriesReadAggregateKPIInput) (string, error)
 }
 type QueryResolver interface {
 	SdType(ctx context.Context, id uint32) (graphQLModel.SDType, error)
 	SdTypes(ctx context.Context) ([]graphQLModel.SDType, error)
+	SdInstance(ctx context.Context, id uint32) (graphQLModel.SDInstance, error)
 	SdInstances(ctx context.Context) ([]graphQLModel.SDInstance, error)
-	SdInstancesByType(ctx context.Context, sdTypeID uint32) ([]graphQLModel.SDInstance, error)
+	SdInstancesByType(ctx context.Context, id uint32) ([]graphQLModel.SDInstance, error)
+	SdInstancesByKpiDefinition(ctx context.Context, id uint32) ([]graphQLModel.SDInstance, error)
 	KpiDefinition(ctx context.Context, id uint32) (graphQLModel.KPIDefinition, error)
 	KpiDefinitions(ctx context.Context) ([]graphQLModel.KPIDefinition, error)
-	KpiFulfillmentCheckResults(ctx context.Context) ([]graphQLModel.KPIFulfillmentCheckResult, error)
+	KpiDefinitionsBySdType(ctx context.Context, id uint32) ([]graphQLModel.KPIDefinition, error)
+	KpiDefinitionsBySdInstance(ctx context.Context, id uint32) ([]graphQLModel.KPIDefinition, error)
+	RawDataPointsBySDType(ctx context.Context, id uint32) ([]graphQLModel.RawDataPoint, error)
+	RawDataPoint(ctx context.Context, id uint32) (graphQLModel.RawDataPoint, error)
+	KpiResults(ctx context.Context) ([]graphQLModel.KPIFulfillmentCheckResult, error)
+	KpiResultsByKpi(ctx context.Context, id uint32) ([]graphQLModel.KPIFulfillmentCheckResult, error)
+	KpiResult(ctx context.Context, request graphQLModel.KPIFulfillmentCheckResultRequest) (graphQLModel.KPIFulfillmentCheckResult, error)
 	SdInstanceGroup(ctx context.Context, id uint32) (graphQLModel.SDInstanceGroup, error)
 	SdInstanceGroups(ctx context.Context) ([]graphQLModel.SDInstanceGroup, error)
 	StatisticsQuerySimpleSensors(ctx context.Context, request *graphQLModel.StatisticsInput, sensors graphQLModel.SimpleSensors) ([]graphQLModel.OutputData, error)
 	StatisticsQuerySensorsWithFields(ctx context.Context, request *graphQLModel.StatisticsInput, sensors graphQLModel.SensorsWithFields) ([]graphQLModel.OutputData, error)
-	UserConfig(ctx context.Context, id uint32) (graphQLModel.UserConfig, error)
-	MyUserConfig(ctx context.Context) (graphQLModel.UserConfig, error)
+	UserConfig(ctx context.Context) (graphQLModel.UserConfig, error)
 	Roles(ctx context.Context) ([]graphQLModel.Role, error)
-	UserRole(ctx context.Context, userID uint32) (*graphQLModel.Role, error)
-	MyRole(ctx context.Context) (*graphQLModel.Role, error)
-	MyAPIKeys(ctx context.Context) ([]graphQLModel.APIKey, error)
-	MyAPIKey(ctx context.Context, id uint32) (graphQLModel.APIKey, error)
+	UserRole(ctx context.Context, id uint32) (*graphQLModel.Role, error)
+	Role(ctx context.Context) (*graphQLModel.Role, error)
+	APIKeys(ctx context.Context) ([]graphQLModel.APIKey, error)
+	APIKey(ctx context.Context, id uint32) (graphQLModel.APIKey, error)
+	TimeSeriesRead(ctx context.Context, request graphQLModel.TimeSeriesReadInput) (graphQLModel.TimeSeriesReadResponse, error)
+	TimeSeriesReadAggregateKpi(ctx context.Context, request graphQLModel.TimeSeriesReadAggregateKPIInput) (graphQLModel.TimeSeriesReadResponse, error)
+	TimeSeriesDistinctTagValues(ctx context.Context, request graphQLModel.TimeSeriesDistinctTagValuesInput) (graphQLModel.TimeSeriesDistinctTagValuesResponse, error)
 }
 type SubscriptionResolver interface {
-	OnSDInstanceRegistered(ctx context.Context) (<-chan graphQLModel.SDInstance, error)
-	OnKPIFulfillmentChecked(ctx context.Context) (<-chan graphQLModel.KPIFulfillmentCheckResultTuple, error)
+	OnSDInstanceRegistered(ctx context.Context, filter *graphQLModel.SDInstanceRegisteredFilter) (<-chan graphQLModel.SDInstance, error)
+	OnRawDataPointArrived(ctx context.Context, filter *graphQLModel.RawDataPointArrivedFilter) (<-chan []graphQLModel.RawDataPoint, error)
+	OnKPIFulfillmentChecked(ctx context.Context, filter *graphQLModel.KPIFulfillmentCheckedFilter) (<-chan []graphQLModel.KPIFulfillmentCheckResult, error)
 }
 
 type executableSchema struct {
@@ -120,10 +133,16 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
 		ec.unmarshalInputAPIKeyInput,
 		ec.unmarshalInputAssignRoleInput,
+		ec.unmarshalInputFilterNodeInput,
+		ec.unmarshalInputFilterRuleInput,
 		ec.unmarshalInputInputData,
 		ec.unmarshalInputKPIDefinitionInput,
+		ec.unmarshalInputKPIFulfillmentCheckResultRequest,
+		ec.unmarshalInputKPIFulfillmentCheckedFilter,
 		ec.unmarshalInputKPINodeInput,
+		ec.unmarshalInputRawDataPointArrivedFilter,
 		ec.unmarshalInputSDInstanceGroupInput,
+		ec.unmarshalInputSDInstanceRegisteredFilter,
 		ec.unmarshalInputSDInstanceUpdateInput,
 		ec.unmarshalInputSDParameterInput,
 		ec.unmarshalInputSDTypeInput,
@@ -131,6 +150,10 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputSensorsWithFields,
 		ec.unmarshalInputSimpleSensors,
 		ec.unmarshalInputStatisticsInput,
+		ec.unmarshalInputTimeSeriesCursorInput,
+		ec.unmarshalInputTimeSeriesDistinctTagValuesInput,
+		ec.unmarshalInputTimeSeriesReadAggregateKPIInput,
+		ec.unmarshalInputTimeSeriesReadInput,
 		ec.unmarshalInputUserConfigInput,
 	)
 	first := true
@@ -249,14 +272,14 @@ var sources = []*ast.Source{
 	{Name: "../schema.graphqls", Input: `# ----- SD types and instances -----
 
 enum SDParameterType {
-  STRING
-  NUMBER
-  BOOLEAN
+  string
+  number
+  boolean
 }
 
 enum SDParameterRole {
-  FIELD
-  TAG
+  field
+  tag
 }
 
 type SDParameter {
@@ -269,8 +292,8 @@ type SDParameter {
 
 type SDType {
   id: ID!
+  uid: String!
   label: String!
-  denotation: String!
   parameters: [SDParameter!]!
 }
 
@@ -283,7 +306,7 @@ input SDParameterInput {
 
 input SDTypeInput {
   label: String!
-  denotation: String!
+  uid: String!
   parameters: [SDParameterInput!]!
 }
 
@@ -302,22 +325,31 @@ input SDInstanceUpdateInput {
   confirmedByUser: Boolean
 }
 
+# ----- Raw Data Point -----
+
+type RawDataPoint {
+  sdTypeID: ID!
+  sdInstanceID: ID!
+  payload: JSON!
+  eventTime: String!
+}
+
 # ----- KPI definitions and nodes -----
 
 enum SDInstanceMode {
-  ALL
-  SELECTED
+  all
+  selected
 }
 
 type KPIDefinition {
   id: ID!
   label: String! 
   sdTypeID: ID!
-  sdTypeSpecification: String!
+  sdTypeUID: String!
   userIdentifier: String!
   nodes: [KPINode!]!
   sdInstanceMode: SDInstanceMode!
-  selectedSDInstanceUIDs: [String!]!
+  selectedSDInstanceIDs: [ID!]!
 }
 
 interface KPINode {
@@ -327,9 +359,10 @@ interface KPINode {
 }
 
 enum LogicalOperationType {
-  AND
-  OR
-  NOR
+  and
+  or
+  nor
+  not
 }
 
 type LogicalOperationKPINode implements KPINode {
@@ -356,6 +389,31 @@ type StringEQAtomKPINode implements KPINode & AtomKPINode {
   stringReferenceValue: String!
 }
 
+type StringNEQAtomKPINode implements KPINode & AtomKPINode {
+  id: ID!
+  parentNodeID: ID
+  nodeType: KPINodeType!
+  sdParameterID: ID!
+  sdParameterSpecification: String!
+  stringReferenceValue: String!
+}
+
+type StringExistsAtomKPINode implements KPINode & AtomKPINode {
+  id: ID!
+  parentNodeID: ID
+  nodeType: KPINodeType!
+  sdParameterID: ID!
+  sdParameterSpecification: String!
+}
+
+type StringNotExistsAtomKPINode implements KPINode & AtomKPINode {
+  id: ID!
+  parentNodeID: ID
+  nodeType: KPINodeType!
+  sdParameterID: ID!
+  sdParameterSpecification: String!
+}
+
 type BooleanEQAtomKPINode implements KPINode & AtomKPINode {
   id: ID!
   parentNodeID: ID
@@ -365,7 +423,41 @@ type BooleanEQAtomKPINode implements KPINode & AtomKPINode {
   booleanReferenceValue: Boolean!
 }
 
+type BooleanNEQAtomKPINode implements KPINode & AtomKPINode {
+  id: ID!
+  parentNodeID: ID
+  nodeType: KPINodeType!
+  sdParameterID: ID!
+  sdParameterSpecification: String!
+  booleanReferenceValue: Boolean!
+}
+
+type BooleanExistsAtomKPINode implements KPINode & AtomKPINode {
+  id: ID!
+  parentNodeID: ID
+  nodeType: KPINodeType!
+  sdParameterID: ID!
+  sdParameterSpecification: String!
+}
+
+type BooleanNotExistsAtomKPINode implements KPINode & AtomKPINode {
+  id: ID!
+  parentNodeID: ID
+  nodeType: KPINodeType!
+  sdParameterID: ID!
+  sdParameterSpecification: String!
+}
+
 type NumericEQAtomKPINode implements KPINode & AtomKPINode {
+  id: ID!
+  parentNodeID: ID
+  nodeType: KPINodeType!
+  sdParameterID: ID!
+  sdParameterSpecification: String!
+  numericReferenceValue: Float!
+}
+
+type NumericNEQAtomKPINode implements KPINode & AtomKPINode {
   id: ID!
   parentNodeID: ID
   nodeType: KPINodeType!
@@ -410,24 +502,49 @@ type NumericLEQAtomKPINode implements KPINode & AtomKPINode {
   numericReferenceValue: Float!
 }
 
+type NumericExistsAtomKPINode implements KPINode & AtomKPINode {
+  id: ID!
+  parentNodeID: ID
+  nodeType: KPINodeType!
+  sdParameterID: ID!
+  sdParameterSpecification: String!
+}
+
+type NumericNotExistsAtomKPINode implements KPINode & AtomKPINode {
+  id: ID!
+  parentNodeID: ID
+  nodeType: KPINodeType!
+  sdParameterID: ID!
+  sdParameterSpecification: String!
+}
+
 input KPIDefinitionInput {
   label: String!
   sdTypeID: ID!
-  sdTypeSpecification: String!
+  sdTypeUID: String!
   userIdentifier: String!
   nodes: [KPINodeInput!]!
   sdInstanceMode: SDInstanceMode!
-  selectedSDInstanceUIDs: [String!]!
+  selectedSDInstanceIDs: [ID!]!
 }
 
 enum KPINodeType {
   StringEQAtom,
+  StringNEQAtom,
+  StringExistsAtom,
+  StringNotExistsAtom,
   BooleanEQAtom,
+  BooleanNEQAtom,
+  BooleanExistsAtom,
+  BooleanNotExistsAtom,
   NumericEQAtom,
+  NumericNEQAtom,
   NumericGTAtom,
   NumericGEQAtom,
   NumericLTAtom,
   NumericLEQAtom,
+  NumericExistsAtom,
+  NumericNotExistsAtom,
   LogicalOperation
 }
 
@@ -446,13 +563,16 @@ input KPINodeInput {
 # ----- KPI fulfillment check results -----
 
 type KPIFulfillmentCheckResult {
-  kpiDefinitionID: ID!
+  sdTypeID: ID!
   sdInstanceID: ID!
+  kpiDefinitionID: ID!
+  eventTime: String!
   fulfilled: Boolean!
 }
 
-type KPIFulfillmentCheckResultTuple {
-  kpiFulfillmentCheckResults: [KPIFulfillmentCheckResult!]!
+input KPIFulfillmentCheckResultRequest {
+  kpiDefinitionID: ID!
+  sdInstanceID: ID!
 }
 
 # ----- SD instance groups -----
@@ -523,7 +643,7 @@ input StatisticsInput {
   Amount of minutes to aggregate by
   For example if the queried range has 1 hour and aggregateMinutes is set to 10 the aggregation will result in 6 points
   """
-  aggregateMinutes: Int
+  aggregateSeconds: Int
   """
   Timezone override default UTC.
   For more details why and how this affects queries see: https://www.influxdata.com/blog/time-zones-in-flux/.
@@ -558,7 +678,7 @@ input InputData {
 # ----- Users and their configurations ----
 
 type UserConfig {
-  userId: ID!
+  userID: ID!
   config: JSON!
 }
 
@@ -569,7 +689,12 @@ input UserConfigInput {
 type Role {
   id: ID!
   label: String!
-  permissions: [String!]
+  permissions: [Permission!]
+}
+
+type Permission {
+  uid: String!
+  label: String!
 }
 
 input AssignRoleInput {
@@ -577,27 +702,55 @@ input AssignRoleInput {
 	roleID: ID!
 }
 
+# ----- Subscription filters -----
+
+input SDInstanceRegisteredFilter {
+  sdTypeIDs: [ID!]
+  sdInstanceIDs: [ID!]
+}
+
+input RawDataPointArrivedFilter {
+  sdTypeIDs: [ID!]
+  sdInstanceIDs: [ID!]
+}
+
+input KPIFulfillmentCheckedFilter {
+  sdTypeIDs: [ID!]
+  kpiDefinitions: [ID!]
+  sdInstanceIDs: [ID!]
+}
+
 # ----- Queries, mutations and subscriptions -----
 
 type Query {
   sdType(id: ID!): SDType!
   sdTypes: [SDType!]!
+  sdInstance(id: ID!): SDInstance!
   sdInstances: [SDInstance!]!
-  sdInstancesByType(sdTypeID: ID!): [SDInstance!]!
+  sdInstancesByType(id: ID!): [SDInstance!]!
+  sdInstancesByKpiDefinition(id: ID!): [SDInstance!]!
   kpiDefinition(id: ID!): KPIDefinition!
   kpiDefinitions: [KPIDefinition!]!
-  kpiFulfillmentCheckResults: [KPIFulfillmentCheckResult!]!
+  kpiDefinitionsBySdType(id: ID!): [KPIDefinition!]!
+  kpiDefinitionsBySdInstance(id: ID!): [KPIDefinition!]!
+  rawDataPointsBySDType(id: ID!): [RawDataPoint!]!
+  rawDataPoint(id: ID!): RawDataPoint!
+  kpiResults: [KPIFulfillmentCheckResult!]!
+  kpiResultsByKPI(id: ID!): [KPIFulfillmentCheckResult!]!
+  kpiResult(request: KPIFulfillmentCheckResultRequest!): KPIFulfillmentCheckResult!
   sdInstanceGroup(id: ID!): SDInstanceGroup!
   sdInstanceGroups: [SDInstanceGroup!]!
   statisticsQuerySimpleSensors(request: StatisticsInput sensors: SimpleSensors!): [OutputData!]!
   statisticsQuerySensorsWithFields(request: StatisticsInput sensors: SensorsWithFields!): [OutputData!]!
-  userConfig(id: ID!): UserConfig!
-  myUserConfig: UserConfig!
+  userConfig: UserConfig!
   roles: [Role!]!
-  userRole(userID: ID!): Role
-  myRole: Role
-  myApiKeys: [APIKey!]!
-  myApiKey(id: ID!): APIKey!
+  userRole(id: ID!): Role
+  role: Role
+  apiKeys: [APIKey!]!
+  apiKey(id: ID!): APIKey!
+  timeSeriesRead(request: TimeSeriesReadInput!): TimeSeriesReadResponse!
+  timeSeriesReadAggregateKPI(request: TimeSeriesReadAggregateKPIInput!): TimeSeriesReadResponse!
+  timeSeriesDistinctTagValues(request: TimeSeriesDistinctTagValuesInput!): TimeSeriesDistinctTagValuesResponse!
 }
 
 type Mutation {
@@ -611,17 +764,20 @@ type Mutation {
   updateSDInstanceGroup(id: ID!, input: SDInstanceGroupInput!): SDInstanceGroup!
   deleteSDInstanceGroup(id: ID!): Boolean!
   statisticsMutate(inputData: InputData!): Boolean!
-  updateUserConfig(userId: ID!, input: UserConfigInput!): UserConfig!
-  deleteUserConfig(userId: ID!): Boolean!
+  updateUserConfig(input: UserConfigInput!): UserConfig!
+  deleteUserConfig: Boolean!
   assignRoleToUser(input: AssignRoleInput!): Boolean!
-  createMyAPIKey(input: APIKeyInput!): String!
-  updateMyAPIKey(id: ID!, input: APIKeyInput!): Boolean!
-  deleteMyAPIKey(id: ID!): Boolean!
+  createAPIKey(input: APIKeyInput!): String!
+  updateAPIKey(id: ID!, input: APIKeyInput!): Boolean!
+  deleteAPIKey(id: ID!): Boolean!
+  startTimeSeriesExport(input: TimeSeriesReadInput!): String!
+  startTimeSeriesExportAggregateKPI(input: TimeSeriesReadAggregateKPIInput!): String!
 }
 
 type Subscription {
-  onSDInstanceRegistered: SDInstance!
-  onKPIFulfillmentChecked: KPIFulfillmentCheckResultTuple!
+  onSDInstanceRegistered(filter: SDInstanceRegisteredFilter): SDInstance!
+  onRawDataPointArrived(filter: RawDataPointArrivedFilter): [RawDataPoint!]!
+  onKPIFulfillmentChecked(filter: KPIFulfillmentCheckedFilter): [KPIFulfillmentCheckResult!]!
 }
 
 # ----- API Keys -----
@@ -644,6 +800,162 @@ input APIKeyInput {
   rateLimit: ID
   permissions: [String!]
   ipRestrictions: [String!]
+}
+
+# ----- Time series data base -----
+
+enum TimeSeriesType {
+  raw
+  kpi
+}
+
+enum FilterNodeType {
+  logical
+  rule
+}
+
+enum LogicalOperator {
+  and
+  or
+  not
+}
+
+enum ParameterRole {
+  meta
+  time
+  tag
+  field
+}
+
+enum FilterOperator {
+  eq
+  neq
+  contains
+  in
+  prefix
+  suffix
+  regex
+}
+
+input FilterRuleInput {
+  tag: String!
+  operator: FilterOperator!
+  value: String!
+}
+
+input FilterNodeInput {
+  type: FilterNodeType!
+  operator: LogicalOperator
+  nodes: [FilterNodeInput!]
+  rule: FilterRuleInput
+}
+
+type TimeSeriesCursor {
+  time: Date!
+  sdInstanceUID: String!
+  kpiDefinitionID: ID
+}
+
+input TimeSeriesCursorInput {
+  time: Date!
+  sdInstanceUID: String!
+  kpiDefinitionID: ID
+}
+
+type TimeSeriesDataPoint {
+  time: Date!
+  tags: JSON!
+  data: JSON!
+}
+
+input TimeSeriesReadInput {
+  type: TimeSeriesType!
+
+  sdTypeID: ID
+  sdInstanceIDs: [ID!]
+  kpiDefinitionIDs: [ID!]
+
+  from: Date
+  to: Date
+
+  limit: Int
+  sortDesc: Boolean
+  batch: Int
+
+  filters: FilterNodeInput
+
+  cursor: TimeSeriesCursorInput
+}
+
+input TimeSeriesReadAggregateKPIInput {
+  sdTypeID: ID
+  sdInstanceIDs: [ID!]
+  kpiDefinitionIDs: [ID!]
+
+  from: Date
+  to: Date
+
+  aggregateSeconds: Int!
+
+  limit: Int
+  batch: Int
+  filters: FilterNodeInput
+
+  cursor: TimeSeriesCursorInput
+}
+
+input TimeSeriesDistinctTagValuesInput {
+  type: TimeSeriesType!
+
+  sdTypeID: ID
+  sdInstanceIDs: [ID!]
+  kpiDefinitionIDs: [ID!]
+
+  from: Date
+  to: Date
+
+  tag: String!
+  filters: FilterNodeInput
+}
+
+type TimeSeriesReadResponse {
+  parameters: [TimeSeriesParameter!]
+  base: JSON!
+  data: [TimeSeriesDataPoint!]
+  hasMoreBatches: Boolean!
+  hasMoreData: Boolean!
+  nextCursor: TimeSeriesCursor
+  error: String
+}
+
+type TimeSeriesDistinctTagValuesResponse {
+  values: [String!]!
+  error: String
+}
+
+type TimeSeriesParameter {
+  denotation: String!
+  label: String!
+  role: ParameterRole!
+}
+
+# ----- Time series data export -----
+
+enum ExportStatus {
+  pending
+  processing
+  done
+  failed
+  expired
+}
+
+type TimeSeriesExport {
+  id: ID!
+  status: ExportStatus!
+  downloadUrl: String
+  createdAt: Date!
+  expiresAt: Date
+  error: String
 }
 `, BuiltIn: false},
 }
@@ -681,6 +993,34 @@ func (ec *executionContext) field_Mutation_assignRoleToUser_argsInput(
 	return zeroVal, nil
 }
 
+func (ec *executionContext) field_Mutation_createAPIKey_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_createAPIKey_argsInput(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_createAPIKey_argsInput(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (graphQLModel.APIKeyInput, error) {
+	if _, ok := rawArgs["input"]; !ok {
+		var zeroVal graphQLModel.APIKeyInput
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+	if tmp, ok := rawArgs["input"]; ok {
+		return ec.unmarshalNAPIKeyInput2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐAPIKeyInput(ctx, tmp)
+	}
+
+	var zeroVal graphQLModel.APIKeyInput
+	return zeroVal, nil
+}
+
 func (ec *executionContext) field_Mutation_createKPIDefinition_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -706,34 +1046,6 @@ func (ec *executionContext) field_Mutation_createKPIDefinition_argsInput(
 	}
 
 	var zeroVal graphQLModel.KPIDefinitionInput
-	return zeroVal, nil
-}
-
-func (ec *executionContext) field_Mutation_createMyAPIKey_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := ec.field_Mutation_createMyAPIKey_argsInput(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["input"] = arg0
-	return args, nil
-}
-func (ec *executionContext) field_Mutation_createMyAPIKey_argsInput(
-	ctx context.Context,
-	rawArgs map[string]any,
-) (graphQLModel.APIKeyInput, error) {
-	if _, ok := rawArgs["input"]; !ok {
-		var zeroVal graphQLModel.APIKeyInput
-		return zeroVal, nil
-	}
-
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-	if tmp, ok := rawArgs["input"]; ok {
-		return ec.unmarshalNAPIKeyInput2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐAPIKeyInput(ctx, tmp)
-	}
-
-	var zeroVal graphQLModel.APIKeyInput
 	return zeroVal, nil
 }
 
@@ -793,17 +1105,17 @@ func (ec *executionContext) field_Mutation_createSDType_argsInput(
 	return zeroVal, nil
 }
 
-func (ec *executionContext) field_Mutation_deleteKPIDefinition_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+func (ec *executionContext) field_Mutation_deleteAPIKey_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := ec.field_Mutation_deleteKPIDefinition_argsID(ctx, rawArgs)
+	arg0, err := ec.field_Mutation_deleteAPIKey_argsID(ctx, rawArgs)
 	if err != nil {
 		return nil, err
 	}
 	args["id"] = arg0
 	return args, nil
 }
-func (ec *executionContext) field_Mutation_deleteKPIDefinition_argsID(
+func (ec *executionContext) field_Mutation_deleteAPIKey_argsID(
 	ctx context.Context,
 	rawArgs map[string]any,
 ) (uint32, error) {
@@ -821,17 +1133,17 @@ func (ec *executionContext) field_Mutation_deleteKPIDefinition_argsID(
 	return zeroVal, nil
 }
 
-func (ec *executionContext) field_Mutation_deleteMyAPIKey_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+func (ec *executionContext) field_Mutation_deleteKPIDefinition_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := ec.field_Mutation_deleteMyAPIKey_argsID(ctx, rawArgs)
+	arg0, err := ec.field_Mutation_deleteKPIDefinition_argsID(ctx, rawArgs)
 	if err != nil {
 		return nil, err
 	}
 	args["id"] = arg0
 	return args, nil
 }
-func (ec *executionContext) field_Mutation_deleteMyAPIKey_argsID(
+func (ec *executionContext) field_Mutation_deleteKPIDefinition_argsID(
 	ctx context.Context,
 	rawArgs map[string]any,
 ) (uint32, error) {
@@ -905,31 +1217,59 @@ func (ec *executionContext) field_Mutation_deleteSDType_argsID(
 	return zeroVal, nil
 }
 
-func (ec *executionContext) field_Mutation_deleteUserConfig_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+func (ec *executionContext) field_Mutation_startTimeSeriesExportAggregateKPI_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := ec.field_Mutation_deleteUserConfig_argsUserID(ctx, rawArgs)
+	arg0, err := ec.field_Mutation_startTimeSeriesExportAggregateKPI_argsInput(ctx, rawArgs)
 	if err != nil {
 		return nil, err
 	}
-	args["userId"] = arg0
+	args["input"] = arg0
 	return args, nil
 }
-func (ec *executionContext) field_Mutation_deleteUserConfig_argsUserID(
+func (ec *executionContext) field_Mutation_startTimeSeriesExportAggregateKPI_argsInput(
 	ctx context.Context,
 	rawArgs map[string]any,
-) (uint32, error) {
-	if _, ok := rawArgs["userId"]; !ok {
-		var zeroVal uint32
+) (graphQLModel.TimeSeriesReadAggregateKPIInput, error) {
+	if _, ok := rawArgs["input"]; !ok {
+		var zeroVal graphQLModel.TimeSeriesReadAggregateKPIInput
 		return zeroVal, nil
 	}
 
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
-	if tmp, ok := rawArgs["userId"]; ok {
-		return ec.unmarshalNID2uint32(ctx, tmp)
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+	if tmp, ok := rawArgs["input"]; ok {
+		return ec.unmarshalNTimeSeriesReadAggregateKPIInput2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesReadAggregateKPIInput(ctx, tmp)
 	}
 
-	var zeroVal uint32
+	var zeroVal graphQLModel.TimeSeriesReadAggregateKPIInput
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_startTimeSeriesExport_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_startTimeSeriesExport_argsInput(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_startTimeSeriesExport_argsInput(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (graphQLModel.TimeSeriesReadInput, error) {
+	if _, ok := rawArgs["input"]; !ok {
+		var zeroVal graphQLModel.TimeSeriesReadInput
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+	if tmp, ok := rawArgs["input"]; ok {
+		return ec.unmarshalNTimeSeriesReadInput2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesReadInput(ctx, tmp)
+	}
+
+	var zeroVal graphQLModel.TimeSeriesReadInput
 	return zeroVal, nil
 }
 
@@ -958,6 +1298,57 @@ func (ec *executionContext) field_Mutation_statisticsMutate_argsInputData(
 	}
 
 	var zeroVal graphQLModel.InputData
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_updateAPIKey_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_updateAPIKey_argsID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	arg1, err := ec.field_Mutation_updateAPIKey_argsInput(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg1
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_updateAPIKey_argsID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (uint32, error) {
+	if _, ok := rawArgs["id"]; !ok {
+		var zeroVal uint32
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+	if tmp, ok := rawArgs["id"]; ok {
+		return ec.unmarshalNID2uint32(ctx, tmp)
+	}
+
+	var zeroVal uint32
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_updateAPIKey_argsInput(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (graphQLModel.APIKeyInput, error) {
+	if _, ok := rawArgs["input"]; !ok {
+		var zeroVal graphQLModel.APIKeyInput
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+	if tmp, ok := rawArgs["input"]; ok {
+		return ec.unmarshalNAPIKeyInput2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐAPIKeyInput(ctx, tmp)
+	}
+
+	var zeroVal graphQLModel.APIKeyInput
 	return zeroVal, nil
 }
 
@@ -1009,57 +1400,6 @@ func (ec *executionContext) field_Mutation_updateKPIDefinition_argsInput(
 	}
 
 	var zeroVal graphQLModel.KPIDefinitionInput
-	return zeroVal, nil
-}
-
-func (ec *executionContext) field_Mutation_updateMyAPIKey_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := ec.field_Mutation_updateMyAPIKey_argsID(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["id"] = arg0
-	arg1, err := ec.field_Mutation_updateMyAPIKey_argsInput(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["input"] = arg1
-	return args, nil
-}
-func (ec *executionContext) field_Mutation_updateMyAPIKey_argsID(
-	ctx context.Context,
-	rawArgs map[string]any,
-) (uint32, error) {
-	if _, ok := rawArgs["id"]; !ok {
-		var zeroVal uint32
-		return zeroVal, nil
-	}
-
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
-	if tmp, ok := rawArgs["id"]; ok {
-		return ec.unmarshalNID2uint32(ctx, tmp)
-	}
-
-	var zeroVal uint32
-	return zeroVal, nil
-}
-
-func (ec *executionContext) field_Mutation_updateMyAPIKey_argsInput(
-	ctx context.Context,
-	rawArgs map[string]any,
-) (graphQLModel.APIKeyInput, error) {
-	if _, ok := rawArgs["input"]; !ok {
-		var zeroVal graphQLModel.APIKeyInput
-		return zeroVal, nil
-	}
-
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-	if tmp, ok := rawArgs["input"]; ok {
-		return ec.unmarshalNAPIKeyInput2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐAPIKeyInput(ctx, tmp)
-	}
-
-	var zeroVal graphQLModel.APIKeyInput
 	return zeroVal, nil
 }
 
@@ -1168,36 +1508,13 @@ func (ec *executionContext) field_Mutation_updateSDInstance_argsInput(
 func (ec *executionContext) field_Mutation_updateUserConfig_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := ec.field_Mutation_updateUserConfig_argsUserID(ctx, rawArgs)
+	arg0, err := ec.field_Mutation_updateUserConfig_argsInput(ctx, rawArgs)
 	if err != nil {
 		return nil, err
 	}
-	args["userId"] = arg0
-	arg1, err := ec.field_Mutation_updateUserConfig_argsInput(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["input"] = arg1
+	args["input"] = arg0
 	return args, nil
 }
-func (ec *executionContext) field_Mutation_updateUserConfig_argsUserID(
-	ctx context.Context,
-	rawArgs map[string]any,
-) (uint32, error) {
-	if _, ok := rawArgs["userId"]; !ok {
-		var zeroVal uint32
-		return zeroVal, nil
-	}
-
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("userId"))
-	if tmp, ok := rawArgs["userId"]; ok {
-		return ec.unmarshalNID2uint32(ctx, tmp)
-	}
-
-	var zeroVal uint32
-	return zeroVal, nil
-}
-
 func (ec *executionContext) field_Mutation_updateUserConfig_argsInput(
 	ctx context.Context,
 	rawArgs map[string]any,
@@ -1244,6 +1561,34 @@ func (ec *executionContext) field_Query___type_argsName(
 	return zeroVal, nil
 }
 
+func (ec *executionContext) field_Query_apiKey_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_apiKey_argsID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_apiKey_argsID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (uint32, error) {
+	if _, ok := rawArgs["id"]; !ok {
+		var zeroVal uint32
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+	if tmp, ok := rawArgs["id"]; ok {
+		return ec.unmarshalNID2uint32(ctx, tmp)
+	}
+
+	var zeroVal uint32
+	return zeroVal, nil
+}
+
 func (ec *executionContext) field_Query_kpiDefinition_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1272,17 +1617,157 @@ func (ec *executionContext) field_Query_kpiDefinition_argsID(
 	return zeroVal, nil
 }
 
-func (ec *executionContext) field_Query_myApiKey_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+func (ec *executionContext) field_Query_kpiDefinitionsBySdInstance_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := ec.field_Query_myApiKey_argsID(ctx, rawArgs)
+	arg0, err := ec.field_Query_kpiDefinitionsBySdInstance_argsID(ctx, rawArgs)
 	if err != nil {
 		return nil, err
 	}
 	args["id"] = arg0
 	return args, nil
 }
-func (ec *executionContext) field_Query_myApiKey_argsID(
+func (ec *executionContext) field_Query_kpiDefinitionsBySdInstance_argsID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (uint32, error) {
+	if _, ok := rawArgs["id"]; !ok {
+		var zeroVal uint32
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+	if tmp, ok := rawArgs["id"]; ok {
+		return ec.unmarshalNID2uint32(ctx, tmp)
+	}
+
+	var zeroVal uint32
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_kpiDefinitionsBySdType_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_kpiDefinitionsBySdType_argsID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_kpiDefinitionsBySdType_argsID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (uint32, error) {
+	if _, ok := rawArgs["id"]; !ok {
+		var zeroVal uint32
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+	if tmp, ok := rawArgs["id"]; ok {
+		return ec.unmarshalNID2uint32(ctx, tmp)
+	}
+
+	var zeroVal uint32
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_kpiResult_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_kpiResult_argsRequest(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["request"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_kpiResult_argsRequest(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (graphQLModel.KPIFulfillmentCheckResultRequest, error) {
+	if _, ok := rawArgs["request"]; !ok {
+		var zeroVal graphQLModel.KPIFulfillmentCheckResultRequest
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("request"))
+	if tmp, ok := rawArgs["request"]; ok {
+		return ec.unmarshalNKPIFulfillmentCheckResultRequest2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPIFulfillmentCheckResultRequest(ctx, tmp)
+	}
+
+	var zeroVal graphQLModel.KPIFulfillmentCheckResultRequest
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_kpiResultsByKPI_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_kpiResultsByKPI_argsID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_kpiResultsByKPI_argsID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (uint32, error) {
+	if _, ok := rawArgs["id"]; !ok {
+		var zeroVal uint32
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+	if tmp, ok := rawArgs["id"]; ok {
+		return ec.unmarshalNID2uint32(ctx, tmp)
+	}
+
+	var zeroVal uint32
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_rawDataPoint_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_rawDataPoint_argsID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_rawDataPoint_argsID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (uint32, error) {
+	if _, ok := rawArgs["id"]; !ok {
+		var zeroVal uint32
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+	if tmp, ok := rawArgs["id"]; ok {
+		return ec.unmarshalNID2uint32(ctx, tmp)
+	}
+
+	var zeroVal uint32
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_rawDataPointsBySDType_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_rawDataPointsBySDType_argsID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_rawDataPointsBySDType_argsID(
 	ctx context.Context,
 	rawArgs map[string]any,
 ) (uint32, error) {
@@ -1328,27 +1813,83 @@ func (ec *executionContext) field_Query_sdInstanceGroup_argsID(
 	return zeroVal, nil
 }
 
-func (ec *executionContext) field_Query_sdInstancesByType_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+func (ec *executionContext) field_Query_sdInstance_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := ec.field_Query_sdInstancesByType_argsSdTypeID(ctx, rawArgs)
+	arg0, err := ec.field_Query_sdInstance_argsID(ctx, rawArgs)
 	if err != nil {
 		return nil, err
 	}
-	args["sdTypeID"] = arg0
+	args["id"] = arg0
 	return args, nil
 }
-func (ec *executionContext) field_Query_sdInstancesByType_argsSdTypeID(
+func (ec *executionContext) field_Query_sdInstance_argsID(
 	ctx context.Context,
 	rawArgs map[string]any,
 ) (uint32, error) {
-	if _, ok := rawArgs["sdTypeID"]; !ok {
+	if _, ok := rawArgs["id"]; !ok {
 		var zeroVal uint32
 		return zeroVal, nil
 	}
 
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("sdTypeID"))
-	if tmp, ok := rawArgs["sdTypeID"]; ok {
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+	if tmp, ok := rawArgs["id"]; ok {
+		return ec.unmarshalNID2uint32(ctx, tmp)
+	}
+
+	var zeroVal uint32
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_sdInstancesByKpiDefinition_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_sdInstancesByKpiDefinition_argsID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_sdInstancesByKpiDefinition_argsID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (uint32, error) {
+	if _, ok := rawArgs["id"]; !ok {
+		var zeroVal uint32
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+	if tmp, ok := rawArgs["id"]; ok {
+		return ec.unmarshalNID2uint32(ctx, tmp)
+	}
+
+	var zeroVal uint32
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_sdInstancesByType_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_sdInstancesByType_argsID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_sdInstancesByType_argsID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (uint32, error) {
+	if _, ok := rawArgs["id"]; !ok {
+		var zeroVal uint32
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+	if tmp, ok := rawArgs["id"]; ok {
 		return ec.unmarshalNID2uint32(ctx, tmp)
 	}
 
@@ -1486,17 +2027,101 @@ func (ec *executionContext) field_Query_statisticsQuerySimpleSensors_argsSensors
 	return zeroVal, nil
 }
 
-func (ec *executionContext) field_Query_userConfig_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+func (ec *executionContext) field_Query_timeSeriesDistinctTagValues_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := ec.field_Query_userConfig_argsID(ctx, rawArgs)
+	arg0, err := ec.field_Query_timeSeriesDistinctTagValues_argsRequest(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["request"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_timeSeriesDistinctTagValues_argsRequest(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (graphQLModel.TimeSeriesDistinctTagValuesInput, error) {
+	if _, ok := rawArgs["request"]; !ok {
+		var zeroVal graphQLModel.TimeSeriesDistinctTagValuesInput
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("request"))
+	if tmp, ok := rawArgs["request"]; ok {
+		return ec.unmarshalNTimeSeriesDistinctTagValuesInput2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesDistinctTagValuesInput(ctx, tmp)
+	}
+
+	var zeroVal graphQLModel.TimeSeriesDistinctTagValuesInput
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_timeSeriesReadAggregateKPI_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_timeSeriesReadAggregateKPI_argsRequest(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["request"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_timeSeriesReadAggregateKPI_argsRequest(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (graphQLModel.TimeSeriesReadAggregateKPIInput, error) {
+	if _, ok := rawArgs["request"]; !ok {
+		var zeroVal graphQLModel.TimeSeriesReadAggregateKPIInput
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("request"))
+	if tmp, ok := rawArgs["request"]; ok {
+		return ec.unmarshalNTimeSeriesReadAggregateKPIInput2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesReadAggregateKPIInput(ctx, tmp)
+	}
+
+	var zeroVal graphQLModel.TimeSeriesReadAggregateKPIInput
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_timeSeriesRead_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_timeSeriesRead_argsRequest(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["request"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_timeSeriesRead_argsRequest(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (graphQLModel.TimeSeriesReadInput, error) {
+	if _, ok := rawArgs["request"]; !ok {
+		var zeroVal graphQLModel.TimeSeriesReadInput
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("request"))
+	if tmp, ok := rawArgs["request"]; ok {
+		return ec.unmarshalNTimeSeriesReadInput2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesReadInput(ctx, tmp)
+	}
+
+	var zeroVal graphQLModel.TimeSeriesReadInput
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Query_userRole_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_userRole_argsID(ctx, rawArgs)
 	if err != nil {
 		return nil, err
 	}
 	args["id"] = arg0
 	return args, nil
 }
-func (ec *executionContext) field_Query_userConfig_argsID(
+func (ec *executionContext) field_Query_userRole_argsID(
 	ctx context.Context,
 	rawArgs map[string]any,
 ) (uint32, error) {
@@ -1514,31 +2139,87 @@ func (ec *executionContext) field_Query_userConfig_argsID(
 	return zeroVal, nil
 }
 
-func (ec *executionContext) field_Query_userRole_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+func (ec *executionContext) field_Subscription_onKPIFulfillmentChecked_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := ec.field_Query_userRole_argsUserID(ctx, rawArgs)
+	arg0, err := ec.field_Subscription_onKPIFulfillmentChecked_argsFilter(ctx, rawArgs)
 	if err != nil {
 		return nil, err
 	}
-	args["userID"] = arg0
+	args["filter"] = arg0
 	return args, nil
 }
-func (ec *executionContext) field_Query_userRole_argsUserID(
+func (ec *executionContext) field_Subscription_onKPIFulfillmentChecked_argsFilter(
 	ctx context.Context,
 	rawArgs map[string]any,
-) (uint32, error) {
-	if _, ok := rawArgs["userID"]; !ok {
-		var zeroVal uint32
+) (*graphQLModel.KPIFulfillmentCheckedFilter, error) {
+	if _, ok := rawArgs["filter"]; !ok {
+		var zeroVal *graphQLModel.KPIFulfillmentCheckedFilter
 		return zeroVal, nil
 	}
 
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("userID"))
-	if tmp, ok := rawArgs["userID"]; ok {
-		return ec.unmarshalNID2uint32(ctx, tmp)
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("filter"))
+	if tmp, ok := rawArgs["filter"]; ok {
+		return ec.unmarshalOKPIFulfillmentCheckedFilter2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPIFulfillmentCheckedFilter(ctx, tmp)
 	}
 
-	var zeroVal uint32
+	var zeroVal *graphQLModel.KPIFulfillmentCheckedFilter
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Subscription_onRawDataPointArrived_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Subscription_onRawDataPointArrived_argsFilter(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["filter"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Subscription_onRawDataPointArrived_argsFilter(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*graphQLModel.RawDataPointArrivedFilter, error) {
+	if _, ok := rawArgs["filter"]; !ok {
+		var zeroVal *graphQLModel.RawDataPointArrivedFilter
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("filter"))
+	if tmp, ok := rawArgs["filter"]; ok {
+		return ec.unmarshalORawDataPointArrivedFilter2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐRawDataPointArrivedFilter(ctx, tmp)
+	}
+
+	var zeroVal *graphQLModel.RawDataPointArrivedFilter
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Subscription_onSDInstanceRegistered_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Subscription_onSDInstanceRegistered_argsFilter(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["filter"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Subscription_onSDInstanceRegistered_argsFilter(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (*graphQLModel.SDInstanceRegisteredFilter, error) {
+	if _, ok := rawArgs["filter"]; !ok {
+		var zeroVal *graphQLModel.SDInstanceRegisteredFilter
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("filter"))
+	if tmp, ok := rawArgs["filter"]; ok {
+		return ec.unmarshalOSDInstanceRegisteredFilter2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐSDInstanceRegisteredFilter(ctx, tmp)
+	}
+
+	var zeroVal *graphQLModel.SDInstanceRegisteredFilter
 	return zeroVal, nil
 }
 
@@ -2266,6 +2947,701 @@ func (ec *executionContext) fieldContext_BooleanEQAtomKPINode_booleanReferenceVa
 	return fc, nil
 }
 
+func (ec *executionContext) _BooleanExistsAtomKPINode_id(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.BooleanExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BooleanExistsAtomKPINode_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint32)
+	fc.Result = res
+	return ec.marshalNID2uint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_BooleanExistsAtomKPINode_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BooleanExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BooleanExistsAtomKPINode_parentNodeID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.BooleanExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BooleanExistsAtomKPINode_parentNodeID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ParentNodeID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*uint32)
+	fc.Result = res
+	return ec.marshalOID2ᚖuint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_BooleanExistsAtomKPINode_parentNodeID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BooleanExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BooleanExistsAtomKPINode_nodeType(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.BooleanExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BooleanExistsAtomKPINode_nodeType(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.NodeType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(graphQLModel.KPINodeType)
+	fc.Result = res
+	return ec.marshalNKPINodeType2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPINodeType(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_BooleanExistsAtomKPINode_nodeType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BooleanExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type KPINodeType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BooleanExistsAtomKPINode_sdParameterID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.BooleanExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BooleanExistsAtomKPINode_sdParameterID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SdParameterID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint32)
+	fc.Result = res
+	return ec.marshalNID2uint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_BooleanExistsAtomKPINode_sdParameterID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BooleanExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BooleanExistsAtomKPINode_sdParameterSpecification(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.BooleanExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BooleanExistsAtomKPINode_sdParameterSpecification(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SdParameterSpecification, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_BooleanExistsAtomKPINode_sdParameterSpecification(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BooleanExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BooleanNEQAtomKPINode_id(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.BooleanNEQAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BooleanNEQAtomKPINode_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint32)
+	fc.Result = res
+	return ec.marshalNID2uint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_BooleanNEQAtomKPINode_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BooleanNEQAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BooleanNEQAtomKPINode_parentNodeID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.BooleanNEQAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BooleanNEQAtomKPINode_parentNodeID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ParentNodeID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*uint32)
+	fc.Result = res
+	return ec.marshalOID2ᚖuint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_BooleanNEQAtomKPINode_parentNodeID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BooleanNEQAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BooleanNEQAtomKPINode_nodeType(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.BooleanNEQAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BooleanNEQAtomKPINode_nodeType(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.NodeType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(graphQLModel.KPINodeType)
+	fc.Result = res
+	return ec.marshalNKPINodeType2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPINodeType(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_BooleanNEQAtomKPINode_nodeType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BooleanNEQAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type KPINodeType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BooleanNEQAtomKPINode_sdParameterID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.BooleanNEQAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BooleanNEQAtomKPINode_sdParameterID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SdParameterID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint32)
+	fc.Result = res
+	return ec.marshalNID2uint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_BooleanNEQAtomKPINode_sdParameterID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BooleanNEQAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BooleanNEQAtomKPINode_sdParameterSpecification(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.BooleanNEQAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BooleanNEQAtomKPINode_sdParameterSpecification(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SdParameterSpecification, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_BooleanNEQAtomKPINode_sdParameterSpecification(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BooleanNEQAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BooleanNEQAtomKPINode_booleanReferenceValue(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.BooleanNEQAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BooleanNEQAtomKPINode_booleanReferenceValue(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.BooleanReferenceValue, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_BooleanNEQAtomKPINode_booleanReferenceValue(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BooleanNEQAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BooleanNotExistsAtomKPINode_id(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.BooleanNotExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BooleanNotExistsAtomKPINode_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint32)
+	fc.Result = res
+	return ec.marshalNID2uint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_BooleanNotExistsAtomKPINode_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BooleanNotExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BooleanNotExistsAtomKPINode_parentNodeID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.BooleanNotExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BooleanNotExistsAtomKPINode_parentNodeID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ParentNodeID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*uint32)
+	fc.Result = res
+	return ec.marshalOID2ᚖuint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_BooleanNotExistsAtomKPINode_parentNodeID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BooleanNotExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BooleanNotExistsAtomKPINode_nodeType(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.BooleanNotExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BooleanNotExistsAtomKPINode_nodeType(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.NodeType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(graphQLModel.KPINodeType)
+	fc.Result = res
+	return ec.marshalNKPINodeType2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPINodeType(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_BooleanNotExistsAtomKPINode_nodeType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BooleanNotExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type KPINodeType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BooleanNotExistsAtomKPINode_sdParameterID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.BooleanNotExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BooleanNotExistsAtomKPINode_sdParameterID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SdParameterID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint32)
+	fc.Result = res
+	return ec.marshalNID2uint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_BooleanNotExistsAtomKPINode_sdParameterID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BooleanNotExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _BooleanNotExistsAtomKPINode_sdParameterSpecification(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.BooleanNotExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BooleanNotExistsAtomKPINode_sdParameterSpecification(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SdParameterSpecification, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_BooleanNotExistsAtomKPINode_sdParameterSpecification(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BooleanNotExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _KPIDefinition_id(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.KPIDefinition) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_KPIDefinition_id(ctx, field)
 	if err != nil {
@@ -2398,8 +3774,8 @@ func (ec *executionContext) fieldContext_KPIDefinition_sdTypeID(_ context.Contex
 	return fc, nil
 }
 
-func (ec *executionContext) _KPIDefinition_sdTypeSpecification(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.KPIDefinition) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_KPIDefinition_sdTypeSpecification(ctx, field)
+func (ec *executionContext) _KPIDefinition_sdTypeUID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.KPIDefinition) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_KPIDefinition_sdTypeUID(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -2412,7 +3788,7 @@ func (ec *executionContext) _KPIDefinition_sdTypeSpecification(ctx context.Conte
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.SdTypeSpecification, nil
+		return obj.SdTypeUID, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2429,7 +3805,7 @@ func (ec *executionContext) _KPIDefinition_sdTypeSpecification(ctx context.Conte
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_KPIDefinition_sdTypeSpecification(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_KPIDefinition_sdTypeUID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "KPIDefinition",
 		Field:      field,
@@ -2574,8 +3950,8 @@ func (ec *executionContext) fieldContext_KPIDefinition_sdInstanceMode(_ context.
 	return fc, nil
 }
 
-func (ec *executionContext) _KPIDefinition_selectedSDInstanceUIDs(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.KPIDefinition) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_KPIDefinition_selectedSDInstanceUIDs(ctx, field)
+func (ec *executionContext) _KPIDefinition_selectedSDInstanceIDs(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.KPIDefinition) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_KPIDefinition_selectedSDInstanceIDs(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -2588,7 +3964,7 @@ func (ec *executionContext) _KPIDefinition_selectedSDInstanceUIDs(ctx context.Co
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.SelectedSDInstanceUIDs, nil
+		return obj.SelectedSDInstanceIDs, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2600,26 +3976,26 @@ func (ec *executionContext) _KPIDefinition_selectedSDInstanceUIDs(ctx context.Co
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]string)
+	res := resTmp.([]uint32)
 	fc.Result = res
-	return ec.marshalNString2ᚕstringᚄ(ctx, field.Selections, res)
+	return ec.marshalNID2ᚕuint32ᚄ(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_KPIDefinition_selectedSDInstanceUIDs(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_KPIDefinition_selectedSDInstanceIDs(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "KPIDefinition",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
+			return nil, errors.New("field of type ID does not have child fields")
 		},
 	}
 	return fc, nil
 }
 
-func (ec *executionContext) _KPIFulfillmentCheckResult_kpiDefinitionID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.KPIFulfillmentCheckResult) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_KPIFulfillmentCheckResult_kpiDefinitionID(ctx, field)
+func (ec *executionContext) _KPIFulfillmentCheckResult_sdTypeID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.KPIFulfillmentCheckResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_KPIFulfillmentCheckResult_sdTypeID(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -2632,7 +4008,7 @@ func (ec *executionContext) _KPIFulfillmentCheckResult_kpiDefinitionID(ctx conte
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.KpiDefinitionID, nil
+		return obj.SdTypeID, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2649,7 +4025,7 @@ func (ec *executionContext) _KPIFulfillmentCheckResult_kpiDefinitionID(ctx conte
 	return ec.marshalNID2uint32(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_KPIFulfillmentCheckResult_kpiDefinitionID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_KPIFulfillmentCheckResult_sdTypeID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "KPIFulfillmentCheckResult",
 		Field:      field,
@@ -2706,6 +4082,94 @@ func (ec *executionContext) fieldContext_KPIFulfillmentCheckResult_sdInstanceID(
 	return fc, nil
 }
 
+func (ec *executionContext) _KPIFulfillmentCheckResult_kpiDefinitionID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.KPIFulfillmentCheckResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_KPIFulfillmentCheckResult_kpiDefinitionID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.KpiDefinitionID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint32)
+	fc.Result = res
+	return ec.marshalNID2uint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_KPIFulfillmentCheckResult_kpiDefinitionID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "KPIFulfillmentCheckResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _KPIFulfillmentCheckResult_eventTime(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.KPIFulfillmentCheckResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_KPIFulfillmentCheckResult_eventTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.EventTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_KPIFulfillmentCheckResult_eventTime(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "KPIFulfillmentCheckResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _KPIFulfillmentCheckResult_fulfilled(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.KPIFulfillmentCheckResult) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_KPIFulfillmentCheckResult_fulfilled(ctx, field)
 	if err != nil {
@@ -2745,58 +4209,6 @@ func (ec *executionContext) fieldContext_KPIFulfillmentCheckResult_fulfilled(_ c
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _KPIFulfillmentCheckResultTuple_kpiFulfillmentCheckResults(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.KPIFulfillmentCheckResultTuple) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_KPIFulfillmentCheckResultTuple_kpiFulfillmentCheckResults(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.KpiFulfillmentCheckResults, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.([]graphQLModel.KPIFulfillmentCheckResult)
-	fc.Result = res
-	return ec.marshalNKPIFulfillmentCheckResult2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPIFulfillmentCheckResultᚄ(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_KPIFulfillmentCheckResultTuple_kpiFulfillmentCheckResults(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "KPIFulfillmentCheckResultTuple",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "kpiDefinitionID":
-				return ec.fieldContext_KPIFulfillmentCheckResult_kpiDefinitionID(ctx, field)
-			case "sdInstanceID":
-				return ec.fieldContext_KPIFulfillmentCheckResult_sdInstanceID(ctx, field)
-			case "fulfilled":
-				return ec.fieldContext_KPIFulfillmentCheckResult_fulfilled(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type KPIFulfillmentCheckResult", field.Name)
 		},
 	}
 	return fc, nil
@@ -3016,10 +4428,10 @@ func (ec *executionContext) fieldContext_Mutation_createSDType(ctx context.Conte
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_SDType_id(ctx, field)
+			case "uid":
+				return ec.fieldContext_SDType_uid(ctx, field)
 			case "label":
 				return ec.fieldContext_SDType_label(ctx, field)
-			case "denotation":
-				return ec.fieldContext_SDType_denotation(ctx, field)
 			case "parameters":
 				return ec.fieldContext_SDType_parameters(ctx, field)
 			}
@@ -3209,16 +4621,16 @@ func (ec *executionContext) fieldContext_Mutation_createKPIDefinition(ctx contex
 				return ec.fieldContext_KPIDefinition_label(ctx, field)
 			case "sdTypeID":
 				return ec.fieldContext_KPIDefinition_sdTypeID(ctx, field)
-			case "sdTypeSpecification":
-				return ec.fieldContext_KPIDefinition_sdTypeSpecification(ctx, field)
+			case "sdTypeUID":
+				return ec.fieldContext_KPIDefinition_sdTypeUID(ctx, field)
 			case "userIdentifier":
 				return ec.fieldContext_KPIDefinition_userIdentifier(ctx, field)
 			case "nodes":
 				return ec.fieldContext_KPIDefinition_nodes(ctx, field)
 			case "sdInstanceMode":
 				return ec.fieldContext_KPIDefinition_sdInstanceMode(ctx, field)
-			case "selectedSDInstanceUIDs":
-				return ec.fieldContext_KPIDefinition_selectedSDInstanceUIDs(ctx, field)
+			case "selectedSDInstanceIDs":
+				return ec.fieldContext_KPIDefinition_selectedSDInstanceIDs(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type KPIDefinition", field.Name)
 		},
@@ -3282,16 +4694,16 @@ func (ec *executionContext) fieldContext_Mutation_updateKPIDefinition(ctx contex
 				return ec.fieldContext_KPIDefinition_label(ctx, field)
 			case "sdTypeID":
 				return ec.fieldContext_KPIDefinition_sdTypeID(ctx, field)
-			case "sdTypeSpecification":
-				return ec.fieldContext_KPIDefinition_sdTypeSpecification(ctx, field)
+			case "sdTypeUID":
+				return ec.fieldContext_KPIDefinition_sdTypeUID(ctx, field)
 			case "userIdentifier":
 				return ec.fieldContext_KPIDefinition_userIdentifier(ctx, field)
 			case "nodes":
 				return ec.fieldContext_KPIDefinition_nodes(ctx, field)
 			case "sdInstanceMode":
 				return ec.fieldContext_KPIDefinition_sdInstanceMode(ctx, field)
-			case "selectedSDInstanceUIDs":
-				return ec.fieldContext_KPIDefinition_selectedSDInstanceUIDs(ctx, field)
+			case "selectedSDInstanceIDs":
+				return ec.fieldContext_KPIDefinition_selectedSDInstanceIDs(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type KPIDefinition", field.Name)
 		},
@@ -3619,7 +5031,7 @@ func (ec *executionContext) _Mutation_updateUserConfig(ctx context.Context, fiel
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().UpdateUserConfig(rctx, fc.Args["userId"].(uint32), fc.Args["input"].(graphQLModel.UserConfigInput))
+		return ec.resolvers.Mutation().UpdateUserConfig(rctx, fc.Args["input"].(graphQLModel.UserConfigInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3644,8 +5056,8 @@ func (ec *executionContext) fieldContext_Mutation_updateUserConfig(ctx context.C
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "userId":
-				return ec.fieldContext_UserConfig_userId(ctx, field)
+			case "userID":
+				return ec.fieldContext_UserConfig_userID(ctx, field)
 			case "config":
 				return ec.fieldContext_UserConfig_config(ctx, field)
 			}
@@ -3680,7 +5092,7 @@ func (ec *executionContext) _Mutation_deleteUserConfig(ctx context.Context, fiel
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().DeleteUserConfig(rctx, fc.Args["userId"].(uint32))
+		return ec.resolvers.Mutation().DeleteUserConfig(rctx)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3697,7 +5109,7 @@ func (ec *executionContext) _Mutation_deleteUserConfig(ctx context.Context, fiel
 	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Mutation_deleteUserConfig(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mutation_deleteUserConfig(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Mutation",
 		Field:      field,
@@ -3706,17 +5118,6 @@ func (ec *executionContext) fieldContext_Mutation_deleteUserConfig(ctx context.C
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
 		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_deleteUserConfig_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
 	}
 	return fc, nil
 }
@@ -3776,8 +5177,8 @@ func (ec *executionContext) fieldContext_Mutation_assignRoleToUser(ctx context.C
 	return fc, nil
 }
 
-func (ec *executionContext) _Mutation_createMyAPIKey(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mutation_createMyAPIKey(ctx, field)
+func (ec *executionContext) _Mutation_createAPIKey(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_createAPIKey(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -3790,7 +5191,7 @@ func (ec *executionContext) _Mutation_createMyAPIKey(ctx context.Context, field 
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().CreateMyAPIKey(rctx, fc.Args["input"].(graphQLModel.APIKeyInput))
+		return ec.resolvers.Mutation().CreateAPIKey(rctx, fc.Args["input"].(graphQLModel.APIKeyInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3807,7 +5208,7 @@ func (ec *executionContext) _Mutation_createMyAPIKey(ctx context.Context, field 
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Mutation_createMyAPIKey(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mutation_createAPIKey(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Mutation",
 		Field:      field,
@@ -3824,15 +5225,15 @@ func (ec *executionContext) fieldContext_Mutation_createMyAPIKey(ctx context.Con
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_createMyAPIKey_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Mutation_createAPIKey_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
 	return fc, nil
 }
 
-func (ec *executionContext) _Mutation_updateMyAPIKey(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mutation_updateMyAPIKey(ctx, field)
+func (ec *executionContext) _Mutation_updateAPIKey(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_updateAPIKey(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -3845,7 +5246,7 @@ func (ec *executionContext) _Mutation_updateMyAPIKey(ctx context.Context, field 
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().UpdateMyAPIKey(rctx, fc.Args["id"].(uint32), fc.Args["input"].(graphQLModel.APIKeyInput))
+		return ec.resolvers.Mutation().UpdateAPIKey(rctx, fc.Args["id"].(uint32), fc.Args["input"].(graphQLModel.APIKeyInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3862,7 +5263,7 @@ func (ec *executionContext) _Mutation_updateMyAPIKey(ctx context.Context, field 
 	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Mutation_updateMyAPIKey(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mutation_updateAPIKey(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Mutation",
 		Field:      field,
@@ -3879,15 +5280,15 @@ func (ec *executionContext) fieldContext_Mutation_updateMyAPIKey(ctx context.Con
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_updateMyAPIKey_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Mutation_updateAPIKey_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
 	return fc, nil
 }
 
-func (ec *executionContext) _Mutation_deleteMyAPIKey(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mutation_deleteMyAPIKey(ctx, field)
+func (ec *executionContext) _Mutation_deleteAPIKey(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_deleteAPIKey(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -3900,7 +5301,7 @@ func (ec *executionContext) _Mutation_deleteMyAPIKey(ctx context.Context, field 
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().DeleteMyAPIKey(rctx, fc.Args["id"].(uint32))
+		return ec.resolvers.Mutation().DeleteAPIKey(rctx, fc.Args["id"].(uint32))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3917,7 +5318,7 @@ func (ec *executionContext) _Mutation_deleteMyAPIKey(ctx context.Context, field 
 	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Mutation_deleteMyAPIKey(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mutation_deleteAPIKey(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Mutation",
 		Field:      field,
@@ -3934,7 +5335,117 @@ func (ec *executionContext) fieldContext_Mutation_deleteMyAPIKey(ctx context.Con
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_deleteMyAPIKey_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Mutation_deleteAPIKey_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_startTimeSeriesExport(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_startTimeSeriesExport(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().StartTimeSeriesExport(rctx, fc.Args["input"].(graphQLModel.TimeSeriesReadInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_startTimeSeriesExport(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_startTimeSeriesExport_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_startTimeSeriesExportAggregateKPI(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_startTimeSeriesExportAggregateKPI(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().StartTimeSeriesExportAggregateKpi(rctx, fc.Args["input"].(graphQLModel.TimeSeriesReadAggregateKPIInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_startTimeSeriesExportAggregateKPI(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_startTimeSeriesExportAggregateKPI_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -4197,6 +5708,223 @@ func (ec *executionContext) fieldContext_NumericEQAtomKPINode_numericReferenceVa
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NumericExistsAtomKPINode_id(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.NumericExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NumericExistsAtomKPINode_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint32)
+	fc.Result = res
+	return ec.marshalNID2uint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NumericExistsAtomKPINode_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NumericExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NumericExistsAtomKPINode_parentNodeID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.NumericExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NumericExistsAtomKPINode_parentNodeID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ParentNodeID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*uint32)
+	fc.Result = res
+	return ec.marshalOID2ᚖuint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NumericExistsAtomKPINode_parentNodeID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NumericExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NumericExistsAtomKPINode_nodeType(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.NumericExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NumericExistsAtomKPINode_nodeType(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.NodeType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(graphQLModel.KPINodeType)
+	fc.Result = res
+	return ec.marshalNKPINodeType2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPINodeType(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NumericExistsAtomKPINode_nodeType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NumericExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type KPINodeType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NumericExistsAtomKPINode_sdParameterID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.NumericExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NumericExistsAtomKPINode_sdParameterID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SdParameterID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint32)
+	fc.Result = res
+	return ec.marshalNID2uint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NumericExistsAtomKPINode_sdParameterID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NumericExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NumericExistsAtomKPINode_sdParameterSpecification(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.NumericExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NumericExistsAtomKPINode_sdParameterSpecification(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SdParameterSpecification, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NumericExistsAtomKPINode_sdParameterSpecification(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NumericExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -5246,6 +6974,484 @@ func (ec *executionContext) fieldContext_NumericLTAtomKPINode_numericReferenceVa
 	return fc, nil
 }
 
+func (ec *executionContext) _NumericNEQAtomKPINode_id(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.NumericNEQAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NumericNEQAtomKPINode_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint32)
+	fc.Result = res
+	return ec.marshalNID2uint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NumericNEQAtomKPINode_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NumericNEQAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NumericNEQAtomKPINode_parentNodeID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.NumericNEQAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NumericNEQAtomKPINode_parentNodeID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ParentNodeID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*uint32)
+	fc.Result = res
+	return ec.marshalOID2ᚖuint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NumericNEQAtomKPINode_parentNodeID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NumericNEQAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NumericNEQAtomKPINode_nodeType(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.NumericNEQAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NumericNEQAtomKPINode_nodeType(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.NodeType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(graphQLModel.KPINodeType)
+	fc.Result = res
+	return ec.marshalNKPINodeType2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPINodeType(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NumericNEQAtomKPINode_nodeType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NumericNEQAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type KPINodeType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NumericNEQAtomKPINode_sdParameterID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.NumericNEQAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NumericNEQAtomKPINode_sdParameterID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SdParameterID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint32)
+	fc.Result = res
+	return ec.marshalNID2uint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NumericNEQAtomKPINode_sdParameterID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NumericNEQAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NumericNEQAtomKPINode_sdParameterSpecification(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.NumericNEQAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NumericNEQAtomKPINode_sdParameterSpecification(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SdParameterSpecification, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NumericNEQAtomKPINode_sdParameterSpecification(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NumericNEQAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NumericNEQAtomKPINode_numericReferenceValue(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.NumericNEQAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NumericNEQAtomKPINode_numericReferenceValue(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.NumericReferenceValue, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(float64)
+	fc.Result = res
+	return ec.marshalNFloat2float64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NumericNEQAtomKPINode_numericReferenceValue(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NumericNEQAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NumericNotExistsAtomKPINode_id(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.NumericNotExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NumericNotExistsAtomKPINode_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint32)
+	fc.Result = res
+	return ec.marshalNID2uint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NumericNotExistsAtomKPINode_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NumericNotExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NumericNotExistsAtomKPINode_parentNodeID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.NumericNotExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NumericNotExistsAtomKPINode_parentNodeID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ParentNodeID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*uint32)
+	fc.Result = res
+	return ec.marshalOID2ᚖuint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NumericNotExistsAtomKPINode_parentNodeID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NumericNotExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NumericNotExistsAtomKPINode_nodeType(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.NumericNotExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NumericNotExistsAtomKPINode_nodeType(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.NodeType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(graphQLModel.KPINodeType)
+	fc.Result = res
+	return ec.marshalNKPINodeType2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPINodeType(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NumericNotExistsAtomKPINode_nodeType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NumericNotExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type KPINodeType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NumericNotExistsAtomKPINode_sdParameterID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.NumericNotExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NumericNotExistsAtomKPINode_sdParameterID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SdParameterID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint32)
+	fc.Result = res
+	return ec.marshalNID2uint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NumericNotExistsAtomKPINode_sdParameterID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NumericNotExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _NumericNotExistsAtomKPINode_sdParameterSpecification(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.NumericNotExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_NumericNotExistsAtomKPINode_sdParameterSpecification(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SdParameterSpecification, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_NumericNotExistsAtomKPINode_sdParameterSpecification(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "NumericNotExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _OutputData_time(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.OutputData) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_OutputData_time(ctx, field)
 	if err != nil {
@@ -5419,6 +7625,94 @@ func (ec *executionContext) fieldContext_OutputData_data(_ context.Context, fiel
 	return fc, nil
 }
 
+func (ec *executionContext) _Permission_uid(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.Permission) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Permission_uid(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Permission_uid(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Permission",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Permission_label(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.Permission) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Permission_label(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Label, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Permission_label(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Permission",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_sdType(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_sdType(ctx, field)
 	if err != nil {
@@ -5460,10 +7754,10 @@ func (ec *executionContext) fieldContext_Query_sdType(ctx context.Context, field
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_SDType_id(ctx, field)
+			case "uid":
+				return ec.fieldContext_SDType_uid(ctx, field)
 			case "label":
 				return ec.fieldContext_SDType_label(ctx, field)
-			case "denotation":
-				return ec.fieldContext_SDType_denotation(ctx, field)
 			case "parameters":
 				return ec.fieldContext_SDType_parameters(ctx, field)
 			}
@@ -5525,15 +7819,84 @@ func (ec *executionContext) fieldContext_Query_sdTypes(_ context.Context, field 
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_SDType_id(ctx, field)
+			case "uid":
+				return ec.fieldContext_SDType_uid(ctx, field)
 			case "label":
 				return ec.fieldContext_SDType_label(ctx, field)
-			case "denotation":
-				return ec.fieldContext_SDType_denotation(ctx, field)
 			case "parameters":
 				return ec.fieldContext_SDType_parameters(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type SDType", field.Name)
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_sdInstance(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_sdInstance(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().SdInstance(rctx, fc.Args["id"].(uint32))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(graphQLModel.SDInstance)
+	fc.Result = res
+	return ec.marshalNSDInstance2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐSDInstance(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_sdInstance(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_SDInstance_id(ctx, field)
+			case "uid":
+				return ec.fieldContext_SDInstance_uid(ctx, field)
+			case "label":
+				return ec.fieldContext_SDInstance_label(ctx, field)
+			case "confirmedByUser":
+				return ec.fieldContext_SDInstance_confirmedByUser(ctx, field)
+			case "userIdentifier":
+				return ec.fieldContext_SDInstance_userIdentifier(ctx, field)
+			case "type":
+				return ec.fieldContext_SDInstance_type(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type SDInstance", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_sdInstance_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -5610,7 +7973,7 @@ func (ec *executionContext) _Query_sdInstancesByType(ctx context.Context, field 
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().SdInstancesByType(rctx, fc.Args["sdTypeID"].(uint32))
+		return ec.resolvers.Query().SdInstancesByType(rctx, fc.Args["id"].(uint32))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5665,6 +8028,75 @@ func (ec *executionContext) fieldContext_Query_sdInstancesByType(ctx context.Con
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_sdInstancesByKpiDefinition(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_sdInstancesByKpiDefinition(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().SdInstancesByKpiDefinition(rctx, fc.Args["id"].(uint32))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]graphQLModel.SDInstance)
+	fc.Result = res
+	return ec.marshalNSDInstance2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐSDInstanceᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_sdInstancesByKpiDefinition(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_SDInstance_id(ctx, field)
+			case "uid":
+				return ec.fieldContext_SDInstance_uid(ctx, field)
+			case "label":
+				return ec.fieldContext_SDInstance_label(ctx, field)
+			case "confirmedByUser":
+				return ec.fieldContext_SDInstance_confirmedByUser(ctx, field)
+			case "userIdentifier":
+				return ec.fieldContext_SDInstance_userIdentifier(ctx, field)
+			case "type":
+				return ec.fieldContext_SDInstance_type(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type SDInstance", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_sdInstancesByKpiDefinition_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_kpiDefinition(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_kpiDefinition(ctx, field)
 	if err != nil {
@@ -5710,16 +8142,16 @@ func (ec *executionContext) fieldContext_Query_kpiDefinition(ctx context.Context
 				return ec.fieldContext_KPIDefinition_label(ctx, field)
 			case "sdTypeID":
 				return ec.fieldContext_KPIDefinition_sdTypeID(ctx, field)
-			case "sdTypeSpecification":
-				return ec.fieldContext_KPIDefinition_sdTypeSpecification(ctx, field)
+			case "sdTypeUID":
+				return ec.fieldContext_KPIDefinition_sdTypeUID(ctx, field)
 			case "userIdentifier":
 				return ec.fieldContext_KPIDefinition_userIdentifier(ctx, field)
 			case "nodes":
 				return ec.fieldContext_KPIDefinition_nodes(ctx, field)
 			case "sdInstanceMode":
 				return ec.fieldContext_KPIDefinition_sdInstanceMode(ctx, field)
-			case "selectedSDInstanceUIDs":
-				return ec.fieldContext_KPIDefinition_selectedSDInstanceUIDs(ctx, field)
+			case "selectedSDInstanceIDs":
+				return ec.fieldContext_KPIDefinition_selectedSDInstanceIDs(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type KPIDefinition", field.Name)
 		},
@@ -5783,16 +8215,16 @@ func (ec *executionContext) fieldContext_Query_kpiDefinitions(_ context.Context,
 				return ec.fieldContext_KPIDefinition_label(ctx, field)
 			case "sdTypeID":
 				return ec.fieldContext_KPIDefinition_sdTypeID(ctx, field)
-			case "sdTypeSpecification":
-				return ec.fieldContext_KPIDefinition_sdTypeSpecification(ctx, field)
+			case "sdTypeUID":
+				return ec.fieldContext_KPIDefinition_sdTypeUID(ctx, field)
 			case "userIdentifier":
 				return ec.fieldContext_KPIDefinition_userIdentifier(ctx, field)
 			case "nodes":
 				return ec.fieldContext_KPIDefinition_nodes(ctx, field)
 			case "sdInstanceMode":
 				return ec.fieldContext_KPIDefinition_sdInstanceMode(ctx, field)
-			case "selectedSDInstanceUIDs":
-				return ec.fieldContext_KPIDefinition_selectedSDInstanceUIDs(ctx, field)
+			case "selectedSDInstanceIDs":
+				return ec.fieldContext_KPIDefinition_selectedSDInstanceIDs(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type KPIDefinition", field.Name)
 		},
@@ -5800,8 +8232,8 @@ func (ec *executionContext) fieldContext_Query_kpiDefinitions(_ context.Context,
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_kpiFulfillmentCheckResults(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_kpiFulfillmentCheckResults(ctx, field)
+func (ec *executionContext) _Query_kpiDefinitionsBySdType(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_kpiDefinitionsBySdType(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -5814,7 +8246,283 @@ func (ec *executionContext) _Query_kpiFulfillmentCheckResults(ctx context.Contex
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().KpiFulfillmentCheckResults(rctx)
+		return ec.resolvers.Query().KpiDefinitionsBySdType(rctx, fc.Args["id"].(uint32))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]graphQLModel.KPIDefinition)
+	fc.Result = res
+	return ec.marshalNKPIDefinition2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPIDefinitionᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_kpiDefinitionsBySdType(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_KPIDefinition_id(ctx, field)
+			case "label":
+				return ec.fieldContext_KPIDefinition_label(ctx, field)
+			case "sdTypeID":
+				return ec.fieldContext_KPIDefinition_sdTypeID(ctx, field)
+			case "sdTypeUID":
+				return ec.fieldContext_KPIDefinition_sdTypeUID(ctx, field)
+			case "userIdentifier":
+				return ec.fieldContext_KPIDefinition_userIdentifier(ctx, field)
+			case "nodes":
+				return ec.fieldContext_KPIDefinition_nodes(ctx, field)
+			case "sdInstanceMode":
+				return ec.fieldContext_KPIDefinition_sdInstanceMode(ctx, field)
+			case "selectedSDInstanceIDs":
+				return ec.fieldContext_KPIDefinition_selectedSDInstanceIDs(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type KPIDefinition", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_kpiDefinitionsBySdType_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_kpiDefinitionsBySdInstance(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_kpiDefinitionsBySdInstance(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().KpiDefinitionsBySdInstance(rctx, fc.Args["id"].(uint32))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]graphQLModel.KPIDefinition)
+	fc.Result = res
+	return ec.marshalNKPIDefinition2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPIDefinitionᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_kpiDefinitionsBySdInstance(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_KPIDefinition_id(ctx, field)
+			case "label":
+				return ec.fieldContext_KPIDefinition_label(ctx, field)
+			case "sdTypeID":
+				return ec.fieldContext_KPIDefinition_sdTypeID(ctx, field)
+			case "sdTypeUID":
+				return ec.fieldContext_KPIDefinition_sdTypeUID(ctx, field)
+			case "userIdentifier":
+				return ec.fieldContext_KPIDefinition_userIdentifier(ctx, field)
+			case "nodes":
+				return ec.fieldContext_KPIDefinition_nodes(ctx, field)
+			case "sdInstanceMode":
+				return ec.fieldContext_KPIDefinition_sdInstanceMode(ctx, field)
+			case "selectedSDInstanceIDs":
+				return ec.fieldContext_KPIDefinition_selectedSDInstanceIDs(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type KPIDefinition", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_kpiDefinitionsBySdInstance_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_rawDataPointsBySDType(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_rawDataPointsBySDType(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().RawDataPointsBySDType(rctx, fc.Args["id"].(uint32))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]graphQLModel.RawDataPoint)
+	fc.Result = res
+	return ec.marshalNRawDataPoint2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐRawDataPointᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_rawDataPointsBySDType(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "sdTypeID":
+				return ec.fieldContext_RawDataPoint_sdTypeID(ctx, field)
+			case "sdInstanceID":
+				return ec.fieldContext_RawDataPoint_sdInstanceID(ctx, field)
+			case "payload":
+				return ec.fieldContext_RawDataPoint_payload(ctx, field)
+			case "eventTime":
+				return ec.fieldContext_RawDataPoint_eventTime(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RawDataPoint", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_rawDataPointsBySDType_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_rawDataPoint(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_rawDataPoint(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().RawDataPoint(rctx, fc.Args["id"].(uint32))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(graphQLModel.RawDataPoint)
+	fc.Result = res
+	return ec.marshalNRawDataPoint2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐRawDataPoint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_rawDataPoint(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "sdTypeID":
+				return ec.fieldContext_RawDataPoint_sdTypeID(ctx, field)
+			case "sdInstanceID":
+				return ec.fieldContext_RawDataPoint_sdInstanceID(ctx, field)
+			case "payload":
+				return ec.fieldContext_RawDataPoint_payload(ctx, field)
+			case "eventTime":
+				return ec.fieldContext_RawDataPoint_eventTime(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RawDataPoint", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_rawDataPoint_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_kpiResults(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_kpiResults(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().KpiResults(rctx)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -5831,7 +8539,7 @@ func (ec *executionContext) _Query_kpiFulfillmentCheckResults(ctx context.Contex
 	return ec.marshalNKPIFulfillmentCheckResult2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPIFulfillmentCheckResultᚄ(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Query_kpiFulfillmentCheckResults(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_kpiResults(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
@@ -5839,15 +8547,153 @@ func (ec *executionContext) fieldContext_Query_kpiFulfillmentCheckResults(_ cont
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "kpiDefinitionID":
-				return ec.fieldContext_KPIFulfillmentCheckResult_kpiDefinitionID(ctx, field)
+			case "sdTypeID":
+				return ec.fieldContext_KPIFulfillmentCheckResult_sdTypeID(ctx, field)
 			case "sdInstanceID":
 				return ec.fieldContext_KPIFulfillmentCheckResult_sdInstanceID(ctx, field)
+			case "kpiDefinitionID":
+				return ec.fieldContext_KPIFulfillmentCheckResult_kpiDefinitionID(ctx, field)
+			case "eventTime":
+				return ec.fieldContext_KPIFulfillmentCheckResult_eventTime(ctx, field)
 			case "fulfilled":
 				return ec.fieldContext_KPIFulfillmentCheckResult_fulfilled(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type KPIFulfillmentCheckResult", field.Name)
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_kpiResultsByKPI(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_kpiResultsByKPI(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().KpiResultsByKpi(rctx, fc.Args["id"].(uint32))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]graphQLModel.KPIFulfillmentCheckResult)
+	fc.Result = res
+	return ec.marshalNKPIFulfillmentCheckResult2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPIFulfillmentCheckResultᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_kpiResultsByKPI(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "sdTypeID":
+				return ec.fieldContext_KPIFulfillmentCheckResult_sdTypeID(ctx, field)
+			case "sdInstanceID":
+				return ec.fieldContext_KPIFulfillmentCheckResult_sdInstanceID(ctx, field)
+			case "kpiDefinitionID":
+				return ec.fieldContext_KPIFulfillmentCheckResult_kpiDefinitionID(ctx, field)
+			case "eventTime":
+				return ec.fieldContext_KPIFulfillmentCheckResult_eventTime(ctx, field)
+			case "fulfilled":
+				return ec.fieldContext_KPIFulfillmentCheckResult_fulfilled(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type KPIFulfillmentCheckResult", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_kpiResultsByKPI_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_kpiResult(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_kpiResult(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().KpiResult(rctx, fc.Args["request"].(graphQLModel.KPIFulfillmentCheckResultRequest))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(graphQLModel.KPIFulfillmentCheckResult)
+	fc.Result = res
+	return ec.marshalNKPIFulfillmentCheckResult2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPIFulfillmentCheckResult(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_kpiResult(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "sdTypeID":
+				return ec.fieldContext_KPIFulfillmentCheckResult_sdTypeID(ctx, field)
+			case "sdInstanceID":
+				return ec.fieldContext_KPIFulfillmentCheckResult_sdInstanceID(ctx, field)
+			case "kpiDefinitionID":
+				return ec.fieldContext_KPIFulfillmentCheckResult_kpiDefinitionID(ctx, field)
+			case "eventTime":
+				return ec.fieldContext_KPIFulfillmentCheckResult_eventTime(ctx, field)
+			case "fulfilled":
+				return ec.fieldContext_KPIFulfillmentCheckResult_fulfilled(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type KPIFulfillmentCheckResult", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_kpiResult_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -6115,7 +8961,7 @@ func (ec *executionContext) _Query_userConfig(ctx context.Context, field graphql
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().UserConfig(rctx, fc.Args["id"].(uint32))
+		return ec.resolvers.Query().UserConfig(rctx)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6132,7 +8978,7 @@ func (ec *executionContext) _Query_userConfig(ctx context.Context, field graphql
 	return ec.marshalNUserConfig2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐUserConfig(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Query_userConfig(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_userConfig(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
@@ -6140,69 +8986,8 @@ func (ec *executionContext) fieldContext_Query_userConfig(ctx context.Context, f
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "userId":
-				return ec.fieldContext_UserConfig_userId(ctx, field)
-			case "config":
-				return ec.fieldContext_UserConfig_config(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type UserConfig", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_userConfig_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_myUserConfig(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_myUserConfig(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().MyUserConfig(rctx)
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(graphQLModel.UserConfig)
-	fc.Result = res
-	return ec.marshalNUserConfig2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐUserConfig(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Query_myUserConfig(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "userId":
-				return ec.fieldContext_UserConfig_userId(ctx, field)
+			case "userID":
+				return ec.fieldContext_UserConfig_userID(ctx, field)
 			case "config":
 				return ec.fieldContext_UserConfig_config(ctx, field)
 			}
@@ -6278,7 +9063,7 @@ func (ec *executionContext) _Query_userRole(ctx context.Context, field graphql.C
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().UserRole(rctx, fc.Args["userID"].(uint32))
+		return ec.resolvers.Query().UserRole(rctx, fc.Args["id"].(uint32))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6324,8 +9109,8 @@ func (ec *executionContext) fieldContext_Query_userRole(ctx context.Context, fie
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_myRole(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_myRole(ctx, field)
+func (ec *executionContext) _Query_role(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_role(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -6338,7 +9123,7 @@ func (ec *executionContext) _Query_myRole(ctx context.Context, field graphql.Col
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().MyRole(rctx)
+		return ec.resolvers.Query().Role(rctx)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6352,7 +9137,7 @@ func (ec *executionContext) _Query_myRole(ctx context.Context, field graphql.Col
 	return ec.marshalORole2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐRole(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Query_myRole(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_role(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
@@ -6373,8 +9158,8 @@ func (ec *executionContext) fieldContext_Query_myRole(_ context.Context, field g
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_myApiKeys(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_myApiKeys(ctx, field)
+func (ec *executionContext) _Query_apiKeys(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_apiKeys(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -6387,7 +9172,7 @@ func (ec *executionContext) _Query_myApiKeys(ctx context.Context, field graphql.
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().MyAPIKeys(rctx)
+		return ec.resolvers.Query().APIKeys(rctx)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6404,7 +9189,7 @@ func (ec *executionContext) _Query_myApiKeys(ctx context.Context, field graphql.
 	return ec.marshalNAPIKey2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐAPIKeyᚄ(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Query_myApiKeys(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_apiKeys(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
@@ -6435,8 +9220,8 @@ func (ec *executionContext) fieldContext_Query_myApiKeys(_ context.Context, fiel
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_myApiKey(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_myApiKey(ctx, field)
+func (ec *executionContext) _Query_apiKey(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_apiKey(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -6449,7 +9234,7 @@ func (ec *executionContext) _Query_myApiKey(ctx context.Context, field graphql.C
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().MyAPIKey(rctx, fc.Args["id"].(uint32))
+		return ec.resolvers.Query().APIKey(rctx, fc.Args["id"].(uint32))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -6466,7 +9251,7 @@ func (ec *executionContext) _Query_myApiKey(ctx context.Context, field graphql.C
 	return ec.marshalNAPIKey2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐAPIKey(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Query_myApiKey(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_apiKey(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
@@ -6501,7 +9286,210 @@ func (ec *executionContext) fieldContext_Query_myApiKey(ctx context.Context, fie
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_myApiKey_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Query_apiKey_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_timeSeriesRead(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_timeSeriesRead(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().TimeSeriesRead(rctx, fc.Args["request"].(graphQLModel.TimeSeriesReadInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(graphQLModel.TimeSeriesReadResponse)
+	fc.Result = res
+	return ec.marshalNTimeSeriesReadResponse2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesReadResponse(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_timeSeriesRead(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "parameters":
+				return ec.fieldContext_TimeSeriesReadResponse_parameters(ctx, field)
+			case "base":
+				return ec.fieldContext_TimeSeriesReadResponse_base(ctx, field)
+			case "data":
+				return ec.fieldContext_TimeSeriesReadResponse_data(ctx, field)
+			case "hasMoreBatches":
+				return ec.fieldContext_TimeSeriesReadResponse_hasMoreBatches(ctx, field)
+			case "hasMoreData":
+				return ec.fieldContext_TimeSeriesReadResponse_hasMoreData(ctx, field)
+			case "nextCursor":
+				return ec.fieldContext_TimeSeriesReadResponse_nextCursor(ctx, field)
+			case "error":
+				return ec.fieldContext_TimeSeriesReadResponse_error(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TimeSeriesReadResponse", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_timeSeriesRead_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_timeSeriesReadAggregateKPI(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_timeSeriesReadAggregateKPI(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().TimeSeriesReadAggregateKpi(rctx, fc.Args["request"].(graphQLModel.TimeSeriesReadAggregateKPIInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(graphQLModel.TimeSeriesReadResponse)
+	fc.Result = res
+	return ec.marshalNTimeSeriesReadResponse2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesReadResponse(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_timeSeriesReadAggregateKPI(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "parameters":
+				return ec.fieldContext_TimeSeriesReadResponse_parameters(ctx, field)
+			case "base":
+				return ec.fieldContext_TimeSeriesReadResponse_base(ctx, field)
+			case "data":
+				return ec.fieldContext_TimeSeriesReadResponse_data(ctx, field)
+			case "hasMoreBatches":
+				return ec.fieldContext_TimeSeriesReadResponse_hasMoreBatches(ctx, field)
+			case "hasMoreData":
+				return ec.fieldContext_TimeSeriesReadResponse_hasMoreData(ctx, field)
+			case "nextCursor":
+				return ec.fieldContext_TimeSeriesReadResponse_nextCursor(ctx, field)
+			case "error":
+				return ec.fieldContext_TimeSeriesReadResponse_error(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TimeSeriesReadResponse", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_timeSeriesReadAggregateKPI_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_timeSeriesDistinctTagValues(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_timeSeriesDistinctTagValues(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().TimeSeriesDistinctTagValues(rctx, fc.Args["request"].(graphQLModel.TimeSeriesDistinctTagValuesInput))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(graphQLModel.TimeSeriesDistinctTagValuesResponse)
+	fc.Result = res
+	return ec.marshalNTimeSeriesDistinctTagValuesResponse2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesDistinctTagValuesResponse(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_timeSeriesDistinctTagValues(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "values":
+				return ec.fieldContext_TimeSeriesDistinctTagValuesResponse_values(ctx, field)
+			case "error":
+				return ec.fieldContext_TimeSeriesDistinctTagValuesResponse_error(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TimeSeriesDistinctTagValuesResponse", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_timeSeriesDistinctTagValues_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -6639,6 +9627,182 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 	return fc, nil
 }
 
+func (ec *executionContext) _RawDataPoint_sdTypeID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.RawDataPoint) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RawDataPoint_sdTypeID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SdTypeID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint32)
+	fc.Result = res
+	return ec.marshalNID2uint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RawDataPoint_sdTypeID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RawDataPoint",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RawDataPoint_sdInstanceID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.RawDataPoint) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RawDataPoint_sdInstanceID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SdInstanceID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint32)
+	fc.Result = res
+	return ec.marshalNID2uint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RawDataPoint_sdInstanceID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RawDataPoint",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RawDataPoint_payload(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.RawDataPoint) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RawDataPoint_payload(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Payload, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNJSON2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RawDataPoint_payload(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RawDataPoint",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type JSON does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RawDataPoint_eventTime(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.RawDataPoint) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RawDataPoint_eventTime(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.EventTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RawDataPoint_eventTime(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RawDataPoint",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Role_id(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.Role) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Role_id(ctx, field)
 	if err != nil {
@@ -6750,9 +9914,9 @@ func (ec *executionContext) _Role_permissions(ctx context.Context, field graphql
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]string)
+	res := resTmp.([]graphQLModel.Permission)
 	fc.Result = res
-	return ec.marshalOString2ᚕstringᚄ(ctx, field.Selections, res)
+	return ec.marshalOPermission2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐPermissionᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Role_permissions(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -6762,7 +9926,13 @@ func (ec *executionContext) fieldContext_Role_permissions(_ context.Context, fie
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
+			switch field.Name {
+			case "uid":
+				return ec.fieldContext_Permission_uid(ctx, field)
+			case "label":
+				return ec.fieldContext_Permission_label(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Permission", field.Name)
 		},
 	}
 	return fc, nil
@@ -7029,10 +10199,10 @@ func (ec *executionContext) fieldContext_SDInstance_type(_ context.Context, fiel
 			switch field.Name {
 			case "id":
 				return ec.fieldContext_SDType_id(ctx, field)
+			case "uid":
+				return ec.fieldContext_SDType_uid(ctx, field)
 			case "label":
 				return ec.fieldContext_SDType_label(ctx, field)
-			case "denotation":
-				return ec.fieldContext_SDType_denotation(ctx, field)
 			case "parameters":
 				return ec.fieldContext_SDType_parameters(ctx, field)
 			}
@@ -7482,6 +10652,50 @@ func (ec *executionContext) fieldContext_SDType_id(_ context.Context, field grap
 	return fc, nil
 }
 
+func (ec *executionContext) _SDType_uid(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.SDType) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SDType_uid(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SDType_uid(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SDType",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _SDType_label(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.SDType) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_SDType_label(ctx, field)
 	if err != nil {
@@ -7514,50 +10728,6 @@ func (ec *executionContext) _SDType_label(ctx context.Context, field graphql.Col
 }
 
 func (ec *executionContext) fieldContext_SDType_label(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "SDType",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _SDType_denotation(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.SDType) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_SDType_denotation(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Denotation, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_SDType_denotation(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "SDType",
 		Field:      field,
@@ -7887,6 +11057,701 @@ func (ec *executionContext) fieldContext_StringEQAtomKPINode_stringReferenceValu
 	return fc, nil
 }
 
+func (ec *executionContext) _StringExistsAtomKPINode_id(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.StringExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StringExistsAtomKPINode_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint32)
+	fc.Result = res
+	return ec.marshalNID2uint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StringExistsAtomKPINode_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StringExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StringExistsAtomKPINode_parentNodeID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.StringExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StringExistsAtomKPINode_parentNodeID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ParentNodeID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*uint32)
+	fc.Result = res
+	return ec.marshalOID2ᚖuint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StringExistsAtomKPINode_parentNodeID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StringExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StringExistsAtomKPINode_nodeType(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.StringExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StringExistsAtomKPINode_nodeType(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.NodeType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(graphQLModel.KPINodeType)
+	fc.Result = res
+	return ec.marshalNKPINodeType2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPINodeType(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StringExistsAtomKPINode_nodeType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StringExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type KPINodeType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StringExistsAtomKPINode_sdParameterID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.StringExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StringExistsAtomKPINode_sdParameterID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SdParameterID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint32)
+	fc.Result = res
+	return ec.marshalNID2uint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StringExistsAtomKPINode_sdParameterID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StringExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StringExistsAtomKPINode_sdParameterSpecification(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.StringExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StringExistsAtomKPINode_sdParameterSpecification(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SdParameterSpecification, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StringExistsAtomKPINode_sdParameterSpecification(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StringExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StringNEQAtomKPINode_id(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.StringNEQAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StringNEQAtomKPINode_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint32)
+	fc.Result = res
+	return ec.marshalNID2uint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StringNEQAtomKPINode_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StringNEQAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StringNEQAtomKPINode_parentNodeID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.StringNEQAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StringNEQAtomKPINode_parentNodeID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ParentNodeID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*uint32)
+	fc.Result = res
+	return ec.marshalOID2ᚖuint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StringNEQAtomKPINode_parentNodeID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StringNEQAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StringNEQAtomKPINode_nodeType(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.StringNEQAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StringNEQAtomKPINode_nodeType(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.NodeType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(graphQLModel.KPINodeType)
+	fc.Result = res
+	return ec.marshalNKPINodeType2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPINodeType(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StringNEQAtomKPINode_nodeType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StringNEQAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type KPINodeType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StringNEQAtomKPINode_sdParameterID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.StringNEQAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StringNEQAtomKPINode_sdParameterID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SdParameterID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint32)
+	fc.Result = res
+	return ec.marshalNID2uint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StringNEQAtomKPINode_sdParameterID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StringNEQAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StringNEQAtomKPINode_sdParameterSpecification(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.StringNEQAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StringNEQAtomKPINode_sdParameterSpecification(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SdParameterSpecification, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StringNEQAtomKPINode_sdParameterSpecification(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StringNEQAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StringNEQAtomKPINode_stringReferenceValue(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.StringNEQAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StringNEQAtomKPINode_stringReferenceValue(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.StringReferenceValue, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StringNEQAtomKPINode_stringReferenceValue(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StringNEQAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StringNotExistsAtomKPINode_id(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.StringNotExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StringNotExistsAtomKPINode_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint32)
+	fc.Result = res
+	return ec.marshalNID2uint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StringNotExistsAtomKPINode_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StringNotExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StringNotExistsAtomKPINode_parentNodeID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.StringNotExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StringNotExistsAtomKPINode_parentNodeID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ParentNodeID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*uint32)
+	fc.Result = res
+	return ec.marshalOID2ᚖuint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StringNotExistsAtomKPINode_parentNodeID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StringNotExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StringNotExistsAtomKPINode_nodeType(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.StringNotExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StringNotExistsAtomKPINode_nodeType(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.NodeType, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(graphQLModel.KPINodeType)
+	fc.Result = res
+	return ec.marshalNKPINodeType2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPINodeType(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StringNotExistsAtomKPINode_nodeType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StringNotExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type KPINodeType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StringNotExistsAtomKPINode_sdParameterID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.StringNotExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StringNotExistsAtomKPINode_sdParameterID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SdParameterID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint32)
+	fc.Result = res
+	return ec.marshalNID2uint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StringNotExistsAtomKPINode_sdParameterID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StringNotExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StringNotExistsAtomKPINode_sdParameterSpecification(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.StringNotExistsAtomKPINode) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StringNotExistsAtomKPINode_sdParameterSpecification(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SdParameterSpecification, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StringNotExistsAtomKPINode_sdParameterSpecification(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StringNotExistsAtomKPINode",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Subscription_onSDInstanceRegistered(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
 	fc, err := ec.fieldContext_Subscription_onSDInstanceRegistered(ctx, field)
 	if err != nil {
@@ -7901,7 +11766,7 @@ func (ec *executionContext) _Subscription_onSDInstanceRegistered(ctx context.Con
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Subscription().OnSDInstanceRegistered(rctx)
+		return ec.resolvers.Subscription().OnSDInstanceRegistered(rctx, fc.Args["filter"].(*graphQLModel.SDInstanceRegisteredFilter))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -7932,7 +11797,7 @@ func (ec *executionContext) _Subscription_onSDInstanceRegistered(ctx context.Con
 	}
 }
 
-func (ec *executionContext) fieldContext_Subscription_onSDInstanceRegistered(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Subscription_onSDInstanceRegistered(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Subscription",
 		Field:      field,
@@ -7956,6 +11821,96 @@ func (ec *executionContext) fieldContext_Subscription_onSDInstanceRegistered(_ c
 			return nil, fmt.Errorf("no field named %q was found under type SDInstance", field.Name)
 		},
 	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_onSDInstanceRegistered_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_onRawDataPointArrived(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	fc, err := ec.fieldContext_Subscription_onRawDataPointArrived(ctx, field)
+	if err != nil {
+		return nil
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = nil
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Subscription().OnRawDataPointArrived(rctx, fc.Args["filter"].(*graphQLModel.RawDataPointArrivedFilter))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return nil
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return nil
+	}
+	return func(ctx context.Context) graphql.Marshaler {
+		select {
+		case res, ok := <-resTmp.(<-chan []graphQLModel.RawDataPoint):
+			if !ok {
+				return nil
+			}
+			return graphql.WriterFunc(func(w io.Writer) {
+				w.Write([]byte{'{'})
+				graphql.MarshalString(field.Alias).MarshalGQL(w)
+				w.Write([]byte{':'})
+				ec.marshalNRawDataPoint2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐRawDataPointᚄ(ctx, field.Selections, res).MarshalGQL(w)
+				w.Write([]byte{'}'})
+			})
+		case <-ctx.Done():
+			return nil
+		}
+	}
+}
+
+func (ec *executionContext) fieldContext_Subscription_onRawDataPointArrived(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "sdTypeID":
+				return ec.fieldContext_RawDataPoint_sdTypeID(ctx, field)
+			case "sdInstanceID":
+				return ec.fieldContext_RawDataPoint_sdInstanceID(ctx, field)
+			case "payload":
+				return ec.fieldContext_RawDataPoint_payload(ctx, field)
+			case "eventTime":
+				return ec.fieldContext_RawDataPoint_eventTime(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RawDataPoint", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_onRawDataPointArrived_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
 	return fc, nil
 }
 
@@ -7973,7 +11928,7 @@ func (ec *executionContext) _Subscription_onKPIFulfillmentChecked(ctx context.Co
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Subscription().OnKPIFulfillmentChecked(rctx)
+		return ec.resolvers.Subscription().OnKPIFulfillmentChecked(rctx, fc.Args["filter"].(*graphQLModel.KPIFulfillmentCheckedFilter))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -7987,7 +11942,7 @@ func (ec *executionContext) _Subscription_onKPIFulfillmentChecked(ctx context.Co
 	}
 	return func(ctx context.Context) graphql.Marshaler {
 		select {
-		case res, ok := <-resTmp.(<-chan graphQLModel.KPIFulfillmentCheckResultTuple):
+		case res, ok := <-resTmp.(<-chan []graphQLModel.KPIFulfillmentCheckResult):
 			if !ok {
 				return nil
 			}
@@ -7995,7 +11950,7 @@ func (ec *executionContext) _Subscription_onKPIFulfillmentChecked(ctx context.Co
 				w.Write([]byte{'{'})
 				graphql.MarshalString(field.Alias).MarshalGQL(w)
 				w.Write([]byte{':'})
-				ec.marshalNKPIFulfillmentCheckResultTuple2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPIFulfillmentCheckResultTuple(ctx, field.Selections, res).MarshalGQL(w)
+				ec.marshalNKPIFulfillmentCheckResult2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPIFulfillmentCheckResultᚄ(ctx, field.Selections, res).MarshalGQL(w)
 				w.Write([]byte{'}'})
 			})
 		case <-ctx.Done():
@@ -8004,7 +11959,7 @@ func (ec *executionContext) _Subscription_onKPIFulfillmentChecked(ctx context.Co
 	}
 }
 
-func (ec *executionContext) fieldContext_Subscription_onKPIFulfillmentChecked(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Subscription_onKPIFulfillmentChecked(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Subscription",
 		Field:      field,
@@ -8012,17 +11967,1089 @@ func (ec *executionContext) fieldContext_Subscription_onKPIFulfillmentChecked(_ 
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "kpiFulfillmentCheckResults":
-				return ec.fieldContext_KPIFulfillmentCheckResultTuple_kpiFulfillmentCheckResults(ctx, field)
+			case "sdTypeID":
+				return ec.fieldContext_KPIFulfillmentCheckResult_sdTypeID(ctx, field)
+			case "sdInstanceID":
+				return ec.fieldContext_KPIFulfillmentCheckResult_sdInstanceID(ctx, field)
+			case "kpiDefinitionID":
+				return ec.fieldContext_KPIFulfillmentCheckResult_kpiDefinitionID(ctx, field)
+			case "eventTime":
+				return ec.fieldContext_KPIFulfillmentCheckResult_eventTime(ctx, field)
+			case "fulfilled":
+				return ec.fieldContext_KPIFulfillmentCheckResult_fulfilled(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type KPIFulfillmentCheckResultTuple", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type KPIFulfillmentCheckResult", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_onKPIFulfillmentChecked_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesCursor_time(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesCursor) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesCursor_time(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Time, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNDate2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesCursor_time(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesCursor",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Date does not have child fields")
 		},
 	}
 	return fc, nil
 }
 
-func (ec *executionContext) _UserConfig_userId(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.UserConfig) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_UserConfig_userId(ctx, field)
+func (ec *executionContext) _TimeSeriesCursor_sdInstanceUID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesCursor) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesCursor_sdInstanceUID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.SdInstanceUID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesCursor_sdInstanceUID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesCursor",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesCursor_kpiDefinitionID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesCursor) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesCursor_kpiDefinitionID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.KpiDefinitionID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*uint32)
+	fc.Result = res
+	return ec.marshalOID2ᚖuint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesCursor_kpiDefinitionID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesCursor",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesDataPoint_time(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesDataPoint) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesDataPoint_time(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Time, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNDate2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesDataPoint_time(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesDataPoint",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Date does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesDataPoint_tags(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesDataPoint) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesDataPoint_tags(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Tags, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNJSON2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesDataPoint_tags(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesDataPoint",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type JSON does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesDataPoint_data(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesDataPoint) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesDataPoint_data(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Data, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNJSON2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesDataPoint_data(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesDataPoint",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type JSON does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesDistinctTagValuesResponse_values(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesDistinctTagValuesResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesDistinctTagValuesResponse_values(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Values, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]string)
+	fc.Result = res
+	return ec.marshalNString2ᚕstringᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesDistinctTagValuesResponse_values(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesDistinctTagValuesResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesDistinctTagValuesResponse_error(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesDistinctTagValuesResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesDistinctTagValuesResponse_error(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Error, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesDistinctTagValuesResponse_error(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesDistinctTagValuesResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesExport_id(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesExport) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesExport_id(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uint32)
+	fc.Result = res
+	return ec.marshalNID2uint32(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesExport_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesExport",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesExport_status(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesExport) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesExport_status(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Status, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(graphQLModel.ExportStatus)
+	fc.Result = res
+	return ec.marshalNExportStatus2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐExportStatus(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesExport_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesExport",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ExportStatus does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesExport_downloadUrl(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesExport) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesExport_downloadUrl(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.DownloadURL, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesExport_downloadUrl(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesExport",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesExport_createdAt(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesExport) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesExport_createdAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNDate2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesExport_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesExport",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Date does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesExport_expiresAt(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesExport) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesExport_expiresAt(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ExpiresAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalODate2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesExport_expiresAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesExport",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Date does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesExport_error(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesExport) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesExport_error(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Error, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesExport_error(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesExport",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesParameter_denotation(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesParameter) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesParameter_denotation(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Denotation, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesParameter_denotation(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesParameter",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesParameter_label(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesParameter) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesParameter_label(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Label, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesParameter_label(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesParameter",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesParameter_role(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesParameter) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesParameter_role(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Role, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(graphQLModel.ParameterRole)
+	fc.Result = res
+	return ec.marshalNParameterRole2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐParameterRole(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesParameter_role(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesParameter",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ParameterRole does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesReadResponse_parameters(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesReadResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesReadResponse_parameters(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Parameters, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]graphQLModel.TimeSeriesParameter)
+	fc.Result = res
+	return ec.marshalOTimeSeriesParameter2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesParameterᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesReadResponse_parameters(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesReadResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "denotation":
+				return ec.fieldContext_TimeSeriesParameter_denotation(ctx, field)
+			case "label":
+				return ec.fieldContext_TimeSeriesParameter_label(ctx, field)
+			case "role":
+				return ec.fieldContext_TimeSeriesParameter_role(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TimeSeriesParameter", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesReadResponse_base(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesReadResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesReadResponse_base(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Base, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNJSON2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesReadResponse_base(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesReadResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type JSON does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesReadResponse_data(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesReadResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesReadResponse_data(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Data, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]graphQLModel.TimeSeriesDataPoint)
+	fc.Result = res
+	return ec.marshalOTimeSeriesDataPoint2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesDataPointᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesReadResponse_data(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesReadResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "time":
+				return ec.fieldContext_TimeSeriesDataPoint_time(ctx, field)
+			case "tags":
+				return ec.fieldContext_TimeSeriesDataPoint_tags(ctx, field)
+			case "data":
+				return ec.fieldContext_TimeSeriesDataPoint_data(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TimeSeriesDataPoint", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesReadResponse_hasMoreBatches(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesReadResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesReadResponse_hasMoreBatches(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.HasMoreBatches, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesReadResponse_hasMoreBatches(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesReadResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesReadResponse_hasMoreData(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesReadResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesReadResponse_hasMoreData(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.HasMoreData, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesReadResponse_hasMoreData(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesReadResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesReadResponse_nextCursor(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesReadResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesReadResponse_nextCursor(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.NextCursor, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*graphQLModel.TimeSeriesCursor)
+	fc.Result = res
+	return ec.marshalOTimeSeriesCursor2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesCursor(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesReadResponse_nextCursor(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesReadResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "time":
+				return ec.fieldContext_TimeSeriesCursor_time(ctx, field)
+			case "sdInstanceUID":
+				return ec.fieldContext_TimeSeriesCursor_sdInstanceUID(ctx, field)
+			case "kpiDefinitionID":
+				return ec.fieldContext_TimeSeriesCursor_kpiDefinitionID(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TimeSeriesCursor", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TimeSeriesReadResponse_error(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.TimeSeriesReadResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TimeSeriesReadResponse_error(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Error, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TimeSeriesReadResponse_error(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TimeSeriesReadResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _UserConfig_userID(ctx context.Context, field graphql.CollectedField, obj *graphQLModel.UserConfig) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_UserConfig_userID(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -8052,7 +13079,7 @@ func (ec *executionContext) _UserConfig_userId(ctx context.Context, field graphq
 	return ec.marshalNID2uint32(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_UserConfig_userId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_UserConfig_userID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "UserConfig",
 		Field:      field,
@@ -10156,6 +15183,95 @@ func (ec *executionContext) unmarshalInputAssignRoleInput(ctx context.Context, o
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputFilterNodeInput(ctx context.Context, obj any) (graphQLModel.FilterNodeInput, error) {
+	var it graphQLModel.FilterNodeInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"type", "operator", "nodes", "rule"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "type":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("type"))
+			data, err := ec.unmarshalNFilterNodeType2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐFilterNodeType(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Type = data
+		case "operator":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("operator"))
+			data, err := ec.unmarshalOLogicalOperator2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐLogicalOperator(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Operator = data
+		case "nodes":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("nodes"))
+			data, err := ec.unmarshalOFilterNodeInput2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐFilterNodeInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Nodes = data
+		case "rule":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("rule"))
+			data, err := ec.unmarshalOFilterRuleInput2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐFilterRuleInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Rule = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputFilterRuleInput(ctx context.Context, obj any) (graphQLModel.FilterRuleInput, error) {
+	var it graphQLModel.FilterRuleInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"tag", "operator", "value"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "tag":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tag"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Tag = data
+		case "operator":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("operator"))
+			data, err := ec.unmarshalNFilterOperator2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐFilterOperator(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Operator = data
+		case "value":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("value"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Value = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputInputData(ctx context.Context, obj any) (graphQLModel.InputData, error) {
 	var it graphQLModel.InputData
 	asMap := map[string]any{}
@@ -10211,7 +15327,7 @@ func (ec *executionContext) unmarshalInputKPIDefinitionInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"label", "sdTypeID", "sdTypeSpecification", "userIdentifier", "nodes", "sdInstanceMode", "selectedSDInstanceUIDs"}
+	fieldsInOrder := [...]string{"label", "sdTypeID", "sdTypeUID", "userIdentifier", "nodes", "sdInstanceMode", "selectedSDInstanceIDs"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -10232,13 +15348,13 @@ func (ec *executionContext) unmarshalInputKPIDefinitionInput(ctx context.Context
 				return it, err
 			}
 			it.SdTypeID = data
-		case "sdTypeSpecification":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sdTypeSpecification"))
+		case "sdTypeUID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sdTypeUID"))
 			data, err := ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.SdTypeSpecification = data
+			it.SdTypeUID = data
 		case "userIdentifier":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("userIdentifier"))
 			data, err := ec.unmarshalNString2string(ctx, v)
@@ -10260,13 +15376,88 @@ func (ec *executionContext) unmarshalInputKPIDefinitionInput(ctx context.Context
 				return it, err
 			}
 			it.SdInstanceMode = data
-		case "selectedSDInstanceUIDs":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("selectedSDInstanceUIDs"))
-			data, err := ec.unmarshalNString2ᚕstringᚄ(ctx, v)
+		case "selectedSDInstanceIDs":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("selectedSDInstanceIDs"))
+			data, err := ec.unmarshalNID2ᚕuint32ᚄ(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.SelectedSDInstanceUIDs = data
+			it.SelectedSDInstanceIDs = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputKPIFulfillmentCheckResultRequest(ctx context.Context, obj any) (graphQLModel.KPIFulfillmentCheckResultRequest, error) {
+	var it graphQLModel.KPIFulfillmentCheckResultRequest
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"kpiDefinitionID", "sdInstanceID"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "kpiDefinitionID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("kpiDefinitionID"))
+			data, err := ec.unmarshalNID2uint32(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.KpiDefinitionID = data
+		case "sdInstanceID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sdInstanceID"))
+			data, err := ec.unmarshalNID2uint32(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SdInstanceID = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputKPIFulfillmentCheckedFilter(ctx context.Context, obj any) (graphQLModel.KPIFulfillmentCheckedFilter, error) {
+	var it graphQLModel.KPIFulfillmentCheckedFilter
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"sdTypeIDs", "kpiDefinitions", "sdInstanceIDs"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "sdTypeIDs":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sdTypeIDs"))
+			data, err := ec.unmarshalOID2ᚕuint32ᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SdTypeIDs = data
+		case "kpiDefinitions":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("kpiDefinitions"))
+			data, err := ec.unmarshalOID2ᚕuint32ᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.KpiDefinitions = data
+		case "sdInstanceIDs":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sdInstanceIDs"))
+			data, err := ec.unmarshalOID2ᚕuint32ᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SdInstanceIDs = data
 		}
 	}
 
@@ -10356,6 +15547,40 @@ func (ec *executionContext) unmarshalInputKPINodeInput(ctx context.Context, obj 
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputRawDataPointArrivedFilter(ctx context.Context, obj any) (graphQLModel.RawDataPointArrivedFilter, error) {
+	var it graphQLModel.RawDataPointArrivedFilter
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"sdTypeIDs", "sdInstanceIDs"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "sdTypeIDs":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sdTypeIDs"))
+			data, err := ec.unmarshalOID2ᚕuint32ᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SdTypeIDs = data
+		case "sdInstanceIDs":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sdInstanceIDs"))
+			data, err := ec.unmarshalOID2ᚕuint32ᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SdInstanceIDs = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputSDInstanceGroupInput(ctx context.Context, obj any) (graphQLModel.SDInstanceGroupInput, error) {
 	var it graphQLModel.SDInstanceGroupInput
 	asMap := map[string]any{}
@@ -10387,6 +15612,40 @@ func (ec *executionContext) unmarshalInputSDInstanceGroupInput(ctx context.Conte
 		case "sdInstanceIDs":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sdInstanceIDs"))
 			data, err := ec.unmarshalNID2ᚕuint32ᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SdInstanceIDs = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputSDInstanceRegisteredFilter(ctx context.Context, obj any) (graphQLModel.SDInstanceRegisteredFilter, error) {
+	var it graphQLModel.SDInstanceRegisteredFilter
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"sdTypeIDs", "sdInstanceIDs"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "sdTypeIDs":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sdTypeIDs"))
+			data, err := ec.unmarshalOID2ᚕuint32ᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SdTypeIDs = data
+		case "sdInstanceIDs":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sdInstanceIDs"))
+			data, err := ec.unmarshalOID2ᚕuint32ᚄ(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -10493,7 +15752,7 @@ func (ec *executionContext) unmarshalInputSDTypeInput(ctx context.Context, obj a
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"label", "denotation", "parameters"}
+	fieldsInOrder := [...]string{"label", "uid", "parameters"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -10507,13 +15766,13 @@ func (ec *executionContext) unmarshalInputSDTypeInput(ctx context.Context, obj a
 				return it, err
 			}
 			it.Label = data
-		case "denotation":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("denotation"))
+		case "uid":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("uid"))
 			data, err := ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.Denotation = data
+			it.UID = data
 		case "parameters":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("parameters"))
 			data, err := ec.unmarshalNSDParameterInput2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐSDParameterInputᚄ(ctx, v)
@@ -10622,7 +15881,7 @@ func (ec *executionContext) unmarshalInputStatisticsInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"from", "to", "aggregateMinutes", "timezone", "operation"}
+	fieldsInOrder := [...]string{"from", "to", "aggregateSeconds", "timezone", "operation"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -10643,13 +15902,13 @@ func (ec *executionContext) unmarshalInputStatisticsInput(ctx context.Context, o
 				return it, err
 			}
 			it.To = data
-		case "aggregateMinutes":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("aggregateMinutes"))
+		case "aggregateSeconds":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("aggregateSeconds"))
 			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.AggregateMinutes = data
+			it.AggregateSeconds = data
 		case "timezone":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("timezone"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -10664,6 +15923,310 @@ func (ec *executionContext) unmarshalInputStatisticsInput(ctx context.Context, o
 				return it, err
 			}
 			it.Operation = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputTimeSeriesCursorInput(ctx context.Context, obj any) (graphQLModel.TimeSeriesCursorInput, error) {
+	var it graphQLModel.TimeSeriesCursorInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"time", "sdInstanceUID", "kpiDefinitionID"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "time":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("time"))
+			data, err := ec.unmarshalNDate2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Time = data
+		case "sdInstanceUID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sdInstanceUID"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SdInstanceUID = data
+		case "kpiDefinitionID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("kpiDefinitionID"))
+			data, err := ec.unmarshalOID2ᚖuint32(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.KpiDefinitionID = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputTimeSeriesDistinctTagValuesInput(ctx context.Context, obj any) (graphQLModel.TimeSeriesDistinctTagValuesInput, error) {
+	var it graphQLModel.TimeSeriesDistinctTagValuesInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"type", "sdTypeID", "sdInstanceIDs", "kpiDefinitionIDs", "from", "to", "tag", "filters"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "type":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("type"))
+			data, err := ec.unmarshalNTimeSeriesType2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesType(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Type = data
+		case "sdTypeID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sdTypeID"))
+			data, err := ec.unmarshalOID2ᚖuint32(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SdTypeID = data
+		case "sdInstanceIDs":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sdInstanceIDs"))
+			data, err := ec.unmarshalOID2ᚕuint32ᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SdInstanceIDs = data
+		case "kpiDefinitionIDs":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("kpiDefinitionIDs"))
+			data, err := ec.unmarshalOID2ᚕuint32ᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.KpiDefinitionIDs = data
+		case "from":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("from"))
+			data, err := ec.unmarshalODate2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.From = data
+		case "to":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("to"))
+			data, err := ec.unmarshalODate2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.To = data
+		case "tag":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tag"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Tag = data
+		case "filters":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("filters"))
+			data, err := ec.unmarshalOFilterNodeInput2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐFilterNodeInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Filters = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputTimeSeriesReadAggregateKPIInput(ctx context.Context, obj any) (graphQLModel.TimeSeriesReadAggregateKPIInput, error) {
+	var it graphQLModel.TimeSeriesReadAggregateKPIInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"sdTypeID", "sdInstanceIDs", "kpiDefinitionIDs", "from", "to", "aggregateSeconds", "limit", "batch", "filters", "cursor"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "sdTypeID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sdTypeID"))
+			data, err := ec.unmarshalOID2ᚖuint32(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SdTypeID = data
+		case "sdInstanceIDs":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sdInstanceIDs"))
+			data, err := ec.unmarshalOID2ᚕuint32ᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SdInstanceIDs = data
+		case "kpiDefinitionIDs":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("kpiDefinitionIDs"))
+			data, err := ec.unmarshalOID2ᚕuint32ᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.KpiDefinitionIDs = data
+		case "from":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("from"))
+			data, err := ec.unmarshalODate2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.From = data
+		case "to":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("to"))
+			data, err := ec.unmarshalODate2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.To = data
+		case "aggregateSeconds":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("aggregateSeconds"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.AggregateSeconds = data
+		case "limit":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Limit = data
+		case "batch":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("batch"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Batch = data
+		case "filters":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("filters"))
+			data, err := ec.unmarshalOFilterNodeInput2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐFilterNodeInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Filters = data
+		case "cursor":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("cursor"))
+			data, err := ec.unmarshalOTimeSeriesCursorInput2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesCursorInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Cursor = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputTimeSeriesReadInput(ctx context.Context, obj any) (graphQLModel.TimeSeriesReadInput, error) {
+	var it graphQLModel.TimeSeriesReadInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"type", "sdTypeID", "sdInstanceIDs", "kpiDefinitionIDs", "from", "to", "limit", "sortDesc", "batch", "filters", "cursor"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "type":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("type"))
+			data, err := ec.unmarshalNTimeSeriesType2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesType(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Type = data
+		case "sdTypeID":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sdTypeID"))
+			data, err := ec.unmarshalOID2ᚖuint32(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SdTypeID = data
+		case "sdInstanceIDs":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sdInstanceIDs"))
+			data, err := ec.unmarshalOID2ᚕuint32ᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SdInstanceIDs = data
+		case "kpiDefinitionIDs":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("kpiDefinitionIDs"))
+			data, err := ec.unmarshalOID2ᚕuint32ᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.KpiDefinitionIDs = data
+		case "from":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("from"))
+			data, err := ec.unmarshalODate2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.From = data
+		case "to":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("to"))
+			data, err := ec.unmarshalODate2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.To = data
+		case "limit":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Limit = data
+		case "sortDesc":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sortDesc"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.SortDesc = data
+		case "batch":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("batch"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Batch = data
+		case "filters":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("filters"))
+			data, err := ec.unmarshalOFilterNodeInput2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐFilterNodeInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Filters = data
+		case "cursor":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("cursor"))
+			data, err := ec.unmarshalOTimeSeriesCursorInput2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesCursorInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Cursor = data
 		}
 	}
 
@@ -10705,6 +16268,27 @@ func (ec *executionContext) _AtomKPINode(ctx context.Context, sel ast.SelectionS
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
+	case graphQLModel.StringNotExistsAtomKPINode:
+		return ec._StringNotExistsAtomKPINode(ctx, sel, &obj)
+	case *graphQLModel.StringNotExistsAtomKPINode:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._StringNotExistsAtomKPINode(ctx, sel, obj)
+	case graphQLModel.StringNEQAtomKPINode:
+		return ec._StringNEQAtomKPINode(ctx, sel, &obj)
+	case *graphQLModel.StringNEQAtomKPINode:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._StringNEQAtomKPINode(ctx, sel, obj)
+	case graphQLModel.StringExistsAtomKPINode:
+		return ec._StringExistsAtomKPINode(ctx, sel, &obj)
+	case *graphQLModel.StringExistsAtomKPINode:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._StringExistsAtomKPINode(ctx, sel, obj)
 	case graphQLModel.StringEQAtomKPINode:
 		return ec._StringEQAtomKPINode(ctx, sel, &obj)
 	case *graphQLModel.StringEQAtomKPINode:
@@ -10712,6 +16296,20 @@ func (ec *executionContext) _AtomKPINode(ctx context.Context, sel ast.SelectionS
 			return graphql.Null
 		}
 		return ec._StringEQAtomKPINode(ctx, sel, obj)
+	case graphQLModel.NumericNotExistsAtomKPINode:
+		return ec._NumericNotExistsAtomKPINode(ctx, sel, &obj)
+	case *graphQLModel.NumericNotExistsAtomKPINode:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._NumericNotExistsAtomKPINode(ctx, sel, obj)
+	case graphQLModel.NumericNEQAtomKPINode:
+		return ec._NumericNEQAtomKPINode(ctx, sel, &obj)
+	case *graphQLModel.NumericNEQAtomKPINode:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._NumericNEQAtomKPINode(ctx, sel, obj)
 	case graphQLModel.NumericLTAtomKPINode:
 		return ec._NumericLTAtomKPINode(ctx, sel, &obj)
 	case *graphQLModel.NumericLTAtomKPINode:
@@ -10740,6 +16338,13 @@ func (ec *executionContext) _AtomKPINode(ctx context.Context, sel ast.SelectionS
 			return graphql.Null
 		}
 		return ec._NumericGEQAtomKPINode(ctx, sel, obj)
+	case graphQLModel.NumericExistsAtomKPINode:
+		return ec._NumericExistsAtomKPINode(ctx, sel, &obj)
+	case *graphQLModel.NumericExistsAtomKPINode:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._NumericExistsAtomKPINode(ctx, sel, obj)
 	case graphQLModel.NumericEQAtomKPINode:
 		return ec._NumericEQAtomKPINode(ctx, sel, &obj)
 	case *graphQLModel.NumericEQAtomKPINode:
@@ -10747,6 +16352,27 @@ func (ec *executionContext) _AtomKPINode(ctx context.Context, sel ast.SelectionS
 			return graphql.Null
 		}
 		return ec._NumericEQAtomKPINode(ctx, sel, obj)
+	case graphQLModel.BooleanNotExistsAtomKPINode:
+		return ec._BooleanNotExistsAtomKPINode(ctx, sel, &obj)
+	case *graphQLModel.BooleanNotExistsAtomKPINode:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._BooleanNotExistsAtomKPINode(ctx, sel, obj)
+	case graphQLModel.BooleanNEQAtomKPINode:
+		return ec._BooleanNEQAtomKPINode(ctx, sel, &obj)
+	case *graphQLModel.BooleanNEQAtomKPINode:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._BooleanNEQAtomKPINode(ctx, sel, obj)
+	case graphQLModel.BooleanExistsAtomKPINode:
+		return ec._BooleanExistsAtomKPINode(ctx, sel, &obj)
+	case *graphQLModel.BooleanExistsAtomKPINode:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._BooleanExistsAtomKPINode(ctx, sel, obj)
 	case graphQLModel.BooleanEQAtomKPINode:
 		return ec._BooleanEQAtomKPINode(ctx, sel, &obj)
 	case *graphQLModel.BooleanEQAtomKPINode:
@@ -10763,6 +16389,27 @@ func (ec *executionContext) _KPINode(ctx context.Context, sel ast.SelectionSet, 
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
+	case graphQLModel.StringNotExistsAtomKPINode:
+		return ec._StringNotExistsAtomKPINode(ctx, sel, &obj)
+	case *graphQLModel.StringNotExistsAtomKPINode:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._StringNotExistsAtomKPINode(ctx, sel, obj)
+	case graphQLModel.StringNEQAtomKPINode:
+		return ec._StringNEQAtomKPINode(ctx, sel, &obj)
+	case *graphQLModel.StringNEQAtomKPINode:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._StringNEQAtomKPINode(ctx, sel, obj)
+	case graphQLModel.StringExistsAtomKPINode:
+		return ec._StringExistsAtomKPINode(ctx, sel, &obj)
+	case *graphQLModel.StringExistsAtomKPINode:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._StringExistsAtomKPINode(ctx, sel, obj)
 	case graphQLModel.StringEQAtomKPINode:
 		return ec._StringEQAtomKPINode(ctx, sel, &obj)
 	case *graphQLModel.StringEQAtomKPINode:
@@ -10770,6 +16417,20 @@ func (ec *executionContext) _KPINode(ctx context.Context, sel ast.SelectionSet, 
 			return graphql.Null
 		}
 		return ec._StringEQAtomKPINode(ctx, sel, obj)
+	case graphQLModel.NumericNotExistsAtomKPINode:
+		return ec._NumericNotExistsAtomKPINode(ctx, sel, &obj)
+	case *graphQLModel.NumericNotExistsAtomKPINode:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._NumericNotExistsAtomKPINode(ctx, sel, obj)
+	case graphQLModel.NumericNEQAtomKPINode:
+		return ec._NumericNEQAtomKPINode(ctx, sel, &obj)
+	case *graphQLModel.NumericNEQAtomKPINode:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._NumericNEQAtomKPINode(ctx, sel, obj)
 	case graphQLModel.NumericLTAtomKPINode:
 		return ec._NumericLTAtomKPINode(ctx, sel, &obj)
 	case *graphQLModel.NumericLTAtomKPINode:
@@ -10798,6 +16459,13 @@ func (ec *executionContext) _KPINode(ctx context.Context, sel ast.SelectionSet, 
 			return graphql.Null
 		}
 		return ec._NumericGEQAtomKPINode(ctx, sel, obj)
+	case graphQLModel.NumericExistsAtomKPINode:
+		return ec._NumericExistsAtomKPINode(ctx, sel, &obj)
+	case *graphQLModel.NumericExistsAtomKPINode:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._NumericExistsAtomKPINode(ctx, sel, obj)
 	case graphQLModel.NumericEQAtomKPINode:
 		return ec._NumericEQAtomKPINode(ctx, sel, &obj)
 	case *graphQLModel.NumericEQAtomKPINode:
@@ -10805,6 +16473,27 @@ func (ec *executionContext) _KPINode(ctx context.Context, sel ast.SelectionSet, 
 			return graphql.Null
 		}
 		return ec._NumericEQAtomKPINode(ctx, sel, obj)
+	case graphQLModel.BooleanNotExistsAtomKPINode:
+		return ec._BooleanNotExistsAtomKPINode(ctx, sel, &obj)
+	case *graphQLModel.BooleanNotExistsAtomKPINode:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._BooleanNotExistsAtomKPINode(ctx, sel, obj)
+	case graphQLModel.BooleanNEQAtomKPINode:
+		return ec._BooleanNEQAtomKPINode(ctx, sel, &obj)
+	case *graphQLModel.BooleanNEQAtomKPINode:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._BooleanNEQAtomKPINode(ctx, sel, obj)
+	case graphQLModel.BooleanExistsAtomKPINode:
+		return ec._BooleanExistsAtomKPINode(ctx, sel, &obj)
+	case *graphQLModel.BooleanExistsAtomKPINode:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._BooleanExistsAtomKPINode(ctx, sel, obj)
 	case graphQLModel.BooleanEQAtomKPINode:
 		return ec._BooleanEQAtomKPINode(ctx, sel, &obj)
 	case *graphQLModel.BooleanEQAtomKPINode:
@@ -10959,6 +16648,179 @@ func (ec *executionContext) _BooleanEQAtomKPINode(ctx context.Context, sel ast.S
 	return out
 }
 
+var booleanExistsAtomKPINodeImplementors = []string{"BooleanExistsAtomKPINode", "KPINode", "AtomKPINode"}
+
+func (ec *executionContext) _BooleanExistsAtomKPINode(ctx context.Context, sel ast.SelectionSet, obj *graphQLModel.BooleanExistsAtomKPINode) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, booleanExistsAtomKPINodeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("BooleanExistsAtomKPINode")
+		case "id":
+			out.Values[i] = ec._BooleanExistsAtomKPINode_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "parentNodeID":
+			out.Values[i] = ec._BooleanExistsAtomKPINode_parentNodeID(ctx, field, obj)
+		case "nodeType":
+			out.Values[i] = ec._BooleanExistsAtomKPINode_nodeType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sdParameterID":
+			out.Values[i] = ec._BooleanExistsAtomKPINode_sdParameterID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sdParameterSpecification":
+			out.Values[i] = ec._BooleanExistsAtomKPINode_sdParameterSpecification(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var booleanNEQAtomKPINodeImplementors = []string{"BooleanNEQAtomKPINode", "KPINode", "AtomKPINode"}
+
+func (ec *executionContext) _BooleanNEQAtomKPINode(ctx context.Context, sel ast.SelectionSet, obj *graphQLModel.BooleanNEQAtomKPINode) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, booleanNEQAtomKPINodeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("BooleanNEQAtomKPINode")
+		case "id":
+			out.Values[i] = ec._BooleanNEQAtomKPINode_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "parentNodeID":
+			out.Values[i] = ec._BooleanNEQAtomKPINode_parentNodeID(ctx, field, obj)
+		case "nodeType":
+			out.Values[i] = ec._BooleanNEQAtomKPINode_nodeType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sdParameterID":
+			out.Values[i] = ec._BooleanNEQAtomKPINode_sdParameterID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sdParameterSpecification":
+			out.Values[i] = ec._BooleanNEQAtomKPINode_sdParameterSpecification(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "booleanReferenceValue":
+			out.Values[i] = ec._BooleanNEQAtomKPINode_booleanReferenceValue(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var booleanNotExistsAtomKPINodeImplementors = []string{"BooleanNotExistsAtomKPINode", "KPINode", "AtomKPINode"}
+
+func (ec *executionContext) _BooleanNotExistsAtomKPINode(ctx context.Context, sel ast.SelectionSet, obj *graphQLModel.BooleanNotExistsAtomKPINode) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, booleanNotExistsAtomKPINodeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("BooleanNotExistsAtomKPINode")
+		case "id":
+			out.Values[i] = ec._BooleanNotExistsAtomKPINode_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "parentNodeID":
+			out.Values[i] = ec._BooleanNotExistsAtomKPINode_parentNodeID(ctx, field, obj)
+		case "nodeType":
+			out.Values[i] = ec._BooleanNotExistsAtomKPINode_nodeType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sdParameterID":
+			out.Values[i] = ec._BooleanNotExistsAtomKPINode_sdParameterID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sdParameterSpecification":
+			out.Values[i] = ec._BooleanNotExistsAtomKPINode_sdParameterSpecification(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var kPIDefinitionImplementors = []string{"KPIDefinition"}
 
 func (ec *executionContext) _KPIDefinition(ctx context.Context, sel ast.SelectionSet, obj *graphQLModel.KPIDefinition) graphql.Marshaler {
@@ -10985,8 +16847,8 @@ func (ec *executionContext) _KPIDefinition(ctx context.Context, sel ast.Selectio
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "sdTypeSpecification":
-			out.Values[i] = ec._KPIDefinition_sdTypeSpecification(ctx, field, obj)
+		case "sdTypeUID":
+			out.Values[i] = ec._KPIDefinition_sdTypeUID(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -11005,8 +16867,8 @@ func (ec *executionContext) _KPIDefinition(ctx context.Context, sel ast.Selectio
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "selectedSDInstanceUIDs":
-			out.Values[i] = ec._KPIDefinition_selectedSDInstanceUIDs(ctx, field, obj)
+		case "selectedSDInstanceIDs":
+			out.Values[i] = ec._KPIDefinition_selectedSDInstanceIDs(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -11044,8 +16906,8 @@ func (ec *executionContext) _KPIFulfillmentCheckResult(ctx context.Context, sel 
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("KPIFulfillmentCheckResult")
-		case "kpiDefinitionID":
-			out.Values[i] = ec._KPIFulfillmentCheckResult_kpiDefinitionID(ctx, field, obj)
+		case "sdTypeID":
+			out.Values[i] = ec._KPIFulfillmentCheckResult_sdTypeID(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -11054,47 +16916,18 @@ func (ec *executionContext) _KPIFulfillmentCheckResult(ctx context.Context, sel 
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "fulfilled":
-			out.Values[i] = ec._KPIFulfillmentCheckResult_fulfilled(ctx, field, obj)
+		case "kpiDefinitionID":
+			out.Values[i] = ec._KPIFulfillmentCheckResult_kpiDefinitionID(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch(ctx)
-	if out.Invalids > 0 {
-		return graphql.Null
-	}
-
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
-
-	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
-			Label:    label,
-			Path:     graphql.GetPath(ctx),
-			FieldSet: dfs,
-			Context:  ctx,
-		})
-	}
-
-	return out
-}
-
-var kPIFulfillmentCheckResultTupleImplementors = []string{"KPIFulfillmentCheckResultTuple"}
-
-func (ec *executionContext) _KPIFulfillmentCheckResultTuple(ctx context.Context, sel ast.SelectionSet, obj *graphQLModel.KPIFulfillmentCheckResultTuple) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, kPIFulfillmentCheckResultTupleImplementors)
-
-	out := graphql.NewFieldSet(fields)
-	deferred := make(map[string]*graphql.FieldSet)
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("KPIFulfillmentCheckResultTuple")
-		case "kpiFulfillmentCheckResults":
-			out.Values[i] = ec._KPIFulfillmentCheckResultTuple_kpiFulfillmentCheckResults(ctx, field, obj)
+		case "eventTime":
+			out.Values[i] = ec._KPIFulfillmentCheckResult_eventTime(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "fulfilled":
+			out.Values[i] = ec._KPIFulfillmentCheckResult_fulfilled(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -11282,23 +17115,37 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "createMyAPIKey":
+		case "createAPIKey":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_createMyAPIKey(ctx, field)
+				return ec._Mutation_createAPIKey(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "updateMyAPIKey":
+		case "updateAPIKey":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_updateMyAPIKey(ctx, field)
+				return ec._Mutation_updateAPIKey(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "deleteMyAPIKey":
+		case "deleteAPIKey":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_deleteMyAPIKey(ctx, field)
+				return ec._Mutation_deleteAPIKey(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "startTimeSeriesExport":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_startTimeSeriesExport(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "startTimeSeriesExportAggregateKPI":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_startTimeSeriesExportAggregateKPI(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -11361,6 +17208,62 @@ func (ec *executionContext) _NumericEQAtomKPINode(ctx context.Context, sel ast.S
 			}
 		case "numericReferenceValue":
 			out.Values[i] = ec._NumericEQAtomKPINode_numericReferenceValue(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var numericExistsAtomKPINodeImplementors = []string{"NumericExistsAtomKPINode", "KPINode", "AtomKPINode"}
+
+func (ec *executionContext) _NumericExistsAtomKPINode(ctx context.Context, sel ast.SelectionSet, obj *graphQLModel.NumericExistsAtomKPINode) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, numericExistsAtomKPINodeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("NumericExistsAtomKPINode")
+		case "id":
+			out.Values[i] = ec._NumericExistsAtomKPINode_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "parentNodeID":
+			out.Values[i] = ec._NumericExistsAtomKPINode_parentNodeID(ctx, field, obj)
+		case "nodeType":
+			out.Values[i] = ec._NumericExistsAtomKPINode_nodeType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sdParameterID":
+			out.Values[i] = ec._NumericExistsAtomKPINode_sdParameterID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sdParameterSpecification":
+			out.Values[i] = ec._NumericExistsAtomKPINode_sdParameterSpecification(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -11631,6 +17534,123 @@ func (ec *executionContext) _NumericLTAtomKPINode(ctx context.Context, sel ast.S
 	return out
 }
 
+var numericNEQAtomKPINodeImplementors = []string{"NumericNEQAtomKPINode", "KPINode", "AtomKPINode"}
+
+func (ec *executionContext) _NumericNEQAtomKPINode(ctx context.Context, sel ast.SelectionSet, obj *graphQLModel.NumericNEQAtomKPINode) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, numericNEQAtomKPINodeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("NumericNEQAtomKPINode")
+		case "id":
+			out.Values[i] = ec._NumericNEQAtomKPINode_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "parentNodeID":
+			out.Values[i] = ec._NumericNEQAtomKPINode_parentNodeID(ctx, field, obj)
+		case "nodeType":
+			out.Values[i] = ec._NumericNEQAtomKPINode_nodeType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sdParameterID":
+			out.Values[i] = ec._NumericNEQAtomKPINode_sdParameterID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sdParameterSpecification":
+			out.Values[i] = ec._NumericNEQAtomKPINode_sdParameterSpecification(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "numericReferenceValue":
+			out.Values[i] = ec._NumericNEQAtomKPINode_numericReferenceValue(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var numericNotExistsAtomKPINodeImplementors = []string{"NumericNotExistsAtomKPINode", "KPINode", "AtomKPINode"}
+
+func (ec *executionContext) _NumericNotExistsAtomKPINode(ctx context.Context, sel ast.SelectionSet, obj *graphQLModel.NumericNotExistsAtomKPINode) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, numericNotExistsAtomKPINodeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("NumericNotExistsAtomKPINode")
+		case "id":
+			out.Values[i] = ec._NumericNotExistsAtomKPINode_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "parentNodeID":
+			out.Values[i] = ec._NumericNotExistsAtomKPINode_parentNodeID(ctx, field, obj)
+		case "nodeType":
+			out.Values[i] = ec._NumericNotExistsAtomKPINode_nodeType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sdParameterID":
+			out.Values[i] = ec._NumericNotExistsAtomKPINode_sdParameterID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sdParameterSpecification":
+			out.Values[i] = ec._NumericNotExistsAtomKPINode_sdParameterSpecification(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var outputDataImplementors = []string{"OutputData"}
 
 func (ec *executionContext) _OutputData(ctx context.Context, sel ast.SelectionSet, obj *graphQLModel.OutputData) graphql.Marshaler {
@@ -11656,6 +17676,50 @@ func (ec *executionContext) _OutputData(ctx context.Context, sel ast.SelectionSe
 			out.Values[i] = ec._OutputData_deviceType(ctx, field, obj)
 		case "data":
 			out.Values[i] = ec._OutputData_data(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var permissionImplementors = []string{"Permission"}
+
+func (ec *executionContext) _Permission(ctx context.Context, sel ast.SelectionSet, obj *graphQLModel.Permission) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, permissionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Permission")
+		case "uid":
+			out.Values[i] = ec._Permission_uid(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "label":
+			out.Values[i] = ec._Permission_label(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -11745,6 +17809,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "sdInstance":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_sdInstance(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "sdInstances":
 			field := field
 
@@ -11777,6 +17863,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_sdInstancesByType(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "sdInstancesByKpiDefinition":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_sdInstancesByKpiDefinition(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -11833,7 +17941,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "kpiFulfillmentCheckResults":
+		case "kpiDefinitionsBySdType":
 			field := field
 
 			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
@@ -11842,7 +17950,139 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_kpiFulfillmentCheckResults(ctx, field)
+				res = ec._Query_kpiDefinitionsBySdType(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "kpiDefinitionsBySdInstance":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_kpiDefinitionsBySdInstance(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "rawDataPointsBySDType":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_rawDataPointsBySDType(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "rawDataPoint":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_rawDataPoint(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "kpiResults":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_kpiResults(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "kpiResultsByKPI":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_kpiResultsByKPI(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "kpiResult":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_kpiResult(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -11965,28 +18205,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "myUserConfig":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_myUserConfig(ctx, field)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "roles":
 			field := field
 
@@ -12028,7 +18246,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "myRole":
+		case "role":
 			field := field
 
 			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
@@ -12037,7 +18255,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_myRole(ctx, field)
+				res = ec._Query_role(ctx, field)
 				return res
 			}
 
@@ -12047,7 +18265,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "myApiKeys":
+		case "apiKeys":
 			field := field
 
 			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
@@ -12056,7 +18274,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_myApiKeys(ctx, field)
+				res = ec._Query_apiKeys(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -12069,7 +18287,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "myApiKey":
+		case "apiKey":
 			field := field
 
 			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
@@ -12078,7 +18296,73 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_myApiKey(ctx, field)
+				res = ec._Query_apiKey(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "timeSeriesRead":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_timeSeriesRead(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "timeSeriesReadAggregateKPI":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_timeSeriesReadAggregateKPI(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "timeSeriesDistinctTagValues":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_timeSeriesDistinctTagValues(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -12099,6 +18383,60 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___schema(ctx, field)
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var rawDataPointImplementors = []string{"RawDataPoint"}
+
+func (ec *executionContext) _RawDataPoint(ctx context.Context, sel ast.SelectionSet, obj *graphQLModel.RawDataPoint) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, rawDataPointImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RawDataPoint")
+		case "sdTypeID":
+			out.Values[i] = ec._RawDataPoint_sdTypeID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sdInstanceID":
+			out.Values[i] = ec._RawDataPoint_sdInstanceID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "payload":
+			out.Values[i] = ec._RawDataPoint_payload(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "eventTime":
+			out.Values[i] = ec._RawDataPoint_eventTime(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -12361,13 +18699,13 @@ func (ec *executionContext) _SDType(ctx context.Context, sel ast.SelectionSet, o
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "label":
-			out.Values[i] = ec._SDType_label(ctx, field, obj)
+		case "uid":
+			out.Values[i] = ec._SDType_uid(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "denotation":
-			out.Values[i] = ec._SDType_denotation(ctx, field, obj)
+		case "label":
+			out.Values[i] = ec._SDType_label(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -12460,6 +18798,179 @@ func (ec *executionContext) _StringEQAtomKPINode(ctx context.Context, sel ast.Se
 	return out
 }
 
+var stringExistsAtomKPINodeImplementors = []string{"StringExistsAtomKPINode", "KPINode", "AtomKPINode"}
+
+func (ec *executionContext) _StringExistsAtomKPINode(ctx context.Context, sel ast.SelectionSet, obj *graphQLModel.StringExistsAtomKPINode) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, stringExistsAtomKPINodeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("StringExistsAtomKPINode")
+		case "id":
+			out.Values[i] = ec._StringExistsAtomKPINode_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "parentNodeID":
+			out.Values[i] = ec._StringExistsAtomKPINode_parentNodeID(ctx, field, obj)
+		case "nodeType":
+			out.Values[i] = ec._StringExistsAtomKPINode_nodeType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sdParameterID":
+			out.Values[i] = ec._StringExistsAtomKPINode_sdParameterID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sdParameterSpecification":
+			out.Values[i] = ec._StringExistsAtomKPINode_sdParameterSpecification(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var stringNEQAtomKPINodeImplementors = []string{"StringNEQAtomKPINode", "KPINode", "AtomKPINode"}
+
+func (ec *executionContext) _StringNEQAtomKPINode(ctx context.Context, sel ast.SelectionSet, obj *graphQLModel.StringNEQAtomKPINode) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, stringNEQAtomKPINodeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("StringNEQAtomKPINode")
+		case "id":
+			out.Values[i] = ec._StringNEQAtomKPINode_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "parentNodeID":
+			out.Values[i] = ec._StringNEQAtomKPINode_parentNodeID(ctx, field, obj)
+		case "nodeType":
+			out.Values[i] = ec._StringNEQAtomKPINode_nodeType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sdParameterID":
+			out.Values[i] = ec._StringNEQAtomKPINode_sdParameterID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sdParameterSpecification":
+			out.Values[i] = ec._StringNEQAtomKPINode_sdParameterSpecification(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "stringReferenceValue":
+			out.Values[i] = ec._StringNEQAtomKPINode_stringReferenceValue(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var stringNotExistsAtomKPINodeImplementors = []string{"StringNotExistsAtomKPINode", "KPINode", "AtomKPINode"}
+
+func (ec *executionContext) _StringNotExistsAtomKPINode(ctx context.Context, sel ast.SelectionSet, obj *graphQLModel.StringNotExistsAtomKPINode) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, stringNotExistsAtomKPINodeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("StringNotExistsAtomKPINode")
+		case "id":
+			out.Values[i] = ec._StringNotExistsAtomKPINode_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "parentNodeID":
+			out.Values[i] = ec._StringNotExistsAtomKPINode_parentNodeID(ctx, field, obj)
+		case "nodeType":
+			out.Values[i] = ec._StringNotExistsAtomKPINode_nodeType(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sdParameterID":
+			out.Values[i] = ec._StringNotExistsAtomKPINode_sdParameterID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sdParameterSpecification":
+			out.Values[i] = ec._StringNotExistsAtomKPINode_sdParameterSpecification(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var subscriptionImplementors = []string{"Subscription"}
 
 func (ec *executionContext) _Subscription(ctx context.Context, sel ast.SelectionSet) func(ctx context.Context) graphql.Marshaler {
@@ -12475,11 +18986,310 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 	switch fields[0].Name {
 	case "onSDInstanceRegistered":
 		return ec._Subscription_onSDInstanceRegistered(ctx, fields[0])
+	case "onRawDataPointArrived":
+		return ec._Subscription_onRawDataPointArrived(ctx, fields[0])
 	case "onKPIFulfillmentChecked":
 		return ec._Subscription_onKPIFulfillmentChecked(ctx, fields[0])
 	default:
 		panic("unknown field " + strconv.Quote(fields[0].Name))
 	}
+}
+
+var timeSeriesCursorImplementors = []string{"TimeSeriesCursor"}
+
+func (ec *executionContext) _TimeSeriesCursor(ctx context.Context, sel ast.SelectionSet, obj *graphQLModel.TimeSeriesCursor) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, timeSeriesCursorImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TimeSeriesCursor")
+		case "time":
+			out.Values[i] = ec._TimeSeriesCursor_time(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sdInstanceUID":
+			out.Values[i] = ec._TimeSeriesCursor_sdInstanceUID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "kpiDefinitionID":
+			out.Values[i] = ec._TimeSeriesCursor_kpiDefinitionID(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var timeSeriesDataPointImplementors = []string{"TimeSeriesDataPoint"}
+
+func (ec *executionContext) _TimeSeriesDataPoint(ctx context.Context, sel ast.SelectionSet, obj *graphQLModel.TimeSeriesDataPoint) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, timeSeriesDataPointImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TimeSeriesDataPoint")
+		case "time":
+			out.Values[i] = ec._TimeSeriesDataPoint_time(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "tags":
+			out.Values[i] = ec._TimeSeriesDataPoint_tags(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "data":
+			out.Values[i] = ec._TimeSeriesDataPoint_data(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var timeSeriesDistinctTagValuesResponseImplementors = []string{"TimeSeriesDistinctTagValuesResponse"}
+
+func (ec *executionContext) _TimeSeriesDistinctTagValuesResponse(ctx context.Context, sel ast.SelectionSet, obj *graphQLModel.TimeSeriesDistinctTagValuesResponse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, timeSeriesDistinctTagValuesResponseImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TimeSeriesDistinctTagValuesResponse")
+		case "values":
+			out.Values[i] = ec._TimeSeriesDistinctTagValuesResponse_values(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "error":
+			out.Values[i] = ec._TimeSeriesDistinctTagValuesResponse_error(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var timeSeriesExportImplementors = []string{"TimeSeriesExport"}
+
+func (ec *executionContext) _TimeSeriesExport(ctx context.Context, sel ast.SelectionSet, obj *graphQLModel.TimeSeriesExport) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, timeSeriesExportImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TimeSeriesExport")
+		case "id":
+			out.Values[i] = ec._TimeSeriesExport_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "status":
+			out.Values[i] = ec._TimeSeriesExport_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "downloadUrl":
+			out.Values[i] = ec._TimeSeriesExport_downloadUrl(ctx, field, obj)
+		case "createdAt":
+			out.Values[i] = ec._TimeSeriesExport_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "expiresAt":
+			out.Values[i] = ec._TimeSeriesExport_expiresAt(ctx, field, obj)
+		case "error":
+			out.Values[i] = ec._TimeSeriesExport_error(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var timeSeriesParameterImplementors = []string{"TimeSeriesParameter"}
+
+func (ec *executionContext) _TimeSeriesParameter(ctx context.Context, sel ast.SelectionSet, obj *graphQLModel.TimeSeriesParameter) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, timeSeriesParameterImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TimeSeriesParameter")
+		case "denotation":
+			out.Values[i] = ec._TimeSeriesParameter_denotation(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "label":
+			out.Values[i] = ec._TimeSeriesParameter_label(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "role":
+			out.Values[i] = ec._TimeSeriesParameter_role(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var timeSeriesReadResponseImplementors = []string{"TimeSeriesReadResponse"}
+
+func (ec *executionContext) _TimeSeriesReadResponse(ctx context.Context, sel ast.SelectionSet, obj *graphQLModel.TimeSeriesReadResponse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, timeSeriesReadResponseImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TimeSeriesReadResponse")
+		case "parameters":
+			out.Values[i] = ec._TimeSeriesReadResponse_parameters(ctx, field, obj)
+		case "base":
+			out.Values[i] = ec._TimeSeriesReadResponse_base(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "data":
+			out.Values[i] = ec._TimeSeriesReadResponse_data(ctx, field, obj)
+		case "hasMoreBatches":
+			out.Values[i] = ec._TimeSeriesReadResponse_hasMoreBatches(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "hasMoreData":
+			out.Values[i] = ec._TimeSeriesReadResponse_hasMoreData(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "nextCursor":
+			out.Values[i] = ec._TimeSeriesReadResponse_nextCursor(ctx, field, obj)
+		case "error":
+			out.Values[i] = ec._TimeSeriesReadResponse_error(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
 }
 
 var userConfigImplementors = []string{"UserConfig"}
@@ -12493,8 +19303,8 @@ func (ec *executionContext) _UserConfig(ctx context.Context, sel ast.SelectionSe
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("UserConfig")
-		case "userId":
-			out.Values[i] = ec._UserConfig_userId(ctx, field, obj)
+		case "userID":
+			out.Values[i] = ec._UserConfig_userID(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -12949,6 +19759,41 @@ func (ec *executionContext) marshalNDate2string(ctx context.Context, sel ast.Sel
 	return res
 }
 
+func (ec *executionContext) unmarshalNExportStatus2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐExportStatus(ctx context.Context, v any) (graphQLModel.ExportStatus, error) {
+	var res graphQLModel.ExportStatus
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNExportStatus2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐExportStatus(ctx context.Context, sel ast.SelectionSet, v graphQLModel.ExportStatus) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) unmarshalNFilterNodeInput2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐFilterNodeInput(ctx context.Context, v any) (graphQLModel.FilterNodeInput, error) {
+	res, err := ec.unmarshalInputFilterNodeInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNFilterNodeType2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐFilterNodeType(ctx context.Context, v any) (graphQLModel.FilterNodeType, error) {
+	var res graphQLModel.FilterNodeType
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNFilterNodeType2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐFilterNodeType(ctx context.Context, sel ast.SelectionSet, v graphQLModel.FilterNodeType) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) unmarshalNFilterOperator2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐFilterOperator(ctx context.Context, v any) (graphQLModel.FilterOperator, error) {
+	var res graphQLModel.FilterOperator
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNFilterOperator2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐFilterOperator(ctx context.Context, sel ast.SelectionSet, v graphQLModel.FilterOperator) graphql.Marshaler {
+	return v
+}
+
 func (ec *executionContext) unmarshalNFloat2float64(ctx context.Context, v any) (float64, error) {
 	res, err := graphql.UnmarshalFloatContext(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -13012,6 +19857,21 @@ func (ec *executionContext) marshalNID2ᚕuint32ᚄ(ctx context.Context, sel ast
 func (ec *executionContext) unmarshalNInputData2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐInputData(ctx context.Context, v any) (graphQLModel.InputData, error) {
 	res, err := ec.unmarshalInputInputData(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v any) (int, error) {
+	res, err := graphql.UnmarshalInt(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.SelectionSet, v int) graphql.Marshaler {
+	res := graphql.MarshalInt(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
 }
 
 func (ec *executionContext) unmarshalNJSON2string(ctx context.Context, v any) (string, error) {
@@ -13130,8 +19990,9 @@ func (ec *executionContext) marshalNKPIFulfillmentCheckResult2ᚕgithubᚗcomᚋ
 	return ret
 }
 
-func (ec *executionContext) marshalNKPIFulfillmentCheckResultTuple2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPIFulfillmentCheckResultTuple(ctx context.Context, sel ast.SelectionSet, v graphQLModel.KPIFulfillmentCheckResultTuple) graphql.Marshaler {
-	return ec._KPIFulfillmentCheckResultTuple(ctx, sel, &v)
+func (ec *executionContext) unmarshalNKPIFulfillmentCheckResultRequest2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPIFulfillmentCheckResultRequest(ctx context.Context, v any) (graphQLModel.KPIFulfillmentCheckResultRequest, error) {
+	res, err := ec.unmarshalInputKPIFulfillmentCheckResultRequest(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalNKPINode2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPINode(ctx context.Context, sel ast.SelectionSet, v graphQLModel.KPINode) graphql.Marshaler {
@@ -13257,6 +20118,68 @@ func (ec *executionContext) marshalNOutputData2ᚕgithubᚗcomᚋMichalBuresᚑO
 				defer wg.Done()
 			}
 			ret[i] = ec.marshalNOutputData2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐOutputData(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) unmarshalNParameterRole2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐParameterRole(ctx context.Context, v any) (graphQLModel.ParameterRole, error) {
+	var res graphQLModel.ParameterRole
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNParameterRole2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐParameterRole(ctx context.Context, sel ast.SelectionSet, v graphQLModel.ParameterRole) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) marshalNPermission2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐPermission(ctx context.Context, sel ast.SelectionSet, v graphQLModel.Permission) graphql.Marshaler {
+	return ec._Permission(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNRawDataPoint2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐRawDataPoint(ctx context.Context, sel ast.SelectionSet, v graphQLModel.RawDataPoint) graphql.Marshaler {
+	return ec._RawDataPoint(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNRawDataPoint2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐRawDataPointᚄ(ctx context.Context, sel ast.SelectionSet, v []graphQLModel.RawDataPoint) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNRawDataPoint2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐRawDataPoint(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -13656,6 +20579,47 @@ func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel
 	return ret
 }
 
+func (ec *executionContext) marshalNTimeSeriesDataPoint2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesDataPoint(ctx context.Context, sel ast.SelectionSet, v graphQLModel.TimeSeriesDataPoint) graphql.Marshaler {
+	return ec._TimeSeriesDataPoint(ctx, sel, &v)
+}
+
+func (ec *executionContext) unmarshalNTimeSeriesDistinctTagValuesInput2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesDistinctTagValuesInput(ctx context.Context, v any) (graphQLModel.TimeSeriesDistinctTagValuesInput, error) {
+	res, err := ec.unmarshalInputTimeSeriesDistinctTagValuesInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNTimeSeriesDistinctTagValuesResponse2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesDistinctTagValuesResponse(ctx context.Context, sel ast.SelectionSet, v graphQLModel.TimeSeriesDistinctTagValuesResponse) graphql.Marshaler {
+	return ec._TimeSeriesDistinctTagValuesResponse(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNTimeSeriesParameter2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesParameter(ctx context.Context, sel ast.SelectionSet, v graphQLModel.TimeSeriesParameter) graphql.Marshaler {
+	return ec._TimeSeriesParameter(ctx, sel, &v)
+}
+
+func (ec *executionContext) unmarshalNTimeSeriesReadAggregateKPIInput2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesReadAggregateKPIInput(ctx context.Context, v any) (graphQLModel.TimeSeriesReadAggregateKPIInput, error) {
+	res, err := ec.unmarshalInputTimeSeriesReadAggregateKPIInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNTimeSeriesReadInput2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesReadInput(ctx context.Context, v any) (graphQLModel.TimeSeriesReadInput, error) {
+	res, err := ec.unmarshalInputTimeSeriesReadInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNTimeSeriesReadResponse2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesReadResponse(ctx context.Context, sel ast.SelectionSet, v graphQLModel.TimeSeriesReadResponse) graphql.Marshaler {
+	return ec._TimeSeriesReadResponse(ctx, sel, &v)
+}
+
+func (ec *executionContext) unmarshalNTimeSeriesType2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesType(ctx context.Context, v any) (graphQLModel.TimeSeriesType, error) {
+	var res graphQLModel.TimeSeriesType
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNTimeSeriesType2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesType(ctx context.Context, sel ast.SelectionSet, v graphQLModel.TimeSeriesType) graphql.Marshaler {
+	return v
+}
+
 func (ec *executionContext) marshalNUserConfig2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐUserConfig(ctx context.Context, sel ast.SelectionSet, v graphQLModel.UserConfig) graphql.Marshaler {
 	return ec._UserConfig(ctx, sel, &v)
 }
@@ -13958,6 +20922,40 @@ func (ec *executionContext) marshalODate2ᚖstring(ctx context.Context, sel ast.
 	return res
 }
 
+func (ec *executionContext) unmarshalOFilterNodeInput2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐFilterNodeInputᚄ(ctx context.Context, v any) ([]graphQLModel.FilterNodeInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []any
+	vSlice = graphql.CoerceList(v)
+	var err error
+	res := make([]graphQLModel.FilterNodeInput, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNFilterNodeInput2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐFilterNodeInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) unmarshalOFilterNodeInput2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐFilterNodeInput(ctx context.Context, v any) (*graphQLModel.FilterNodeInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputFilterNodeInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalOFilterRuleInput2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐFilterRuleInput(ctx context.Context, v any) (*graphQLModel.FilterRuleInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputFilterRuleInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalOFloat2ᚖfloat64(ctx context.Context, v any) (*float64, error) {
 	if v == nil {
 		return nil, nil
@@ -13972,6 +20970,42 @@ func (ec *executionContext) marshalOFloat2ᚖfloat64(ctx context.Context, sel as
 	}
 	res := graphql.MarshalFloatContext(*v)
 	return graphql.WrapContextMarshaler(ctx, res)
+}
+
+func (ec *executionContext) unmarshalOID2ᚕuint32ᚄ(ctx context.Context, v any) ([]uint32, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var vSlice []any
+	vSlice = graphql.CoerceList(v)
+	var err error
+	res := make([]uint32, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNID2uint32(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalOID2ᚕuint32ᚄ(ctx context.Context, sel ast.SelectionSet, v []uint32) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNID2uint32(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) unmarshalOID2ᚖuint32(ctx context.Context, v any) (*uint32, error) {
@@ -14006,6 +21040,14 @@ func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.Sele
 	return res
 }
 
+func (ec *executionContext) unmarshalOKPIFulfillmentCheckedFilter2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐKPIFulfillmentCheckedFilter(ctx context.Context, v any) (*graphQLModel.KPIFulfillmentCheckedFilter, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputKPIFulfillmentCheckedFilter(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalOLogicalOperationType2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐLogicalOperationType(ctx context.Context, v any) (*graphQLModel.LogicalOperationType, error) {
 	if v == nil {
 		return nil, nil
@@ -14022,11 +21064,90 @@ func (ec *executionContext) marshalOLogicalOperationType2ᚖgithubᚗcomᚋMicha
 	return v
 }
 
+func (ec *executionContext) unmarshalOLogicalOperator2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐLogicalOperator(ctx context.Context, v any) (*graphQLModel.LogicalOperator, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(graphQLModel.LogicalOperator)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOLogicalOperator2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐLogicalOperator(ctx context.Context, sel ast.SelectionSet, v *graphQLModel.LogicalOperator) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
+}
+
+func (ec *executionContext) marshalOPermission2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐPermissionᚄ(ctx context.Context, sel ast.SelectionSet, v []graphQLModel.Permission) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNPermission2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐPermission(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) unmarshalORawDataPointArrivedFilter2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐRawDataPointArrivedFilter(ctx context.Context, v any) (*graphQLModel.RawDataPointArrivedFilter, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputRawDataPointArrivedFilter(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalORole2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐRole(ctx context.Context, sel ast.SelectionSet, v *graphQLModel.Role) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._Role(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOSDInstanceRegisteredFilter2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐSDInstanceRegisteredFilter(ctx context.Context, v any) (*graphQLModel.SDInstanceRegisteredFilter, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputSDInstanceRegisteredFilter(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalOStatisticsInput2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐStatisticsInput(ctx context.Context, v any) (*graphQLModel.StatisticsInput, error) {
@@ -14103,6 +21224,115 @@ func (ec *executionContext) marshalOString2ᚖstring(ctx context.Context, sel as
 	}
 	res := graphql.MarshalString(*v)
 	return res
+}
+
+func (ec *executionContext) marshalOTimeSeriesCursor2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesCursor(ctx context.Context, sel ast.SelectionSet, v *graphQLModel.TimeSeriesCursor) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._TimeSeriesCursor(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOTimeSeriesCursorInput2ᚖgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesCursorInput(ctx context.Context, v any) (*graphQLModel.TimeSeriesCursorInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputTimeSeriesCursorInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOTimeSeriesDataPoint2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesDataPointᚄ(ctx context.Context, sel ast.SelectionSet, v []graphQLModel.TimeSeriesDataPoint) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNTimeSeriesDataPoint2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesDataPoint(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalOTimeSeriesParameter2ᚕgithubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesParameterᚄ(ctx context.Context, sel ast.SelectionSet, v []graphQLModel.TimeSeriesParameter) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNTimeSeriesParameter2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesParameter(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalO__EnumValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐEnumValueᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.EnumValue) graphql.Marshaler {

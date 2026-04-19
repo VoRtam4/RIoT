@@ -17,6 +17,7 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
 )
 
@@ -27,28 +28,34 @@ var (
 
 type RelationalDatabaseClient interface {
 	setup()
-	PerformOnStartupOperations(permissions map[string]map[string]bool) error
+	PerformOnStartupOperations(permissions map[string]map[string]bool, formatPermissionLabel func(string) string) error
 	PersistKPIDefinition(userID uint32, kpiDefinition sharedModel.KPIDefinition) sharedUtils.Result[uint32]
 	LoadAllKPIDefinitions() sharedUtils.Result[[]sharedModel.KPIDefinition]
 	LoadKPIDefinition(userID uint32, id uint32) sharedUtils.Result[sharedModel.KPIDefinition]
 	LoadKPIDefinitions(userID uint32) sharedUtils.Result[[]sharedModel.KPIDefinition]
+	LoadKPIDefinitionsBySDType(userID uint32, sdTypeID uint32) sharedUtils.Result[[]sharedModel.KPIDefinition]
+	LoadKPIDefinitionsBySDInstance(userID uint32, sdInstanceID uint32) sharedUtils.Result[[]sharedModel.KPIDefinition]
 	DeleteKPIDefinition(id uint32) error
 	PersistSDType(sdType dllModel.SDType) sharedUtils.Result[dllModel.SDType]
 	UpsertSDType(sdType dllModel.SDType) sharedUtils.Result[dllModel.SDType]
 	LoadSDType(id uint32) sharedUtils.Result[dllModel.SDType]
 	LoadSDInstancesByType(sdTypeID uint32) sharedUtils.Result[[]dllModel.SDInstance]
 	LoadSDInstancesByKpiDefinition(kpiDefinitionID uint32) sharedUtils.Result[[]dllModel.SDInstance]
-	LoadSDTypeBasedOnDenotation(denotation string) sharedUtils.Result[dllModel.SDType]
+	LoadSDTypeBasedOnUID(uid string) sharedUtils.Result[dllModel.SDType]
 	LoadSDTypes() sharedUtils.Result[[]dllModel.SDType]
 	DeleteSDType(id uint32) error
 	PersistSDInstance(sdInstance dllModel.SDInstance) sharedUtils.Result[uint32]
-	PersistNewSDInstance(uid string, sdTypeSpecification string) sharedUtils.Result[dllModel.SDInstance]
+	UpsertSDInstance(uid string, sdTypeSpecification string, label string) sharedUtils.Result[dllModel.SDInstance]
 	LoadSDInstance(id uint32) sharedUtils.Result[dllModel.SDInstance]
 	LoadSDInstanceBasedOnUID(uid string) sharedUtils.Result[sharedUtils.Optional[dllModel.SDInstance]]
 	LoadSDInstances() sharedUtils.Result[[]dllModel.SDInstance]
-	PersistKPIFulFulfillmentCheckResultTuple(sdInstanceUID string, kpiDefinitionIDs []uint32, fulfillmentStatuses []bool, eventTimes []time.Time) sharedUtils.Result[[]dllModel.KPIFulfillmentCheckResult]
-	LoadKPIFulFulfillmentCheckResult(kpiDefinitionID uint32, sdInstanceID uint32) sharedUtils.Result[sharedUtils.Optional[dllModel.KPIFulfillmentCheckResult]]
-	LoadKPIFulFulfillmentCheckResults() sharedUtils.Result[[]dllModel.KPIFulfillmentCheckResult]
+	PersistRawDataPoints(points []dllModel.RawDataPoint) sharedUtils.Result[[]dllModel.RawDataPoint]
+	LoadRawDataPointsBySDType(sdTypeID uint32) sharedUtils.Result[[]dllModel.RawDataPoint]
+	LoadRawDataPoint(sdInstanceID uint32) sharedUtils.Result[sharedUtils.Optional[dllModel.RawDataPoint]]
+	PersistKPIFulfillmentCheckResults(points []dllModel.KPIFulfillmentCheckResult, reprocess bool) sharedUtils.Result[[]dllModel.KPIFulfillmentCheckResult]
+	LoadKPIFulfillmentCheckResults(userID uint32) sharedUtils.Result[[]dllModel.KPIFulfillmentCheckResult]
+	LoadKPIFulfillmentCheckResultsByKPI(userID uint32, kpiDefinitionID uint32) sharedUtils.Result[[]dllModel.KPIFulfillmentCheckResult]
+	LoadKPIFulfillmentCheckResult(userID uint32, input dllModel.KPIFulfillmentCheckResultRequest) sharedUtils.Result[sharedUtils.Optional[dllModel.KPIFulfillmentCheckResult]]
 	LoadSDInstanceGroups() sharedUtils.Result[[]dllModel.SDInstanceGroup]
 	LoadSDInstanceGroup(id uint32) sharedUtils.Result[dllModel.SDInstanceGroup]
 	PersistSDInstanceGroup(sdInstanceGroup dllModel.SDInstanceGroup) sharedUtils.Result[uint32]
@@ -67,7 +74,8 @@ type RelationalDatabaseClient interface {
 	CreateAPIKey(userID uint32, k dllModel.APIKey) sharedUtils.Result[dllModel.APIKey]
 	UpdateAPIKey(k dllModel.APIKey) sharedUtils.Result[dllModel.APIKey]
 	DeleteAPIKey(id uint32) error
-	GetRoleIDByLabel(label string) sharedUtils.Result[dllModel.Role]
+	LoadRoles() sharedUtils.Result[[]dllModel.Role]
+	LoadRoleByUID(uid string) sharedUtils.Result[dllModel.Role]
 	GetUserRole(userID uint32) sharedUtils.Result[dllModel.Role]
 	SetUserRole(userID uint32, roleID uint32) error
 }
@@ -112,6 +120,7 @@ func (r *relationalDatabaseClientImpl) setup() {
 		new(dbModel.SDTypeEntity),
 		new(dbModel.SDParameterEntity),
 		new(dbModel.SDInstanceEntity),
+		new(dbModel.RawDataPointEntity),
 		new(dbModel.KPIFulfillmentCheckResultEntity),
 		new(dbModel.SDInstanceGroupEntity),
 		new(dbModel.SDInstanceGroupMembershipEntity),
@@ -122,6 +131,7 @@ func (r *relationalDatabaseClientImpl) setup() {
 		new(dbModel.GraphQLOperationEntity),
 		new(dbModel.RoleEntity),
 		new(dbModel.RolesPermissionsMappingEntity),
+		new(dbModel.APIKeysPermissionsMappingEntity),
 		new(dbModel.PermissionEntity),
 		new(dbModel.OperationTypeAccessPermissionEntity),
 		new(dbModel.SingleOperationPermissionEntity),
@@ -130,7 +140,7 @@ func (r *relationalDatabaseClientImpl) setup() {
 	), "[RDB client (GORM)]: auto-migration failed")
 }
 
-func (r *relationalDatabaseClientImpl) PerformOnStartupOperations(permissions map[string]map[string]bool) error {
+func (r *relationalDatabaseClientImpl) PerformOnStartupOperations(permissions map[string]map[string]bool, formatPermissionLabel func(string) string) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 
 		for roleLabel, perms := range permissions {
@@ -153,9 +163,9 @@ func (r *relationalDatabaseClientImpl) PerformOnStartupOperations(permissions ma
 				}
 
 				var perm dbModel.PermissionEntity
-				err := tx.Where("label = ?", permLabel).First(&perm).Error
+				err := tx.Where("uid = ?", permLabel).First(&perm).Error
 				if errors.Is(err, gorm.ErrRecordNotFound) {
-					perm = dbModel.PermissionEntity{Label: permLabel}
+					perm = dbModel.PermissionEntity{UID: permLabel, Label: formatPermissionLabel(permLabel)}
 					if err := tx.Create(&perm).Error; err != nil {
 						return err
 					}
@@ -176,9 +186,7 @@ func (r *relationalDatabaseClientImpl) PerformOnStartupOperations(permissions ma
 func (r *relationalDatabaseClientImpl) PersistKPIDefinition(userID uint32, kpiDefinition sharedModel.KPIDefinition) sharedUtils.Result[uint32] {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
 	kpiDefinitionID := sharedUtils.NewOptionalFromPointer(kpiDefinition.ID).GetPayloadOrDefault(0)
-
 	idsOfKPINodeEntitiesFormingTheKPIDefinition := sharedUtils.EmptySlice[uint32]()
 	if kpiDefinitionID != 0 {
 		getIDsResult := dbModel.GetIDsOfKPINodeEntitiesFormingTheKPIDefinition(r.db, kpiDefinitionID)
@@ -187,18 +195,15 @@ func (r *relationalDatabaseClientImpl) PersistKPIDefinition(userID uint32, kpiDe
 		}
 		idsOfKPINodeEntitiesFormingTheKPIDefinition = getIDsResult.GetPayload()
 	}
-
 	kpiNodeEntity, kpiNodeEntities, logicalNodes, atomNodes := dll2db.ToDBModelEntitiesKPIDefinition(kpiDefinition)
-
-	referencedSDInstancesResult := dbUtil.LoadEntitiesFromDB[dbModel.SDInstanceEntity](
-		r.db,
-		dbUtil.Where("uid IN (?)", kpiDefinition.SelectedSDInstanceUIDs),
-	)
-	if referencedSDInstancesResult.IsFailure() {
-		return sharedUtils.NewFailureResult[uint32](referencedSDInstancesResult.GetError())
+	referencedSDInstances := make([]dbModel.SDInstanceEntity, 0)
+	if len(kpiDefinition.SelectedSDInstanceIDs) > 0 {
+		referencedSDInstancesResult := dbUtil.LoadEntitiesFromDB[dbModel.SDInstanceEntity](r.db, dbUtil.Where("id IN (?)", kpiDefinition.SelectedSDInstanceIDs))
+		if referencedSDInstancesResult.IsFailure() {
+			return sharedUtils.NewFailureResult[uint32](referencedSDInstancesResult.GetError())
+		}
+		referencedSDInstances = referencedSDInstancesResult.GetPayload()
 	}
-	referencedSDInstances := referencedSDInstancesResult.GetPayload()
-
 	kpiDefinitionEntity := dbModel.KPIDefinitionEntity{
 		ID:             kpiDefinitionID,
 		Label:          kpiDefinition.Label,
@@ -208,66 +213,56 @@ func (r *relationalDatabaseClientImpl) PersistKPIDefinition(userID uint32, kpiDe
 		RootNode:       kpiNodeEntity,
 		SDInstanceMode: string(kpiDefinition.SDInstanceMode),
 	}
-
 	err := r.db.Transaction(func(tx *gorm.DB) error {
 		for _, entity := range kpiNodeEntities {
 			if err := dbUtil.PersistEntityIntoDB(tx, entity); err != nil {
 				return err
 			}
 		}
-
 		if err := dbUtil.PersistEntityIntoDB(tx, &kpiDefinitionEntity); err != nil {
 			return err
 		}
-
 		for _, entity := range logicalNodes {
 			if err := dbUtil.PersistEntityIntoDB(tx, &entity); err != nil {
 				return err
 			}
 		}
-
 		for _, entity := range atomNodes {
 			if err := dbUtil.PersistEntityIntoDB(tx, &entity); err != nil {
 				return err
 			}
 		}
-
-		return nil
-	})
-
-	if err != nil {
-		return sharedUtils.NewFailureResult[uint32](err)
-	}
-
-	if kpiDefinitionID != 0 {
-		if err := dbUtil.DeleteEntitiesBasedOnWhereClauses[dbModel.SDInstanceKPIDefinitionRelationshipEntity](r.db, dbUtil.Where("kpi_definition_id = ?", kpiDefinitionID)); err != nil {
-			return sharedUtils.NewFailureResult[uint32](err)
+		if kpiDefinitionID != 0 {
+			if err := dbUtil.DeleteEntitiesBasedOnWhereClauses[dbModel.SDInstanceKPIDefinitionRelationshipEntity](
+				tx,
+				dbUtil.Where("kpi_definition_id = ?", kpiDefinitionID),
+			); err != nil {
+				return err
+			}
 		}
-	}
-
-	sdInstanceRelations := sharedUtils.Map(referencedSDInstances, func(sdInstance dbModel.SDInstanceEntity) dbModel.SDInstanceKPIDefinitionRelationshipEntity {
-		return dbModel.SDInstanceKPIDefinitionRelationshipEntity{
-			KPIDefinitionID: kpiDefinitionEntity.ID,
-			SDInstanceID:    sdInstance.ID,
-			SDInstanceUID:   sdInstance.UID,
-		}
-	})
-
-	if err := r.db.Transaction(func(tx *gorm.DB) error {
-		for _, entity := range sdInstanceRelations {
+		for _, sdInstance := range referencedSDInstances {
+			entity := dbModel.SDInstanceKPIDefinitionRelationshipEntity{
+				KPIDefinitionID: kpiDefinitionEntity.ID,
+				SDInstanceID:    sdInstance.ID,
+				SDInstanceUID:   sdInstance.UID,
+			}
 			if err := dbUtil.PersistEntityIntoDB(tx, &entity); err != nil {
 				return err
 			}
 		}
 		return nil
-	}); err != nil {
+	})
+	if err != nil {
 		return sharedUtils.NewFailureResult[uint32](err)
 	}
-
-	if err := dbUtil.DeleteEntitiesBasedOnSliceOfIds[dbModel.KPINodeEntity](r.db, idsOfKPINodeEntitiesFormingTheKPIDefinition); err != nil {
-		log.Printf("cleanup failed: %s\n", err.Error())
+	if len(idsOfKPINodeEntitiesFormingTheKPIDefinition) > 0 {
+		if err := dbUtil.DeleteEntitiesBasedOnSliceOfIds[dbModel.KPINodeEntity](
+			r.db,
+			idsOfKPINodeEntitiesFormingTheKPIDefinition,
+		); err != nil {
+			log.Printf("cleanup failed: %s\n", err.Error())
+		}
 	}
-
 	return sharedUtils.NewSuccessResult[uint32](kpiDefinitionEntity.ID)
 }
 
@@ -322,11 +317,22 @@ func (r *relationalDatabaseClientImpl) LoadKPIDefinition(userID uint32, id uint3
 func (r *relationalDatabaseClientImpl) LoadKPIDefinitions(userID uint32) sharedUtils.Result[[]sharedModel.KPIDefinition] {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	result := dbUtil.LoadEntitiesFromDB[dbModel.KPIDefinitionEntity](r.db, dbUtil.Where("user_id = ?", userID), dbUtil.Preload("SDType"), dbUtil.Preload("SDInstanceKPIDefinitionRelationshipRecords"))
+
+	result := dbUtil.LoadEntitiesFromDB[dbModel.KPIDefinitionEntity](
+		r.db,
+		dbUtil.Where("user_id = ?", userID),
+		dbUtil.Preload("SDType"),
+		dbUtil.Preload("SDInstanceKPIDefinitionRelationshipRecords"),
+	)
 	if result.IsFailure() {
 		return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](result.GetError())
 	}
+
 	entities := result.GetPayload()
+	if len(entities) == 0 {
+		return sharedUtils.NewSuccessResult([]sharedModel.KPIDefinition{})
+	}
+
 	allNodeIDs := make([]uint32, 0)
 	for _, entity := range entities {
 		idsResult := dbModel.GetIDsOfKPINodeEntitiesFormingTheKPIDefinition(r.db, entity.ID)
@@ -335,34 +341,47 @@ func (r *relationalDatabaseClientImpl) LoadKPIDefinitions(userID uint32) sharedU
 		}
 		allNodeIDs = append(allNodeIDs, idsResult.GetPayload()...)
 	}
-	kpiNodesResult := dbUtil.LoadEntitiesFromDB[dbModel.KPINodeEntity](
-		r.db,
-		dbUtil.Where("id IN (?)", allNodeIDs),
-	)
-	if kpiNodesResult.IsFailure() {
-		return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](kpiNodesResult.GetError())
-	}
-	kpiNodes := kpiNodesResult.GetPayload()
 
-	logicalNodesResult := dbUtil.LoadEntitiesFromDB[dbModel.LogicalOperationKPINodeEntity](
-		r.db,
-		dbUtil.Where("node_id IN (?)", allNodeIDs),
-	)
-	if logicalNodesResult.IsFailure() {
-		return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](logicalNodesResult.GetError())
-	}
-	logicalNodes := logicalNodesResult.GetPayload()
+	kpiNodes := make([]dbModel.KPINodeEntity, 0)
+	logicalNodes := make([]dbModel.LogicalOperationKPINodeEntity, 0)
+	atomNodes := make([]dbModel.AtomKPINodeEntity, 0)
 
-	atomNodesResult := dbUtil.LoadEntitiesFromDB[dbModel.AtomKPINodeEntity](r.db, dbUtil.Where("node_id IN (?)", allNodeIDs), dbUtil.Preload("SDParameter"))
-	if atomNodesResult.IsFailure() {
-		return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](atomNodesResult.GetError())
+	if len(allNodeIDs) > 0 {
+		kpiNodesResult := dbUtil.LoadEntitiesFromDB[dbModel.KPINodeEntity](
+			r.db,
+			dbUtil.Where("id IN (?)", allNodeIDs),
+		)
+		if kpiNodesResult.IsFailure() {
+			return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](kpiNodesResult.GetError())
+		}
+		kpiNodes = kpiNodesResult.GetPayload()
+
+		logicalNodesResult := dbUtil.LoadEntitiesFromDB[dbModel.LogicalOperationKPINodeEntity](
+			r.db,
+			dbUtil.Where("node_id IN (?)", allNodeIDs),
+		)
+		if logicalNodesResult.IsFailure() {
+			return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](logicalNodesResult.GetError())
+		}
+		logicalNodes = logicalNodesResult.GetPayload()
+
+		atomNodesResult := dbUtil.LoadEntitiesFromDB[dbModel.AtomKPINodeEntity](
+			r.db,
+			dbUtil.Where("node_id IN (?)", allNodeIDs),
+			dbUtil.Preload("SDParameter"),
+		)
+		if atomNodesResult.IsFailure() {
+			return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](atomNodesResult.GetError())
+		}
+		atomNodes = atomNodesResult.GetPayload()
 	}
-	atomNodes := atomNodesResult.GetPayload()
-	kpis := make([]sharedModel.KPIDefinition, 0)
+
+	kpis := make([]sharedModel.KPIDefinition, 0, len(entities))
 	for _, entity := range entities {
 		kpi := db2dll.ToDLLModelKPIDefinition(entity, kpiNodes, logicalNodes, atomNodes)
 		kpis = append(kpis, kpi)
 	}
+
 	return sharedUtils.NewSuccessResult(kpis)
 }
 
@@ -370,12 +389,20 @@ func (r *relationalDatabaseClientImpl) LoadAllKPIDefinitions() sharedUtils.Resul
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	kpiDefinitionEntitiesLoadResult := dbUtil.LoadEntitiesFromDB[dbModel.KPIDefinitionEntity](r.db, dbUtil.Preload("SDType", "SDInstanceKPIDefinitionRelationshipRecords"))
+	kpiDefinitionEntitiesLoadResult := dbUtil.LoadEntitiesFromDB[dbModel.KPIDefinitionEntity](
+		r.db,
+		dbUtil.Preload("SDType"),
+		dbUtil.Preload("SDInstanceKPIDefinitionRelationshipRecords"),
+	)
 	if kpiDefinitionEntitiesLoadResult.IsFailure() {
 		err := fmt.Errorf("failed to load KPI definition entities from the database: %w", kpiDefinitionEntitiesLoadResult.GetError())
 		return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](err)
 	}
 	kpiDefinitionEntities := kpiDefinitionEntitiesLoadResult.GetPayload()
+
+	if len(kpiDefinitionEntities) == 0 {
+		return sharedUtils.NewSuccessResult([]sharedModel.KPIDefinition{})
+	}
 
 	kpiNodeEntitiesLoadResult := dbUtil.LoadEntitiesFromDB[dbModel.KPINodeEntity](r.db)
 	if kpiNodeEntitiesLoadResult.IsFailure() {
@@ -402,13 +429,114 @@ func (r *relationalDatabaseClientImpl) LoadAllKPIDefinitions() sharedUtils.Resul
 	atomNodes := atomNodesLoadResult.GetPayload()
 
 	kpiDefinitions := make([]sharedModel.KPIDefinition, 0, len(kpiDefinitionEntities))
-
 	for _, entity := range kpiDefinitionEntities {
 		kpiDefinition := db2dll.ToDLLModelKPIDefinition(entity, kpiNodeEntities, logicalNodes, atomNodes)
 		kpiDefinitions = append(kpiDefinitions, kpiDefinition)
 	}
 
 	return sharedUtils.NewSuccessResult(kpiDefinitions)
+}
+
+func (r *relationalDatabaseClientImpl) LoadKPIDefinitionsBySDType(userID uint32, sdTypeID uint32) sharedUtils.Result[[]sharedModel.KPIDefinition] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	result := dbUtil.LoadEntitiesFromDB[dbModel.KPIDefinitionEntity](r.db, dbUtil.Where("user_id = ? AND sd_type_id = ?", userID, sdTypeID), dbUtil.Preload("SDType"), dbUtil.Preload("SDInstanceKPIDefinitionRelationshipRecords"))
+	if result.IsFailure() {
+		return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](result.GetError())
+	}
+	entities := result.GetPayload()
+	allNodeIDs := make([]uint32, 0)
+	for _, entity := range entities {
+		idsResult := dbModel.GetIDsOfKPINodeEntitiesFormingTheKPIDefinition(r.db, entity.ID)
+		if idsResult.IsFailure() {
+			return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](idsResult.GetError())
+		}
+		allNodeIDs = append(allNodeIDs, idsResult.GetPayload()...)
+	}
+	if len(allNodeIDs) == 0 {
+		return sharedUtils.NewSuccessResult([]sharedModel.KPIDefinition{})
+	}
+	kpiNodesResult := dbUtil.LoadEntitiesFromDB[dbModel.KPINodeEntity](r.db, dbUtil.Where("id IN (?)", allNodeIDs))
+	if kpiNodesResult.IsFailure() {
+		return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](kpiNodesResult.GetError())
+	}
+	kpiNodes := kpiNodesResult.GetPayload()
+	logicalNodesResult := dbUtil.LoadEntitiesFromDB[dbModel.LogicalOperationKPINodeEntity](r.db, dbUtil.Where("node_id IN (?)", allNodeIDs))
+	if logicalNodesResult.IsFailure() {
+		return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](logicalNodesResult.GetError())
+	}
+	logicalNodes := logicalNodesResult.GetPayload()
+	atomNodesResult := dbUtil.LoadEntitiesFromDB[dbModel.AtomKPINodeEntity](r.db, dbUtil.Where("node_id IN (?)", allNodeIDs), dbUtil.Preload("SDParameter"))
+	if atomNodesResult.IsFailure() {
+		return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](atomNodesResult.GetError())
+	}
+	atomNodes := atomNodesResult.GetPayload()
+	kpis := make([]sharedModel.KPIDefinition, 0, len(entities))
+	for _, entity := range entities {
+		kpi := db2dll.ToDLLModelKPIDefinition(entity, kpiNodes, logicalNodes, atomNodes)
+		kpis = append(kpis, kpi)
+	}
+	return sharedUtils.NewSuccessResult(kpis)
+}
+
+func (r *relationalDatabaseClientImpl) LoadKPIDefinitionsBySDInstance(userID uint32, sdInstanceID uint32) sharedUtils.Result[[]sharedModel.KPIDefinition] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	result := dbUtil.LoadEntitiesFromDB[dbModel.KPIDefinitionEntity](r.db, dbUtil.Where("user_id = ?", userID), dbUtil.Preload("SDType"), dbUtil.Preload("SDInstanceKPIDefinitionRelationshipRecords"))
+	if result.IsFailure() {
+		return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](result.GetError())
+	}
+	entities := result.GetPayload()
+	filtered := make([]dbModel.KPIDefinitionEntity, 0)
+	for _, e := range entities {
+		if e.SDInstanceMode == string(sharedModel.ALL) {
+			filtered = append(filtered, e)
+			continue
+		}
+		for _, rel := range e.SDInstanceKPIDefinitionRelationshipRecords {
+			if rel.SDInstanceID == sdInstanceID {
+				filtered = append(filtered, e)
+				break
+			}
+		}
+	}
+	if len(filtered) == 0 {
+		return sharedUtils.NewSuccessResult([]sharedModel.KPIDefinition{})
+	}
+	allNodeIDs := make([]uint32, 0)
+	for _, entity := range filtered {
+		idsResult := dbModel.GetIDsOfKPINodeEntitiesFormingTheKPIDefinition(r.db, entity.ID)
+		if idsResult.IsFailure() {
+			return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](idsResult.GetError())
+		}
+		allNodeIDs = append(allNodeIDs, idsResult.GetPayload()...)
+	}
+	kpiNodes := make([]dbModel.KPINodeEntity, 0)
+	logicalNodes := make([]dbModel.LogicalOperationKPINodeEntity, 0)
+	atomNodes := make([]dbModel.AtomKPINodeEntity, 0)
+	if len(allNodeIDs) > 0 {
+		kpiNodesResult := dbUtil.LoadEntitiesFromDB[dbModel.KPINodeEntity](r.db, dbUtil.Where("id IN (?)", allNodeIDs))
+		if kpiNodesResult.IsFailure() {
+			return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](kpiNodesResult.GetError())
+		}
+		kpiNodes = kpiNodesResult.GetPayload()
+		logicalNodesResult := dbUtil.LoadEntitiesFromDB[dbModel.LogicalOperationKPINodeEntity](r.db, dbUtil.Where("node_id IN (?)", allNodeIDs))
+		if logicalNodesResult.IsFailure() {
+			return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](logicalNodesResult.GetError())
+		}
+		logicalNodes = logicalNodesResult.GetPayload()
+		atomNodesResult := dbUtil.LoadEntitiesFromDB[dbModel.AtomKPINodeEntity](r.db, dbUtil.Where("node_id IN (?)", allNodeIDs), dbUtil.Preload("SDParameter"))
+		if atomNodesResult.IsFailure() {
+			return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](atomNodesResult.GetError())
+		}
+		atomNodes = atomNodesResult.GetPayload()
+	}
+	kpis := make([]sharedModel.KPIDefinition, 0, len(filtered))
+	for _, entity := range filtered {
+		kpi := db2dll.ToDLLModelKPIDefinition(entity, kpiNodes, logicalNodes, atomNodes)
+		kpis = append(kpis, kpi)
+	}
+	return sharedUtils.NewSuccessResult(kpis)
 }
 
 func (r *relationalDatabaseClientImpl) DeleteKPIDefinition(id uint32) error {
@@ -442,40 +570,71 @@ func (r *relationalDatabaseClientImpl) PersistSDType(sdType dllModel.SDType) sha
 func (r *relationalDatabaseClientImpl) UpsertSDType(sdType dllModel.SDType) sharedUtils.Result[dllModel.SDType] {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	existingResult := dbUtil.LoadEntityFromDB[dbModel.SDTypeEntity](r.db, dbUtil.Preload("Parameters"), dbUtil.Where("denotation = ?", sdType.Denotation))
+	existingResult := dbUtil.LoadEntityFromDB[dbModel.SDTypeEntity](r.db, dbUtil.Preload("Parameters"), dbUtil.Where("uid = ?", sdType.UID))
+	var entity dbModel.SDTypeEntity
 	if existingResult.IsFailure() {
 		if errors.Is(existingResult.GetError(), gorm.ErrRecordNotFound) {
-			sdTypeEntity := dll2db.ToDBModelEntitySDType(sdType)
-			if err := dbUtil.PersistEntityIntoDB(r.db, &sdTypeEntity); err != nil {
+			entity = dll2db.ToDBModelEntitySDType(sdType)
+			if err := dbUtil.PersistEntityIntoDB(r.db, &entity); err != nil {
 				return sharedUtils.NewFailureResult[dllModel.SDType](err)
 			}
-			return sharedUtils.NewSuccessResult(db2dll.ToDLLModelSDType(sdTypeEntity))
+			return sharedUtils.NewSuccessResult(db2dll.ToDLLModelSDType(entity))
 		}
 		return sharedUtils.NewFailureResult[dllModel.SDType](existingResult.GetError())
 	}
-	existing := existingResult.GetPayload()
-	existingParams := map[string]bool{}
-	for _, p := range existing.Parameters {
-		existingParams[p.Denotation] = true
+	entity = existingResult.GetPayload()
+	if sdType.Label != "" && entity.Label != sdType.Label {
+		entity.Label = sdType.Label
+		if err := r.db.Save(&entity).Error; err != nil {
+			return sharedUtils.NewFailureResult[dllModel.SDType](err)
+		}
+	}
+	existingMap := make(map[string]dbModel.SDParameterEntity)
+	for _, p := range entity.Parameters {
+		existingMap[p.Denotation] = p
+	}
+	incomingMap := make(map[string]dllModel.SDParameter)
+	for _, p := range sdType.Parameters {
+		incomingMap[p.Denotation] = p
 	}
 	for _, newParam := range sdType.Parameters {
-		if existingParams[newParam.Denotation] {
+		if existingParam, ok := existingMap[newParam.Denotation]; ok {
+			if existingParam.Label != newParam.Label ||
+				existingParam.Type != string(newParam.Type) ||
+				existingParam.Role != string(newParam.Role) {
+				existingParam.Label = newParam.Label
+				existingParam.Type = string(newParam.Type)
+				existingParam.Role = string(newParam.Role)
+
+				if err := r.db.Save(&existingParam).Error; err != nil {
+					return sharedUtils.NewFailureResult[dllModel.SDType](err)
+				}
+			}
 			continue
 		}
 		paramEntity := dbModel.SDParameterEntity{
 			Denotation: newParam.Denotation,
+			Label:      newParam.Label,
 			Type:       string(newParam.Type),
-			SDTypeID:   existing.ID,
+			Role:       string(newParam.Role),
+			SDTypeID:   entity.ID,
 		}
 		if err := dbUtil.PersistEntityIntoDB(r.db, &paramEntity); err != nil {
 			return sharedUtils.NewFailureResult[dllModel.SDType](err)
 		}
-		log.Printf("SDType %s rozšířen o parametr %s", sdType.Denotation, newParam.Denotation)
 	}
-	updated := loadSDType(r.db, dbUtil.Where("id = ?", existing.ID))
+	for denotation, existingParam := range existingMap {
+		if _, ok := incomingMap[denotation]; !ok {
+			if err := r.db.Delete(&existingParam).Error; err != nil {
+				return sharedUtils.NewFailureResult[dllModel.SDType](err)
+			}
+		}
+	}
+	updated := loadSDType(r.db, dbUtil.Where("id = ?", entity.ID))
 	if updated.IsFailure() {
 		return sharedUtils.NewFailureResult[dllModel.SDType](updated.GetError())
 	}
+
 	return updated
 }
 
@@ -493,10 +652,10 @@ func (r *relationalDatabaseClientImpl) LoadSDType(id uint32) sharedUtils.Result[
 	return loadSDType(r.db, dbUtil.Where("id = ?", id))
 }
 
-func (r *relationalDatabaseClientImpl) LoadSDTypeBasedOnDenotation(denotation string) sharedUtils.Result[dllModel.SDType] {
+func (r *relationalDatabaseClientImpl) LoadSDTypeBasedOnUID(uid string) sharedUtils.Result[dllModel.SDType] {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return loadSDType(r.db, dbUtil.Where("denotation = ?", denotation))
+	return loadSDType(r.db, dbUtil.Where("uid = ?", uid))
 }
 
 func (r *relationalDatabaseClientImpl) LoadSDTypes() sharedUtils.Result[[]dllModel.SDType] {
@@ -541,31 +700,53 @@ func (r *relationalDatabaseClientImpl) PersistSDInstance(sdInstance dllModel.SDI
 	return sharedUtils.NewSuccessResult[uint32](sdInstanceEntity.ID)
 }
 
-func (r *relationalDatabaseClientImpl) PersistNewSDInstance(uid string, sdTypeSpecification string) sharedUtils.Result[dllModel.SDInstance] {
+func (r *relationalDatabaseClientImpl) UpsertSDInstance(uid string, sdTypeSpecification string, label string) sharedUtils.Result[dllModel.SDInstance] {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	sdInstanceEntityLoadResult := dbUtil.LoadEntityFromDB[dbModel.SDInstanceEntity](r.db, dbUtil.Where("uid = ?", uid))
-	if sdInstanceEntityLoadResult.IsSuccess() {
-		return sharedUtils.NewSuccessResult(db2dll.ToDLLModelSDInstance(sdInstanceEntityLoadResult.GetPayload()))
-	} else if sdInstanceEntityLoadError := sdInstanceEntityLoadResult.GetError(); !errors.Is(sdInstanceEntityLoadError, gorm.ErrRecordNotFound) {
-		return sharedUtils.NewFailureResult[dllModel.SDInstance](sdInstanceEntityLoadError)
+	existingResult := dbUtil.LoadEntityFromDB[dbModel.SDInstanceEntity](r.db, dbUtil.Preload("SDType"), dbUtil.Where("uid = ?", uid))
+	if existingResult.IsSuccess() {
+		entity := existingResult.GetPayload()
+		if label != "" && entity.Label != label {
+			entity.Label = label
+			if err := r.db.Save(&entity).Error; err != nil {
+				return sharedUtils.NewFailureResult[dllModel.SDInstance](err)
+			}
+		}
+		return sharedUtils.NewSuccessResult(db2dll.ToDLLModelSDInstance(entity))
 	}
-	referencedSDTypeEntityLoadResult := dbUtil.LoadEntityFromDB[dbModel.SDTypeEntity](r.db, dbUtil.Where("denotation = ?", sdTypeSpecification))
-	if referencedSDTypeEntityLoadResult.IsFailure() {
-		referencedSDTypeEntityLoadError := referencedSDTypeEntityLoadResult.GetError()
-		err := sharedUtils.Ternary(errors.Is(referencedSDTypeEntityLoadError, gorm.ErrRecordNotFound), ErrOperationWouldLeadToForeignKeyIntegrityBreach, referencedSDTypeEntityLoadError)
+	if err := existingResult.GetError(); !errors.Is(err, gorm.ErrRecordNotFound) {
 		return sharedUtils.NewFailureResult[dllModel.SDInstance](err)
 	}
-	sdInstanceEntity := dbModel.SDInstanceEntity{
+	sdTypeResult := dbUtil.LoadEntityFromDB[dbModel.SDTypeEntity](r.db, dbUtil.Where("uid = ?", sdTypeSpecification))
+	var sdTypeEntity dbModel.SDTypeEntity
+	if sdTypeResult.IsFailure() {
+		sdTypeErr := sdTypeResult.GetError()
+		if errors.Is(sdTypeErr, gorm.ErrRecordNotFound) {
+			sdTypeEntity = dbModel.SDTypeEntity{
+				UID:   sdTypeSpecification,
+				Label: sharedUtils.SafeLabel("", sdTypeSpecification),
+			}
+			if err := dbUtil.PersistEntityIntoDB(r.db, &sdTypeEntity); err != nil {
+				return sharedUtils.NewFailureResult[dllModel.SDInstance](err)
+			}
+		} else {
+			return sharedUtils.NewFailureResult[dllModel.SDInstance](sdTypeErr)
+		}
+	} else {
+		sdTypeEntity = sdTypeResult.GetPayload()
+	}
+	entity := dbModel.SDInstanceEntity{
 		UID:             uid,
+		Label:           sharedUtils.SafeLabel(label, uid),
 		ConfirmedByUser: false,
 		UserIdentifier:  uid,
-		SDTypeID:        referencedSDTypeEntityLoadResult.GetPayload().ID,
+		SDTypeID:        sdTypeEntity.ID,
+		SDType:          sdTypeEntity,
 	}
-	if err := dbUtil.PersistEntityIntoDB(r.db, &sdInstanceEntity); err != nil {
+	if err := dbUtil.PersistEntityIntoDB(r.db, &entity); err != nil {
 		return sharedUtils.NewFailureResult[dllModel.SDInstance](err)
 	}
-	return sharedUtils.NewSuccessResult[dllModel.SDInstance](db2dll.ToDLLModelSDInstance(sdInstanceEntity))
+	return sharedUtils.NewSuccessResult(db2dll.ToDLLModelSDInstance(entity))
 }
 
 func (r *relationalDatabaseClientImpl) LoadSDInstance(id uint32) sharedUtils.Result[dllModel.SDInstance] {
@@ -603,85 +784,173 @@ func (r *relationalDatabaseClientImpl) LoadSDInstances() sharedUtils.Result[[]dl
 	return sharedUtils.NewSuccessResult[[]dllModel.SDInstance](sharedUtils.Map(sdInstanceEntitiesLoadResult.GetPayload(), db2dll.ToDLLModelSDInstance))
 }
 
-func (r *relationalDatabaseClientImpl) PersistKPIFulFulfillmentCheckResultTuple(sdInstanceUID string, kpiDefinitionIDs []uint32, fulfillmentStatuses []bool, eventTimes []time.Time) sharedUtils.Result[[]dllModel.KPIFulfillmentCheckResult] {
+func (r *relationalDatabaseClientImpl) LoadSDInstancesByType(sdTypeID uint32) sharedUtils.Result[[]dllModel.SDInstance] {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	referencedKPIDefinitionEntitiesExistCheckResult := dbUtil.DoIDsExist[dbModel.KPIDefinitionEntity](r.db, kpiDefinitionIDs)
-	if referencedKPIDefinitionEntitiesExistCheckResult.IsFailure() {
-		return sharedUtils.NewFailureResult[[]dllModel.KPIFulfillmentCheckResult](referencedKPIDefinitionEntitiesExistCheckResult.GetError())
+	result := dbUtil.LoadEntitiesFromDB[dbModel.SDInstanceEntity](r.db, dbUtil.Preload("SDType"), dbUtil.Where("sd_type_id = ?", sdTypeID))
+	if result.IsFailure() {
+		return sharedUtils.NewFailureResult[[]dllModel.SDInstance](result.GetError())
 	}
-	if referencedKPIDefinitionEntitiesExist := referencedKPIDefinitionEntitiesExistCheckResult.GetPayload(); !referencedKPIDefinitionEntitiesExist {
-		return sharedUtils.NewFailureResult[[]dllModel.KPIFulfillmentCheckResult](ErrOperationWouldLeadToForeignKeyIntegrityBreach)
-	}
-	referencedSDInstanceEntityLoadResult := dbUtil.LoadEntityFromDB[dbModel.SDInstanceEntity](r.db, dbUtil.Where("uid = ?", sdInstanceUID))
-	if referencedSDInstanceEntityLoadResult.IsFailure() {
-		referencedSDInstanceEntityLoadError := referencedSDInstanceEntityLoadResult.GetError()
-		err := sharedUtils.Ternary(errors.Is(referencedSDInstanceEntityLoadError, gorm.ErrRecordNotFound), ErrOperationWouldLeadToForeignKeyIntegrityBreach, referencedSDInstanceEntityLoadError)
-		return sharedUtils.NewFailureResult[[]dllModel.KPIFulfillmentCheckResult](err)
-	}
-	referencedSDInstanceEntityID := referencedSDInstanceEntityLoadResult.GetPayload().ID
-	kpiFulfillmentCheckResultEntities := make([]dbModel.KPIFulfillmentCheckResultEntity, 0)
-	err := r.db.Transaction(func(tx *gorm.DB) error {
-		for index, kpiDefinitionID := range kpiDefinitionIDs {
-			eventTime := eventTimes[index]
-			existingResult := dbModel.KPIFulfillmentCheckResultEntity{}
-			err := tx.Where("kpi_definition_id = ? AND sd_instance_id = ?", kpiDefinitionID, referencedSDInstanceEntityID).First(&existingResult).Error
-			if err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					newResult := dbModel.KPIFulfillmentCheckResultEntity{
-						KPIDefinitionID: kpiDefinitionID,
-						SDInstanceID:    referencedSDInstanceEntityID,
-						Fulfilled:       fulfillmentStatuses[index],
-						EventTime:       eventTime,
-					}
-					if err := tx.Create(&newResult).Error; err != nil {
-						return err
-					}
-					kpiFulfillmentCheckResultEntities = append(kpiFulfillmentCheckResultEntities, newResult)
-					continue
-				}
-				return err
-			}
-			if eventTime.After(existingResult.EventTime) {
-				existingResult.Fulfilled = fulfillmentStatuses[index]
-				existingResult.EventTime = eventTime
-				if err := tx.Save(&existingResult).Error; err != nil {
-					return err
-				}
-				kpiFulfillmentCheckResultEntities = append(kpiFulfillmentCheckResultEntities, existingResult)
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return sharedUtils.NewFailureResult[[]dllModel.KPIFulfillmentCheckResult](err)
-	}
-	return sharedUtils.NewSuccessResult(sharedUtils.Map(kpiFulfillmentCheckResultEntities, db2dll.ToDLLModelKPIFulfillmentCheckResult))
+	return sharedUtils.NewSuccessResult(sharedUtils.Map(result.GetPayload(), db2dll.ToDLLModelSDInstance))
 }
 
-func (r *relationalDatabaseClientImpl) LoadKPIFulFulfillmentCheckResult(kpiDefinitionID uint32, sdInstanceID uint32) sharedUtils.Result[sharedUtils.Optional[dllModel.KPIFulfillmentCheckResult]] {
+func (r *relationalDatabaseClientImpl) LoadSDInstancesByKpiDefinition(kpiDefinitionID uint32) sharedUtils.Result[[]dllModel.SDInstance] {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	kpiFulFulfillmentCheckResultEntityLoadResult := dbUtil.LoadEntityFromDB[dbModel.KPIFulfillmentCheckResultEntity](r.db, dbUtil.Where("kpi_definition_id = ?", kpiDefinitionID), dbUtil.Where("sd_instance_id = ?", sdInstanceID))
-	if kpiFulFulfillmentCheckResultEntityLoadResult.IsFailure() {
-		err := kpiFulFulfillmentCheckResultEntityLoadResult.GetError()
+	kpiResult := dbUtil.LoadEntityFromDB[dbModel.KPIDefinitionEntity](r.db, dbUtil.Preload("SDType"), dbUtil.Preload("SDInstanceKPIDefinitionRelationshipRecords"), dbUtil.Where("id = ?", kpiDefinitionID))
+	if kpiResult.IsFailure() {
+		return sharedUtils.NewFailureResult[[]dllModel.SDInstance](kpiResult.GetError())
+	}
+	kpi := kpiResult.GetPayload()
+	if kpi.SDInstanceMode == string(sharedModel.ALL) {
+		instancesResult := dbUtil.LoadEntitiesFromDB[dbModel.SDInstanceEntity](r.db, dbUtil.Preload("SDType"), dbUtil.Where("sd_type_id = ?", kpi.SDTypeID))
+		if instancesResult.IsFailure() {
+			return sharedUtils.NewFailureResult[[]dllModel.SDInstance](instancesResult.GetError())
+		}
+		return sharedUtils.NewSuccessResult(sharedUtils.Map(instancesResult.GetPayload(), db2dll.ToDLLModelSDInstance))
+	}
+	if kpi.SDInstanceMode == string(sharedModel.SELECTED) {
+		relations := kpi.SDInstanceKPIDefinitionRelationshipRecords
+		if len(relations) == 0 {
+			return sharedUtils.NewSuccessResult([]dllModel.SDInstance{})
+		}
+		uids := sharedUtils.Map(relations, func(r dbModel.SDInstanceKPIDefinitionRelationshipEntity) string {
+			return r.SDInstanceUID
+		})
+		instancesResult := dbUtil.LoadEntitiesFromDB[dbModel.SDInstanceEntity](r.db, dbUtil.Preload("SDType"), dbUtil.Where("uid IN (?)", uids))
+		if instancesResult.IsFailure() {
+			return sharedUtils.NewFailureResult[[]dllModel.SDInstance](instancesResult.GetError())
+		}
+		return sharedUtils.NewSuccessResult(sharedUtils.Map(instancesResult.GetPayload(), db2dll.ToDLLModelSDInstance))
+	}
+	return sharedUtils.NewSuccessResult([]dllModel.SDInstance{})
+}
+
+func (r *relationalDatabaseClientImpl) PersistRawDataPoints(points []dllModel.RawDataPoint) sharedUtils.Result[[]dllModel.RawDataPoint] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(points) == 0 {
+		return sharedUtils.NewSuccessResult([]dllModel.RawDataPoint{})
+	}
+	entities := sharedUtils.Map(points, dll2db.ToDBModelRawDataPoint)
+	tx := r.db.Clauses(clause.OnConflict{
+		Columns: []clause.Column{
+			{Name: "sd_instance_id"},
+		},
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"event_time": gorm.Expr("EXCLUDED.event_time"),
+			"payload":    gorm.Expr("EXCLUDED.payload"),
+		}),
+		Where: clause.Where{
+			Exprs: []clause.Expression{
+				gorm.Expr("EXCLUDED.event_time > raw_data_point_entities.event_time"),
+			},
+		},
+	}).Create(&entities)
+	if tx.Error != nil {
+		return sharedUtils.NewFailureResult[[]dllModel.RawDataPoint](tx.Error)
+	}
+	return sharedUtils.NewSuccessResult(points)
+}
+
+func (r *relationalDatabaseClientImpl) LoadRawDataPointsBySDType(sdTypeID uint32) sharedUtils.Result[[]dllModel.RawDataPoint] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	result := dbUtil.LoadEntitiesFromDB[dbModel.RawDataPointEntity](r.db, dbUtil.Preload("SDInstance"), dbUtil.Where("sd_instance_id IN (?)", r.db.Table("sd_instances").Select("id").Where("sd_type_id = ?", sdTypeID)))
+	if result.IsFailure() {
+		return sharedUtils.NewFailureResult[[]dllModel.RawDataPoint](result.GetError())
+	}
+	return sharedUtils.NewSuccessResult(sharedUtils.Map(result.GetPayload(), db2dll.ToDLLModelRawDataPoint))
+}
+
+func (r *relationalDatabaseClientImpl) LoadRawDataPoint(sdInstanceID uint32) sharedUtils.Result[sharedUtils.Optional[dllModel.RawDataPoint]] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	result := dbUtil.LoadEntityFromDB[dbModel.RawDataPointEntity](r.db, dbUtil.Preload("SDInstance"), dbUtil.Where("sd_instance_id = ?", sdInstanceID))
+	if result.IsFailure() {
+		err := result.GetError()
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return sharedUtils.NewSuccessResult[sharedUtils.Optional[dllModel.KPIFulfillmentCheckResult]](sharedUtils.NewEmptyOptional[dllModel.KPIFulfillmentCheckResult]())
-		} else {
-			return sharedUtils.NewFailureResult[sharedUtils.Optional[dllModel.KPIFulfillmentCheckResult]](err)
+			return sharedUtils.NewSuccessResult(sharedUtils.NewEmptyOptional[dllModel.RawDataPoint]())
 		}
+		return sharedUtils.NewFailureResult[sharedUtils.Optional[dllModel.RawDataPoint]](err)
 	}
-	return sharedUtils.NewSuccessResult[sharedUtils.Optional[dllModel.KPIFulfillmentCheckResult]](sharedUtils.NewOptionalOf(db2dll.ToDLLModelKPIFulfillmentCheckResult(kpiFulFulfillmentCheckResultEntityLoadResult.GetPayload())))
+	return sharedUtils.NewSuccessResult(sharedUtils.NewOptionalOf(db2dll.ToDLLModelRawDataPoint(result.GetPayload())))
 }
 
-func (r *relationalDatabaseClientImpl) LoadKPIFulFulfillmentCheckResults() sharedUtils.Result[[]dllModel.KPIFulfillmentCheckResult] {
+func (r *relationalDatabaseClientImpl) PersistKPIFulfillmentCheckResults(points []dllModel.KPIFulfillmentCheckResult, reprocess bool) sharedUtils.Result[[]dllModel.KPIFulfillmentCheckResult] {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	kpiFulFulfillmentCheckResultEntitiesLoadResult := dbUtil.LoadEntitiesFromDB[dbModel.KPIFulfillmentCheckResultEntity](r.db)
-	if kpiFulFulfillmentCheckResultEntitiesLoadResult.IsFailure() {
-		return sharedUtils.NewFailureResult[[]dllModel.KPIFulfillmentCheckResult](kpiFulFulfillmentCheckResultEntitiesLoadResult.GetError())
+	if len(points) == 0 {
+		return sharedUtils.NewSuccessResult([]dllModel.KPIFulfillmentCheckResult{})
 	}
-	return sharedUtils.NewSuccessResult[[]dllModel.KPIFulfillmentCheckResult](sharedUtils.Map(kpiFulFulfillmentCheckResultEntitiesLoadResult.GetPayload(), db2dll.ToDLLModelKPIFulfillmentCheckResult))
+	entities := sharedUtils.Map(points, dll2db.ToDBModelEntityKPIFulfillmentCheckResult)
+	tx := &gorm.DB{}
+	if reprocess {
+		tx = r.db.Clauses(clause.OnConflict{
+			Columns: []clause.Column{
+				{Name: "kpi_definition_id"},
+				{Name: "sd_instance_id"},
+			},
+			DoUpdates: clause.Assignments(map[string]interface{}{
+				"event_time": gorm.Expr("EXCLUDED.event_time"),
+				"fulfilled":  gorm.Expr("EXCLUDED.fulfilled"),
+			}),
+		}).Create(&entities)
+	} else {
+		tx = r.db.Clauses(clause.OnConflict{
+			Columns: []clause.Column{
+				{Name: "kpi_definition_id"},
+				{Name: "sd_instance_id"},
+			},
+			DoUpdates: clause.Assignments(map[string]interface{}{
+				"event_time": gorm.Expr("EXCLUDED.event_time"),
+				"fulfilled":  gorm.Expr("EXCLUDED.fulfilled"),
+			}),
+			Where: clause.Where{
+				Exprs: []clause.Expression{
+					gorm.Expr("EXCLUDED.event_time > kpi_fulfillment_check_results.event_time"),
+				},
+			},
+		}).Create(&entities)
+	}
+	if tx.Error != nil {
+		return sharedUtils.NewFailureResult[[]dllModel.KPIFulfillmentCheckResult](tx.Error)
+	}
+	return sharedUtils.NewSuccessResult(points)
+}
+
+func (r *relationalDatabaseClientImpl) LoadKPIFulfillmentCheckResults(userID uint32) sharedUtils.Result[[]dllModel.KPIFulfillmentCheckResult] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	result := dbUtil.LoadEntitiesFromDB[dbModel.KPIFulfillmentCheckResultEntity](r.db, dbUtil.Preload("SDInstance"), dbUtil.Where("kpi_definition_id IN (?)", r.db.Table("kpi_definitions").Select("id").Where("user_id = ?", userID)))
+	if result.IsFailure() {
+		return sharedUtils.NewFailureResult[[]dllModel.KPIFulfillmentCheckResult](result.GetError())
+	}
+	return sharedUtils.NewSuccessResult(sharedUtils.Map(result.GetPayload(), db2dll.ToDLLModelKPIFulfillmentCheckResult))
+}
+
+func (r *relationalDatabaseClientImpl) LoadKPIFulfillmentCheckResultsByKPI(userID uint32, kpiDefinitionID uint32) sharedUtils.Result[[]dllModel.KPIFulfillmentCheckResult] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	result := dbUtil.LoadEntitiesFromDB[dbModel.KPIFulfillmentCheckResultEntity](r.db, dbUtil.Preload("SDInstance"), dbUtil.Where(`kpi_definition_id = ? AND kpi_definition_id IN (?)`, kpiDefinitionID, r.db.Table("kpi_definitions").Select("id").Where("user_id = ?", userID)))
+	if result.IsFailure() {
+		return sharedUtils.NewFailureResult[[]dllModel.KPIFulfillmentCheckResult](result.GetError())
+	}
+	return sharedUtils.NewSuccessResult(sharedUtils.Map(result.GetPayload(), db2dll.ToDLLModelKPIFulfillmentCheckResult))
+}
+
+func (r *relationalDatabaseClientImpl) LoadKPIFulfillmentCheckResult(userID uint32, input dllModel.KPIFulfillmentCheckResultRequest) sharedUtils.Result[sharedUtils.Optional[dllModel.KPIFulfillmentCheckResult]] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	result := dbUtil.LoadEntityFromDB[dbModel.KPIFulfillmentCheckResultEntity](r.db, dbUtil.Preload("SDInstance"), dbUtil.Where(`kpi_definition_id = ? AND sd_instance_id = ? AND kpi_definition_id IN (?)`, input.KPIDefinitionID, input.SDInstanceID, r.db.Table("kpi_definitions").Select("id").Where("user_id = ?", userID)))
+	if result.IsFailure() {
+		err := result.GetError()
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return sharedUtils.NewSuccessResult(sharedUtils.NewEmptyOptional[dllModel.KPIFulfillmentCheckResult]())
+		}
+		return sharedUtils.NewFailureResult[sharedUtils.Optional[dllModel.KPIFulfillmentCheckResult]](err)
+	}
+	return sharedUtils.NewSuccessResult(sharedUtils.NewOptionalOf(db2dll.ToDLLModelKPIFulfillmentCheckResult(result.GetPayload())))
 }
 
 func (r *relationalDatabaseClientImpl) LoadSDInstanceGroups() sharedUtils.Result[[]dllModel.SDInstanceGroup] {
@@ -807,7 +1076,7 @@ func (r *relationalDatabaseClientImpl) DeleteUserConfig(userId uint32) error {
 func (r *relationalDatabaseClientImpl) LoadAPIKeyByHash(hash string) sharedUtils.Result[sharedUtils.Optional[dllModel.APIKey]] {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	result := dbUtil.LoadEntityFromDB[dbModel.APIKeyEntity](r.db, dbUtil.Preload("IPRestrictions"), dbUtil.Preload("Role.Permissions"), dbUtil.Where("key_hash = ?", hash))
+	result := dbUtil.LoadEntityFromDB[dbModel.APIKeyEntity](r.db, dbUtil.Preload("IPRestrictions"), dbUtil.Preload("Permissions"), dbUtil.Where("key_hash = ?", hash))
 	if result.IsFailure() {
 		err := result.GetError()
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -820,9 +1089,9 @@ func (r *relationalDatabaseClientImpl) LoadAPIKeyByHash(hash string) sharedUtils
 	return sharedUtils.NewSuccessResult(sharedUtils.NewOptionalOf(dll))
 }
 
-func (c *relationalDatabaseClientImpl) LoadAPIKeyByID(id uint32) sharedUtils.Result[sharedUtils.Optional[dllModel.APIKey]] {
+func (r *relationalDatabaseClientImpl) LoadAPIKeyByID(id uint32) sharedUtils.Result[sharedUtils.Optional[dllModel.APIKey]] {
 	var entity dbModel.APIKeyEntity
-	err := c.db.Preload("Role.Permissions").Preload("IPRestrictions").First(&entity, id).Error
+	err := r.db.Preload("Permissions").Preload("IPRestrictions").First(&entity, id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return sharedUtils.NewSuccessResult(sharedUtils.NewEmptyOptional[dllModel.APIKey]())
@@ -832,9 +1101,9 @@ func (c *relationalDatabaseClientImpl) LoadAPIKeyByID(id uint32) sharedUtils.Res
 	return sharedUtils.NewSuccessResult(sharedUtils.NewOptionalOf(db2dll.ToDLLModelAPIKey(entity)))
 }
 
-func (c *relationalDatabaseClientImpl) LoadAPIKeysForUser(userID uint32) sharedUtils.Result[[]dllModel.APIKey] {
+func (r *relationalDatabaseClientImpl) LoadAPIKeysForUser(userID uint32) sharedUtils.Result[[]dllModel.APIKey] {
 	var entities []dbModel.APIKeyEntity
-	err := c.db.Preload("Role.Permissions").Preload("IPRestrictions").Where("user_id = ?", userID).Find(&entities).Error
+	err := r.db.Preload("Permissions").Preload("IPRestrictions").Where("user_id = ?", userID).Find(&entities).Error
 	if err != nil {
 		return sharedUtils.NewFailureResult[[]dllModel.APIKey](err)
 	}
@@ -844,23 +1113,13 @@ func (c *relationalDatabaseClientImpl) LoadAPIKeysForUser(userID uint32) sharedU
 	return sharedUtils.NewSuccessResult(result)
 }
 
-func (c *relationalDatabaseClientImpl) CreateAPIKey(userID uint32, k dllModel.APIKey) sharedUtils.Result[dllModel.APIKey] {
-	perms, err := c.getOrCreatePermissions(k.Permissions)
+func (r *relationalDatabaseClientImpl) CreateAPIKey(userID uint32, k dllModel.APIKey) sharedUtils.Result[dllModel.APIKey] {
+	perms, err := r.loadPermissionsByUIDs(k.Permissions)
 	if err != nil {
-		return sharedUtils.NewFailureResult[dllModel.APIKey](err)
-	}
-	role := dbModel.RoleEntity{
-		Label: fmt.Sprintf("api_key_%d", time.Now().UnixNano()),
-	}
-	if err := c.db.Create(&role).Error; err != nil {
-		return sharedUtils.NewFailureResult[dllModel.APIKey](err)
-	}
-	if err := c.db.Model(&role).Association("Permissions").Append(perms); err != nil {
 		return sharedUtils.NewFailureResult[dllModel.APIKey](err)
 	}
 	entity := dbModel.APIKeyEntity{
 		UserID:    userID,
-		RoleID:    role.ID,
 		Label:     k.Label,
 		ExpiresAt: k.ExpiresAt,
 		Revoked:   k.Revoked,
@@ -869,22 +1128,25 @@ func (c *relationalDatabaseClientImpl) CreateAPIKey(userID uint32, k dllModel.AP
 	if k.KeyHash != nil {
 		entity.KeyHash = *k.KeyHash
 	}
-	if err := c.db.Create(&entity).Error; err != nil {
+	if err := r.db.Create(&entity).Error; err != nil {
+		return sharedUtils.NewFailureResult[dllModel.APIKey](err)
+	}
+	if err := r.db.Model(&entity).Association("Permissions").Replace(perms); err != nil {
 		return sharedUtils.NewFailureResult[dllModel.APIKey](err)
 	}
 	if k.IPRestrictions != nil {
 		newList := uniqueStrings(k.IPRestrictions)
 		currentMap := make(map[string]dbModel.APIKeyIPRestrictionEntity)
-		for _, r := range entity.IPRestrictions {
-			currentMap[r.CIDR] = r
+		for _, row := range entity.IPRestrictions {
+			currentMap[row.CIDR] = row
 		}
 		newMap := make(map[string]struct{})
 		for _, cidr := range newList {
 			newMap[cidr] = struct{}{}
 		}
-		for cidr, r := range currentMap {
+		for cidr, row := range currentMap {
 			if _, ok := newMap[cidr]; !ok {
-				if err := c.db.Delete(&r).Error; err != nil {
+				if err := r.db.Delete(&row).Error; err != nil {
 					return sharedUtils.NewFailureResult[dllModel.APIKey](err)
 				}
 			}
@@ -895,50 +1157,47 @@ func (c *relationalDatabaseClientImpl) CreateAPIKey(userID uint32, k dllModel.AP
 					APIKeyID: entity.ID,
 					CIDR:     cidr,
 				}
-				if err := c.db.Create(&ip).Error; err != nil {
+				if err := r.db.Create(&ip).Error; err != nil {
 					return sharedUtils.NewFailureResult[dllModel.APIKey](err)
 				}
 			}
 		}
 	}
-	err = c.db.Preload("Role.Permissions").Preload("IPRestrictions").First(&entity, entity.ID).Error
+	err = r.db.Preload("Permissions").Preload("IPRestrictions").First(&entity, entity.ID).Error
 	if err != nil {
 		return sharedUtils.NewFailureResult[dllModel.APIKey](err)
 	}
 	return sharedUtils.NewSuccessResult(db2dll.ToDLLModelAPIKey(entity))
 }
 
-func (c *relationalDatabaseClientImpl) getOrCreatePermissions(labels []string) ([]dbModel.PermissionEntity, error) {
-	if len(labels) == 0 {
+func (r *relationalDatabaseClientImpl) loadPermissionsByUIDs(uids []string) ([]dbModel.PermissionEntity, error) {
+	uniqueUIDs := uniqueStrings(uids)
+	if len(uniqueUIDs) == 0 {
 		return []dbModel.PermissionEntity{}, nil
 	}
 	var perms []dbModel.PermissionEntity
-	err := c.db.Where("label IN ?", labels).Find(&perms).Error
+	err := r.db.Where("uid IN ?", uniqueUIDs).Find(&perms).Error
 	if err != nil {
 		return nil, err
 	}
-	existing := map[string]bool{}
+	existing := make(map[string]bool, len(perms))
 	for _, p := range perms {
-		existing[p.Label] = true
+		existing[p.UID] = true
 	}
-	for _, label := range labels {
-		if !existing[label] {
-			p := dbModel.PermissionEntity{Label: label}
-			if err := c.db.Create(&p).Error; err != nil {
-				return nil, err
-			}
-			perms = append(perms, p)
+	for _, uid := range uniqueUIDs {
+		if !existing[uid] {
+			return nil, fmt.Errorf("permission '%s' not found", uid)
 		}
 	}
 	return perms, nil
 }
 
-func (c *relationalDatabaseClientImpl) UpdateAPIKey(k dllModel.APIKey) sharedUtils.Result[dllModel.APIKey] {
-	if k.ID.IsEmpty() {
+func (r *relationalDatabaseClientImpl) UpdateAPIKey(k dllModel.APIKey) sharedUtils.Result[dllModel.APIKey] {
+	if k.ID.IsEmpty() || k.UserID == nil {
 		return sharedUtils.NewFailureResult[dllModel.APIKey](fmt.Errorf("missing id"))
 	}
 	var entity dbModel.APIKeyEntity
-	err := c.db.Preload("Role.Permissions").Preload("IPRestrictions").First(&entity, k.ID.GetPayload()).Error
+	err := r.db.Preload("Permissions").Preload("IPRestrictions").First(&entity, k.ID.GetPayload()).Error
 	if err != nil {
 		return sharedUtils.NewFailureResult[dllModel.APIKey](err)
 	}
@@ -947,16 +1206,16 @@ func (c *relationalDatabaseClientImpl) UpdateAPIKey(k dllModel.APIKey) sharedUti
 	entity.Revoked = k.Revoked
 	entity.RateLimit = k.RateLimit
 	if k.Permissions != nil {
-		perms, err := c.getOrCreatePermissions(k.Permissions)
+		perms, err := r.loadPermissionsByUIDs(k.Permissions)
 		if err != nil {
 			return sharedUtils.NewFailureResult[dllModel.APIKey](err)
 		}
-		if err := c.db.Model(&entity.Role).Association("Permissions").Replace(perms); err != nil {
+		if err := r.db.Model(&entity).Association("Permissions").Replace(perms); err != nil {
 			return sharedUtils.NewFailureResult[dllModel.APIKey](err)
 		}
 	}
 	if k.IPRestrictions != nil {
-		if err := c.db.Where("api_key_id = ?", entity.ID).
+		if err := r.db.Where("api_key_id = ?", entity.ID).
 			Delete(&dbModel.APIKeyIPRestrictionEntity{}).Error; err != nil {
 			return sharedUtils.NewFailureResult[dllModel.APIKey](err)
 		}
@@ -970,9 +1229,9 @@ func (c *relationalDatabaseClientImpl) UpdateAPIKey(k dllModel.APIKey) sharedUti
 			for _, cidr := range newList {
 				newMap[cidr] = struct{}{}
 			}
-			for cidr, r := range currentMap {
+			for cidr, row := range currentMap {
 				if _, ok := newMap[cidr]; !ok {
-					if err := c.db.Delete(&r).Error; err != nil {
+					if err := r.db.Delete(&row).Error; err != nil {
 						return sharedUtils.NewFailureResult[dllModel.APIKey](err)
 					}
 				}
@@ -983,14 +1242,14 @@ func (c *relationalDatabaseClientImpl) UpdateAPIKey(k dllModel.APIKey) sharedUti
 						APIKeyID: entity.ID,
 						CIDR:     cidr,
 					}
-					if err := c.db.Create(&ip).Error; err != nil {
+					if err := r.db.Create(&ip).Error; err != nil {
 						return sharedUtils.NewFailureResult[dllModel.APIKey](err)
 					}
 				}
 			}
 		}
 	}
-	if err := c.db.Save(&entity).Error; err != nil {
+	if err := r.db.Save(&entity).Error; err != nil {
 		return sharedUtils.NewFailureResult[dllModel.APIKey](err)
 	}
 	return sharedUtils.NewSuccessResult(db2dll.ToDLLModelAPIKey(entity))
@@ -1008,40 +1267,51 @@ func uniqueStrings(input []string) []string {
 	return result
 }
 
-func (c *relationalDatabaseClientImpl) DeleteAPIKey(id uint32) error {
-	var entity dbModel.APIKeyEntity
-	if err := c.db.Preload("Role").First(&entity, id).Error; err != nil {
-		return err
-	}
-	if err := c.db.Delete(&entity).Error; err != nil {
-		return err
-	}
-	if err := c.db.Delete(&dbModel.RoleEntity{}, entity.RoleID).Error; err != nil {
-		return err
-	}
-	return nil
+func (r *relationalDatabaseClientImpl) DeleteAPIKey(id uint32) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var entity dbModel.APIKeyEntity
+		if err := tx.First(&entity, id).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&entity).Association("Permissions").Clear(); err != nil {
+			return err
+		}
+		if err := tx.Delete(&entity).Error; err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
-func (c *relationalDatabaseClientImpl) GetRoleIDByLabel(label string) sharedUtils.Result[dllModel.Role] {
+func (r *relationalDatabaseClientImpl) LoadRoles() sharedUtils.Result[[]dllModel.Role] {
+	var roles []dbModel.RoleEntity
+	err := r.db.Preload("Permissions").Order("label ASC").Find(&roles).Error
+	if err != nil {
+		return sharedUtils.NewFailureResult[[]dllModel.Role](err)
+	}
+	return sharedUtils.NewSuccessResult(sharedUtils.Map(roles, db2dll.ToDLLModelRole))
+}
+
+func (r *relationalDatabaseClientImpl) LoadRoleByUID(uid string) sharedUtils.Result[dllModel.Role] {
 	var role dbModel.RoleEntity
-	err := c.db.Preload("Permissions").Where("label = ?", label).First(&role).Error
+	err := r.db.Preload("Permissions").Where("label = ?", uid).First(&role).Error
 	if err != nil {
 		return sharedUtils.NewFailureResult[dllModel.Role](err)
 	}
 	return sharedUtils.NewSuccessResult(db2dll.ToDLLModelRole(role))
 }
 
-func (c *relationalDatabaseClientImpl) GetUserRole(userID uint32) sharedUtils.Result[dllModel.Role] {
+func (r *relationalDatabaseClientImpl) GetUserRole(userID uint32) sharedUtils.Result[dllModel.Role] {
 	var user dbModel.UserEntity
-	err := c.db.Preload("Role.Permissions").Where("id = ?", userID).First(&user).Error
+	err := r.db.Preload("Role.Permissions").Where("id = ?", userID).First(&user).Error
 	if err != nil {
 		return sharedUtils.NewFailureResult[dllModel.Role](err)
 	}
 	return sharedUtils.NewSuccessResult(db2dll.ToDLLModelRole(user.Role))
 }
 
-func (c *relationalDatabaseClientImpl) SetUserRole(userID uint32, roleID uint32) error {
-	err := c.db.Model(&dbModel.UserEntity{}).Where("id = ?", userID).Update("role_id", roleID).Error
+func (r *relationalDatabaseClientImpl) SetUserRole(userID uint32, roleID uint32) error {
+	err := r.db.Model(&dbModel.UserEntity{}).Where("id = ?", userID).Update("role_id", roleID).Error
 	if err != nil {
 		return err
 	}

@@ -132,17 +132,14 @@ func (this BooleanNotExistsAtomKPINode) GetSdParameterSpecification() string {
 type FilterNodeInput struct {
 	Type     FilterNodeType    `json:"type"`
 	Operator *LogicalOperator  `json:"operator,omitempty"`
-	Not      *bool             `json:"not,omitempty"`
-	Rules    []FilterNodeInput `json:"rules,omitempty"`
+	Nodes    []FilterNodeInput `json:"nodes,omitempty"`
 	Rule     *FilterRuleInput  `json:"rule,omitempty"`
 }
 
 type FilterRuleInput struct {
-	Field     string           `json:"field"`
-	Target    FilterTargetType `json:"target"`
-	Operator  FilterOperator   `json:"operator"`
-	Value     *string          `json:"value,omitempty"`
-	ValueType FilterValueType  `json:"valueType"`
+	Tag      string         `json:"tag"`
+	Operator FilterOperator `json:"operator"`
+	Value    string         `json:"value"`
 }
 
 type InputData struct {
@@ -153,34 +150,43 @@ type InputData struct {
 }
 
 type KPIDefinition struct {
-	ID                     uint32         `json:"id"`
-	Label                  string         `json:"label"`
-	SdTypeID               uint32         `json:"sdTypeID"`
-	SdTypeSpecification    string         `json:"sdTypeSpecification"`
-	UserIdentifier         string         `json:"userIdentifier"`
-	Nodes                  []KPINode      `json:"nodes"`
-	SdInstanceMode         SDInstanceMode `json:"sdInstanceMode"`
-	SelectedSDInstanceUIDs []string       `json:"selectedSDInstanceUIDs"`
+	ID                    uint32         `json:"id"`
+	Label                 string         `json:"label"`
+	SdTypeID              uint32         `json:"sdTypeID"`
+	SdTypeUID             string         `json:"sdTypeUID"`
+	UserIdentifier        string         `json:"userIdentifier"`
+	Nodes                 []KPINode      `json:"nodes"`
+	SdInstanceMode        SDInstanceMode `json:"sdInstanceMode"`
+	SelectedSDInstanceIDs []uint32       `json:"selectedSDInstanceIDs"`
 }
 
 type KPIDefinitionInput struct {
-	Label                  string         `json:"label"`
-	SdTypeID               uint32         `json:"sdTypeID"`
-	SdTypeSpecification    string         `json:"sdTypeSpecification"`
-	UserIdentifier         string         `json:"userIdentifier"`
-	Nodes                  []KPINodeInput `json:"nodes"`
-	SdInstanceMode         SDInstanceMode `json:"sdInstanceMode"`
-	SelectedSDInstanceUIDs []string       `json:"selectedSDInstanceUIDs"`
+	Label                 string         `json:"label"`
+	SdTypeID              uint32         `json:"sdTypeID"`
+	SdTypeUID             string         `json:"sdTypeUID"`
+	UserIdentifier        string         `json:"userIdentifier"`
+	Nodes                 []KPINodeInput `json:"nodes"`
+	SdInstanceMode        SDInstanceMode `json:"sdInstanceMode"`
+	SelectedSDInstanceIDs []uint32       `json:"selectedSDInstanceIDs"`
 }
 
 type KPIFulfillmentCheckResult struct {
-	KpiDefinitionID uint32 `json:"kpiDefinitionID"`
+	SdTypeID        uint32 `json:"sdTypeID"`
 	SdInstanceID    uint32 `json:"sdInstanceID"`
+	KpiDefinitionID uint32 `json:"kpiDefinitionID"`
+	EventTime       string `json:"eventTime"`
 	Fulfilled       bool   `json:"fulfilled"`
 }
 
-type KPIFulfillmentCheckResultTuple struct {
-	KpiFulfillmentCheckResults []KPIFulfillmentCheckResult `json:"kpiFulfillmentCheckResults"`
+type KPIFulfillmentCheckResultRequest struct {
+	KpiDefinitionID uint32 `json:"kpiDefinitionID"`
+	SdInstanceID    uint32 `json:"sdInstanceID"`
+}
+
+type KPIFulfillmentCheckedFilter struct {
+	SdTypeIDs      []uint32 `json:"sdTypeIDs,omitempty"`
+	KpiDefinitions []uint32 `json:"kpiDefinitions,omitempty"`
+	SdInstanceIDs  []uint32 `json:"sdInstanceIDs,omitempty"`
 }
 
 type KPINodeInput struct {
@@ -383,13 +389,30 @@ type OutputData struct {
 	Data       string  `json:"data"`
 }
 
+type Permission struct {
+	UID   string `json:"uid"`
+	Label string `json:"label"`
+}
+
 type Query struct {
 }
 
+type RawDataPoint struct {
+	SdTypeID     uint32 `json:"sdTypeID"`
+	SdInstanceID uint32 `json:"sdInstanceID"`
+	Payload      string `json:"payload"`
+	EventTime    string `json:"eventTime"`
+}
+
+type RawDataPointArrivedFilter struct {
+	SdTypeIDs     []uint32 `json:"sdTypeIDs,omitempty"`
+	SdInstanceIDs []uint32 `json:"sdInstanceIDs,omitempty"`
+}
+
 type Role struct {
-	ID          uint32   `json:"id"`
-	Label       string   `json:"label"`
-	Permissions []string `json:"permissions,omitempty"`
+	ID          uint32       `json:"id"`
+	Label       string       `json:"label"`
+	Permissions []Permission `json:"permissions,omitempty"`
 }
 
 type SDInstance struct {
@@ -412,6 +435,11 @@ type SDInstanceGroupInput struct {
 	Label          string   `json:"label"`
 	UserIdentifier string   `json:"userIdentifier"`
 	SdInstanceIDs  []uint32 `json:"sdInstanceIDs"`
+}
+
+type SDInstanceRegisteredFilter struct {
+	SdTypeIDs     []uint32 `json:"sdTypeIDs,omitempty"`
+	SdInstanceIDs []uint32 `json:"sdInstanceIDs,omitempty"`
 }
 
 type SDInstanceUpdateInput struct {
@@ -437,14 +465,14 @@ type SDParameterInput struct {
 
 type SDType struct {
 	ID         uint32        `json:"id"`
+	UID        string        `json:"uid"`
 	Label      string        `json:"label"`
-	Denotation string        `json:"denotation"`
 	Parameters []SDParameter `json:"parameters"`
 }
 
 type SDTypeInput struct {
 	Label      string             `json:"label"`
-	Denotation string             `json:"denotation"`
+	UID        string             `json:"uid"`
 	Parameters []SDParameterInput `json:"parameters"`
 }
 
@@ -469,7 +497,7 @@ type StatisticsInput struct {
 	To *string `json:"to,omitempty"`
 	// Amount of minutes to aggregate by
 	// For example if the queried range has 1 hour and aggregateMinutes is set to 10 the aggregation will result in 6 points
-	AggregateMinutes *int `json:"aggregateMinutes,omitempty"`
+	AggregateSeconds *int `json:"aggregateSeconds,omitempty"`
 	// Timezone override default UTC.
 	// For more details why and how this affects queries see: https://www.influxdata.com/blog/time-zones-in-flux/.
 	// In most cases you can ignore this and some edge aggregations can be influenced.
@@ -564,13 +592,238 @@ func (this StringNotExistsAtomKPINode) GetSdParameterSpecification() string {
 type Subscription struct {
 }
 
+type TimeSeriesCursor struct {
+	Time            string  `json:"time"`
+	SdInstanceUID   string  `json:"sdInstanceUID"`
+	KpiDefinitionID *uint32 `json:"kpiDefinitionID,omitempty"`
+}
+
+type TimeSeriesCursorInput struct {
+	Time            string  `json:"time"`
+	SdInstanceUID   string  `json:"sdInstanceUID"`
+	KpiDefinitionID *uint32 `json:"kpiDefinitionID,omitempty"`
+}
+
+type TimeSeriesDataPoint struct {
+	Time string `json:"time"`
+	Tags string `json:"tags"`
+	Data string `json:"data"`
+}
+
+type TimeSeriesDistinctTagValuesInput struct {
+	Type             TimeSeriesType   `json:"type"`
+	SdTypeID         *uint32          `json:"sdTypeID,omitempty"`
+	SdInstanceIDs    []uint32         `json:"sdInstanceIDs,omitempty"`
+	KpiDefinitionIDs []uint32         `json:"kpiDefinitionIDs,omitempty"`
+	From             *string          `json:"from,omitempty"`
+	To               *string          `json:"to,omitempty"`
+	Tag              string           `json:"tag"`
+	Filters          *FilterNodeInput `json:"filters,omitempty"`
+}
+
+type TimeSeriesDistinctTagValuesResponse struct {
+	Values []string `json:"values"`
+	Error  *string  `json:"error,omitempty"`
+}
+
+type TimeSeriesExport struct {
+	ID          uint32       `json:"id"`
+	Status      ExportStatus `json:"status"`
+	DownloadURL *string      `json:"downloadUrl,omitempty"`
+	CreatedAt   string       `json:"createdAt"`
+	ExpiresAt   *string      `json:"expiresAt,omitempty"`
+	Error       *string      `json:"error,omitempty"`
+}
+
+type TimeSeriesParameter struct {
+	Denotation string        `json:"denotation"`
+	Label      string        `json:"label"`
+	Role       ParameterRole `json:"role"`
+}
+
+type TimeSeriesReadAggregateKPIInput struct {
+	SdTypeID         *uint32                `json:"sdTypeID,omitempty"`
+	SdInstanceIDs    []uint32               `json:"sdInstanceIDs,omitempty"`
+	KpiDefinitionIDs []uint32               `json:"kpiDefinitionIDs,omitempty"`
+	From             *string                `json:"from,omitempty"`
+	To               *string                `json:"to,omitempty"`
+	AggregateSeconds int                    `json:"aggregateSeconds"`
+	Limit            *int                   `json:"limit,omitempty"`
+	Batch            *int                   `json:"batch,omitempty"`
+	Filters          *FilterNodeInput       `json:"filters,omitempty"`
+	Cursor           *TimeSeriesCursorInput `json:"cursor,omitempty"`
+}
+
+type TimeSeriesReadInput struct {
+	Type             TimeSeriesType         `json:"type"`
+	SdTypeID         *uint32                `json:"sdTypeID,omitempty"`
+	SdInstanceIDs    []uint32               `json:"sdInstanceIDs,omitempty"`
+	KpiDefinitionIDs []uint32               `json:"kpiDefinitionIDs,omitempty"`
+	From             *string                `json:"from,omitempty"`
+	To               *string                `json:"to,omitempty"`
+	Limit            *int                   `json:"limit,omitempty"`
+	SortDesc         *bool                  `json:"sortDesc,omitempty"`
+	Batch            *int                   `json:"batch,omitempty"`
+	Filters          *FilterNodeInput       `json:"filters,omitempty"`
+	Cursor           *TimeSeriesCursorInput `json:"cursor,omitempty"`
+}
+
+type TimeSeriesReadResponse struct {
+	Parameters     []TimeSeriesParameter `json:"parameters,omitempty"`
+	Base           string                `json:"base"`
+	Data           []TimeSeriesDataPoint `json:"data,omitempty"`
+	HasMoreBatches bool                  `json:"hasMoreBatches"`
+	HasMoreData    bool                  `json:"hasMoreData"`
+	NextCursor     *TimeSeriesCursor     `json:"nextCursor,omitempty"`
+	Error          *string               `json:"error,omitempty"`
+}
+
 type UserConfig struct {
-	UserID uint32 `json:"userId"`
+	UserID uint32 `json:"userID"`
 	Config string `json:"config"`
 }
 
 type UserConfigInput struct {
 	Config string `json:"config"`
+}
+
+type ExportStatus string
+
+const (
+	ExportStatusPending    ExportStatus = "pending"
+	ExportStatusProcessing ExportStatus = "processing"
+	ExportStatusDone       ExportStatus = "done"
+	ExportStatusFailed     ExportStatus = "failed"
+	ExportStatusExpired    ExportStatus = "expired"
+)
+
+var AllExportStatus = []ExportStatus{
+	ExportStatusPending,
+	ExportStatusProcessing,
+	ExportStatusDone,
+	ExportStatusFailed,
+	ExportStatusExpired,
+}
+
+func (e ExportStatus) IsValid() bool {
+	switch e {
+	case ExportStatusPending, ExportStatusProcessing, ExportStatusDone, ExportStatusFailed, ExportStatusExpired:
+		return true
+	}
+	return false
+}
+
+func (e ExportStatus) String() string {
+	return string(e)
+}
+
+func (e *ExportStatus) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ExportStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ExportStatus", str)
+	}
+	return nil
+}
+
+func (e ExportStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type FilterNodeType string
+
+const (
+	FilterNodeTypeLogical FilterNodeType = "logical"
+	FilterNodeTypeRule    FilterNodeType = "rule"
+)
+
+var AllFilterNodeType = []FilterNodeType{
+	FilterNodeTypeLogical,
+	FilterNodeTypeRule,
+}
+
+func (e FilterNodeType) IsValid() bool {
+	switch e {
+	case FilterNodeTypeLogical, FilterNodeTypeRule:
+		return true
+	}
+	return false
+}
+
+func (e FilterNodeType) String() string {
+	return string(e)
+}
+
+func (e *FilterNodeType) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = FilterNodeType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid FilterNodeType", str)
+	}
+	return nil
+}
+
+func (e FilterNodeType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type FilterOperator string
+
+const (
+	FilterOperatorEq       FilterOperator = "eq"
+	FilterOperatorNeq      FilterOperator = "neq"
+	FilterOperatorContains FilterOperator = "contains"
+	FilterOperatorIn       FilterOperator = "in"
+	FilterOperatorPrefix   FilterOperator = "prefix"
+	FilterOperatorSuffix   FilterOperator = "suffix"
+	FilterOperatorRegex    FilterOperator = "regex"
+)
+
+var AllFilterOperator = []FilterOperator{
+	FilterOperatorEq,
+	FilterOperatorNeq,
+	FilterOperatorContains,
+	FilterOperatorIn,
+	FilterOperatorPrefix,
+	FilterOperatorSuffix,
+	FilterOperatorRegex,
+}
+
+func (e FilterOperator) IsValid() bool {
+	switch e {
+	case FilterOperatorEq, FilterOperatorNeq, FilterOperatorContains, FilterOperatorIn, FilterOperatorPrefix, FilterOperatorSuffix, FilterOperatorRegex:
+		return true
+	}
+	return false
+}
+
+func (e FilterOperator) String() string {
+	return string(e)
+}
+
+func (e *FilterOperator) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = FilterOperator(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid FilterOperator", str)
+	}
+	return nil
+}
+
+func (e FilterOperator) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 type KPINodeType string
@@ -647,10 +900,10 @@ func (e KPINodeType) MarshalGQL(w io.Writer) {
 type LogicalOperationType string
 
 const (
-	LogicalOperationTypeAnd LogicalOperationType = "AND"
-	LogicalOperationTypeOr  LogicalOperationType = "OR"
-	LogicalOperationTypeNor LogicalOperationType = "NOR"
-	LogicalOperationTypeNot LogicalOperationType = "NOT"
+	LogicalOperationTypeAnd LogicalOperationType = "and"
+	LogicalOperationTypeOr  LogicalOperationType = "or"
+	LogicalOperationTypeNor LogicalOperationType = "nor"
+	LogicalOperationTypeNot LogicalOperationType = "not"
 )
 
 var AllLogicalOperationType = []LogicalOperationType{
@@ -692,9 +945,9 @@ func (e LogicalOperationType) MarshalGQL(w io.Writer) {
 type LogicalOperator string
 
 const (
-	LogicalOperatorAnd LogicalOperator = "AND"
-	LogicalOperatorOr  LogicalOperator = "OR"
-	LogicalOperatorNot LogicalOperator = "NOT"
+	LogicalOperatorAnd LogicalOperator = "and"
+	LogicalOperatorOr  LogicalOperator = "or"
+	LogicalOperatorNot LogicalOperator = "not"
 )
 
 var AllLogicalOperator = []LogicalOperator{
@@ -732,54 +985,56 @@ func (e LogicalOperator) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
-type ParameterType string
+type ParameterRole string
 
 const (
-	ParameterTypeBase  ParameterType = "BASE"
-	ParameterTypeTag   ParameterType = "TAG"
-	ParameterTypeField ParameterType = "FIELD"
+	ParameterRoleMeta  ParameterRole = "meta"
+	ParameterRoleTime  ParameterRole = "time"
+	ParameterRoleTag   ParameterRole = "tag"
+	ParameterRoleField ParameterRole = "field"
 )
 
-var AllParameterType = []ParameterType{
-	ParameterTypeBase,
-	ParameterTypeTag,
-	ParameterTypeField,
+var AllParameterRole = []ParameterRole{
+	ParameterRoleMeta,
+	ParameterRoleTime,
+	ParameterRoleTag,
+	ParameterRoleField,
 }
 
-func (e ParameterType) IsValid() bool {
+func (e ParameterRole) IsValid() bool {
 	switch e {
-	case ParameterTypeBase, ParameterTypeTag, ParameterTypeField:
+	case ParameterRoleMeta, ParameterRoleTime, ParameterRoleTag, ParameterRoleField:
 		return true
 	}
 	return false
 }
 
-func (e ParameterType) String() string {
+func (e ParameterRole) String() string {
 	return string(e)
 }
 
-func (e *ParameterType) UnmarshalGQL(v any) error {
+func (e *ParameterRole) UnmarshalGQL(v any) error {
 	str, ok := v.(string)
 	if !ok {
 		return fmt.Errorf("enums must be strings")
 	}
 
-	*e = ParameterType(str)
+	*e = ParameterRole(str)
 	if !e.IsValid() {
-		return fmt.Errorf("%s is not a valid ParameterType", str)
+		return fmt.Errorf("%s is not a valid ParameterRole", str)
 	}
 	return nil
 }
 
-func (e ParameterType) MarshalGQL(w io.Writer) {
+func (e ParameterRole) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 type SDInstanceMode string
 
 const (
-	SDInstanceModeAll      SDInstanceMode = "ALL"
-	SDInstanceModeSelected SDInstanceMode = "SELECTED"
+	SDInstanceModeAll      SDInstanceMode = "all"
+	SDInstanceModeSelected SDInstanceMode = "selected"
 )
 
 var AllSDInstanceMode = []SDInstanceMode{
@@ -819,8 +1074,8 @@ func (e SDInstanceMode) MarshalGQL(w io.Writer) {
 type SDParameterRole string
 
 const (
-	SDParameterRoleField SDParameterRole = "FIELD"
-	SDParameterRoleTag   SDParameterRole = "TAG"
+	SDParameterRoleField SDParameterRole = "field"
+	SDParameterRoleTag   SDParameterRole = "tag"
 )
 
 var AllSDParameterRole = []SDParameterRole{
@@ -860,9 +1115,9 @@ func (e SDParameterRole) MarshalGQL(w io.Writer) {
 type SDParameterType string
 
 const (
-	SDParameterTypeString  SDParameterType = "STRING"
-	SDParameterTypeNumber  SDParameterType = "NUMBER"
-	SDParameterTypeBoolean SDParameterType = "BOOLEAN"
+	SDParameterTypeString  SDParameterType = "string"
+	SDParameterTypeNumber  SDParameterType = "number"
+	SDParameterTypeBoolean SDParameterType = "boolean"
 )
 
 var AllSDParameterType = []SDParameterType{
@@ -968,5 +1223,46 @@ func (e *StatisticsOperation) UnmarshalGQL(v any) error {
 }
 
 func (e StatisticsOperation) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type TimeSeriesType string
+
+const (
+	TimeSeriesTypeRaw TimeSeriesType = "raw"
+	TimeSeriesTypeKpi TimeSeriesType = "kpi"
+)
+
+var AllTimeSeriesType = []TimeSeriesType{
+	TimeSeriesTypeRaw,
+	TimeSeriesTypeKpi,
+}
+
+func (e TimeSeriesType) IsValid() bool {
+	switch e {
+	case TimeSeriesTypeRaw, TimeSeriesTypeKpi:
+		return true
+	}
+	return false
+}
+
+func (e TimeSeriesType) String() string {
+	return string(e)
+}
+
+func (e *TimeSeriesType) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = TimeSeriesType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid TimeSeriesType", str)
+	}
+	return nil
+}
+
+func (e TimeSeriesType) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }

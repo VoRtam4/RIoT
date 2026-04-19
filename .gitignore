@@ -1,11 +1,9 @@
 # Ingore the IDE folder
 .idea
+.codex
 
 # Ignore most of the docker directory contents
-/docker/mongo-data
-/docker/mosquitto-data
-/docker/mosquitto-log
-/docker/postgres-data
+docker
 
 # Ignore some front-end directories
 frontend/dist/

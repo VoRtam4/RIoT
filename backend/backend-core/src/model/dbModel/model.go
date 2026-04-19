@@ -13,7 +13,7 @@ type KPIDefinitionEntity struct {
 	UserIdentifier                             string                                      `gorm:"column:user_identifier;not null"`
 	RootNodeID                                 *uint32                                     `gorm:"column:root_node_id;not null"`
 	RootNode                                   *KPINodeEntity                              `gorm:"foreignKey:RootNodeID"`
-	SDTypeID                                   uint32                                      `gorm:"column:sd_type_id;not null"`
+	SDTypeID                                   uint32                                      `gorm:"column:sd_type_id;index;not null"`
 	SDType                                     SDTypeEntity                                `gorm:"foreignKey:SDTypeID;constraint:OnDelete:CASCADE"`
 	SDInstanceMode                             string                                      `gorm:"column:sd_instance_mode;not null"`
 	KPIFulfillmentCheckResults                 []KPIFulfillmentCheckResultEntity           `gorm:"foreignKey:KPIDefinitionID;constraint:OnDelete:CASCADE"`
@@ -61,8 +61,8 @@ func (AtomKPINodeEntity) TableName() string {
 
 type SDTypeEntity struct {
 	ID         uint32              `gorm:"column:id;primaryKey;not null"`
+	UID        string              `gorm:"column:uid;not null;uniqueIndex"`
 	Label      string              `gorm:"column:label;not null"`
-	Denotation string              `gorm:"column:denotation;not null;index"` // Denotation is a separately indexed field
 	Parameters []SDParameterEntity `gorm:"foreignKey:SDTypeID;constraint:OnDelete:CASCADE"`
 	Commands   []SDCommandEntity   `gorm:"foreignKey:SDTypeID;constraint:OnDelete:CASCADE"`
 }
@@ -73,7 +73,7 @@ func (SDTypeEntity) TableName() string {
 
 type SDParameterEntity struct {
 	ID         uint32 `gorm:"column:id;primaryKey;not null"`
-	SDTypeID   uint32 `gorm:"column:sd_type_id;not null"`
+	SDTypeID   uint32 `gorm:"column:sd_type_id;index;not null"`
 	Label      string `gorm:"column:label;not null"`
 	Denotation string `gorm:"column:denotation;not null"`
 	Type       string `gorm:"column:type;not null"`
@@ -86,11 +86,11 @@ func (SDParameterEntity) TableName() string {
 
 type SDInstanceEntity struct {
 	ID                                         uint32                                      `gorm:"column:id;primaryKey;not null"`
-	UID                                        string                                      `gorm:"column:uid;not null;index"` // UID is a separately indexed field
+	UID                                        string                                      `gorm:"column:uid;not null;index"`
 	Label                                      string                                      `gorm:"column:label;not null"`
 	ConfirmedByUser                            bool                                        `gorm:"column:confirmed_by_user;not null"`
 	UserIdentifier                             string                                      `gorm:"column:user_identifier;not null"`
-	SDTypeID                                   uint32                                      `gorm:"column:sd_type_id"`
+	SDTypeID                                   uint32                                      `gorm:"column:sd_type_id;index"`
 	SDType                                     SDTypeEntity                                `gorm:"foreignKey:SDTypeID;constraint:OnDelete:CASCADE"`
 	GroupMembershipRecords                     []SDInstanceGroupMembershipEntity           `gorm:"foreignKey:SDInstanceID;constraint:OnDelete:CASCADE"`
 	KPIFulfillmentCheckResults                 []KPIFulfillmentCheckResultEntity           `gorm:"foreignKey:SDInstanceID;constraint:OnDelete:CASCADE"`
@@ -101,11 +101,24 @@ func (SDInstanceEntity) TableName() string {
 	return "sd_instances"
 }
 
+type RawDataPointEntity struct {
+	SDInstanceID uint32           `gorm:"column:sd_instance_id;primaryKey;not null"`
+	SDInstance   SDInstanceEntity `gorm:"foreignKey:SDInstanceID;constraint:OnDelete:CASCADE"`
+	EventTime    time.Time        `gorm:"column:event_time;not null"`
+	Payload      []byte           `gorm:"column:payload;type:bytea;not null"`
+}
+
+func (RawDataPointEntity) TableName() string {
+	return "raw_data_point_entities"
+}
+
 type KPIFulfillmentCheckResultEntity struct {
-	KPIDefinitionID uint32    `gorm:"column:kpi_definition_id;primaryKey;not null"`
-	SDInstanceID    uint32    `gorm:"column:sd_instance_id;primaryKey;not null"`
-	Fulfilled       bool      `gorm:"column:fulfilled;not null"`
-	EventTime       time.Time `gorm:"column:event_time;not null;index"`
+	KPIDefinitionID uint32              `gorm:"column:kpi_definition_id;primaryKey;not null;index"`
+	KPIDefinition   KPIDefinitionEntity `gorm:"foreignKey:KPIDefinitionID;constraint:OnDelete:CASCADE"`
+	SDInstanceID    uint32              `gorm:"column:sd_instance_id;primaryKey;not null"`
+	SDInstance      SDInstanceEntity    `gorm:"foreignKey:SDInstanceID;constraint:OnDelete:CASCADE"`
+	Fulfilled       bool                `gorm:"column:fulfilled;not null"`
+	EventTime       time.Time           `gorm:"column:event_time;not null;index"`
 }
 
 func (KPIFulfillmentCheckResultEntity) TableName() string {
@@ -138,6 +151,10 @@ type SDInstanceKPIDefinitionRelationshipEntity struct { // TODO: Missing 'TableN
 	SDInstanceUID   string `gorm:"column:sd_instance_uid;not null"`
 }
 
+func (SDInstanceKPIDefinitionRelationshipEntity) TableName() string {
+	return "sd_instance_kpi_definition_relationship_entities"
+}
+
 // UserEntity represents a user of the application who can log in using various OAuth providers.
 type UserEntity struct {
 	gorm.Model
@@ -155,31 +172,6 @@ type UserEntity struct {
 	Role                   RoleEntity                  `gorm:"foreignKey:RoleID"`
 	CreatedAt              time.Time                   `gorm:"foreignKey:createdAt"`
 	UpdatedAt              time.Time                   `gorm:"foreignKey:updatedAt"`
-	/*
-	   ID        uint           `gorm:"primaryKey"` // Primary key for the user
-	   CreatedAt time.Time      // Timestamp of creation
-	   UpdatedAt time.Time      // Timestamp of the last update
-	   DeletedAt gorm.DeletedAt `gorm:"index"` // Soft delete field
-
-	   // Basic User Information
-	   Username     string `gorm:"uniqueIndex;size:100"` // Unique username for the user
-	   Email        string `gorm:"uniqueIndex;size:255"` // User's email address (unique)
-	   Name         string `gorm:"size:255"`             // Full name of the user
-	   ProfileImage string `gorm:"size:500"`             // URL to the user's profile image
-
-	   // OAuth Information
-	   Provider     string    `gorm:"size:50"`        // OAuth provider name (e.g., google, github)
-	   ProviderID   string    `gorm:"size:255;index"` // Unique ID provided by the OAuth provider
-	   OAuthToken   string    `gorm:"size:500"`       // OAuth access token
-	   RefreshToken string    `gorm:"size:500"`       // OAuth refresh token, if available
-	   TokenExpiry  time.Time // Expiration time of the OAuth token
-
-	   // Additional Metadata
-	   LastLoginAt time.Time                   // Timestamp of the last login
-	   IsActive    bool                        `gorm:"default:true"` // Whether the user's account is active
-	   Invocations []SDCommandInvocationEntity `gorm:"foreignKey:user_id;constraint:OnDelete:CASCADE"`
-	   UserConfig  UserConfigEntity            `gorm:"foreignKey:user_id;constraint:OnDelete:CASCADE"`
-	*/
 }
 
 func (UserEntity) TableName() string { // TODO: Standardize table names, e.g. 'user' × 'users'
@@ -266,8 +258,10 @@ func (RolesPermissionsMappingEntity) TableName() string {
 
 type PermissionEntity struct {
 	ID                            uint32                               `gorm:"column:id;primaryKey;not null"`
-	Label                         string                               `gorm:"column:label;not null;uniqueIndex"`
+	UID                           string                               `gorm:"column:uid;not null;uniqueIndex"`
+	Label                         string                               `gorm:"column:label;not null"`
 	Roles                         []RoleEntity                         `gorm:"many2many:roles_permissions_mapping;joinForeignKey:PermissionID;joinReferences:RoleID"`
+	APIKeys                       []APIKeyEntity                       `gorm:"many2many:api_keys_permissions_mapping;joinForeignKey:PermissionID;joinReferences:APIKeyID"`
 	OperationTypeAccessPermission *OperationTypeAccessPermissionEntity `gorm:"foreignKey:PermissionID;constraint:OnDelete:CASCADE"`
 	SingleOperationPermission     *SingleOperationPermissionEntity     `gorm:"foreignKey:PermissionID;constraint:OnDelete:CASCADE"`
 }
@@ -295,8 +289,6 @@ type SingleOperationPermissionEntity struct {
 type APIKeyEntity struct {
 	ID             uint32                      `gorm:"column:id;primaryKey;not null"`
 	UserID         uint32                      `gorm:"column:user_id;not null;index"`
-	RoleID         uint32                      `gorm:"column:role_id;not null"`
-	Role           RoleEntity                  `gorm:"foreignKey:RoleID"`
 	KeyHash        string                      `gorm:"column:key_hash;not null;uniqueIndex"`
 	Label          string                      `gorm:"column:label;not null"`
 	RateLimit      *uint32                     `gorm:"column:rate_limit"`
@@ -305,11 +297,21 @@ type APIKeyEntity struct {
 	LastUsedAt     *time.Time                  `gorm:"column:last_used_at"`
 	CreatedAt      time.Time                   `gorm:"column:created_at;not null"`
 	UpdatedAt      time.Time                   `gorm:"column:updated_at;not null"`
+	Permissions    []PermissionEntity          `gorm:"many2many:api_keys_permissions_mapping;joinForeignKey:APIKeyID;joinReferences:PermissionID"`
 	IPRestrictions []APIKeyIPRestrictionEntity `gorm:"foreignKey:APIKeyID;constraint:OnDelete:CASCADE"`
 }
 
 func (APIKeyEntity) TableName() string {
 	return "api_keys"
+}
+
+type APIKeysPermissionsMappingEntity struct {
+	APIKeyID      uint32 `gorm:"column:api_key_id;primaryKey;not null;index;constraint:OnDelete:CASCADE"`
+	PermissionID  uint32 `gorm:"column:permission_id;primaryKey;not null;constraint:OnDelete:CASCADE"`
+}
+
+func (APIKeysPermissionsMappingEntity) TableName() string {
+	return "api_keys_permissions_mapping"
 }
 
 type APIKeyIPRestrictionEntity struct {

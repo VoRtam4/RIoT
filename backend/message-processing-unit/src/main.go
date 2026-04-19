@@ -78,14 +78,23 @@ func checkForKPIDefinitionsBySDTypeDenotationMapUpdates() {
 func checkForSDTypeUpdates() {
 	rabbitMQClient := rabbitmq.NewClient()
 	defer rabbitMQClient.Dispose()
-	err := rabbitmq.ConsumeJSONMessages[[]sharedModel.SDTypeRegistrationRequestISCMessage](rabbitMQClient, sharedConstants.SetOfSDTypesUpdatesQueueName,
-		func(messages []sharedModel.SDTypeRegistrationRequestISCMessage) error {
+	err := rabbitmq.ConsumeJSONMessages[[]sharedModel.SDTypeUpdateISCMessage](rabbitMQClient, sharedConstants.SetOfSDTypesUpdatesQueueName,
+		func(messages []sharedModel.SDTypeUpdateISCMessage) error {
 			processing.UpdateSDType(messages)
 			return nil
 		},
 	)
 	if err != nil {
 		log.Printf("[MPU][SDTYPE] Failed consuming SDType updates: %s", err.Error())
+	}
+}
+
+func checkForKPIDeleteRequests() {
+	rabbitMQClient := rabbitmq.NewClient()
+	defer rabbitMQClient.Dispose()
+	err := rabbitmq.ConsumeJSONMessages[sharedModel.KPIDeleteResultsRequestISCMessage](rabbitMQClient, sharedConstants.MPUDeleteQueueName, processing.ProcessDelete)
+	if err != nil {
+		log.Printf("[MPU][DELETE] Failed consuming delete requests: %s", err.Error())
 	}
 }
 
@@ -99,6 +108,5 @@ func main() {
 	log.Println("Dependencies should be up and running...")
 	processing.InitializeProcessing()
 	sharedUtils.StartLoggingProfilingInformationPeriodically(time.Minute)
-	sharedUtils.WaitForAll(checkForKPIDefinitionsBySDTypeDenotationMapUpdates, checkForKPIFulfilmentCheckRequests, checkForKPIReprocessRequests, checkForSDTypeUpdates)
-	processing.StartCacheCleanup(1*time.Hour, 7*24*time.Hour)
+	sharedUtils.WaitForAll(checkForKPIDefinitionsBySDTypeDenotationMapUpdates, checkForKPIFulfilmentCheckRequests, checkForKPIReprocessRequests, checkForSDTypeUpdates, checkForKPIDeleteRequests)
 }

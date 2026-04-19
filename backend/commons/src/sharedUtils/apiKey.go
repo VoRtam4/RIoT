@@ -33,10 +33,10 @@ func VerifyAPIKeyHash(rawKey string, stored string) bool {
 	return subtle.ConstantTimeCompare([]byte(computed), []byte(expectedHash)) == 1
 }
 
-func ValidatePermissions(userPermissions []string, requested []string) error {
+func ValidatePermissions[T any](userPermissions []T, requested []string, extractUID func(T) string) error {
 	allowed := make(map[string]bool, len(userPermissions))
 	for _, p := range userPermissions {
-		allowed[p] = true
+		allowed[extractUID(p)] = true
 	}
 	for _, p := range requested {
 		if !allowed[p] {

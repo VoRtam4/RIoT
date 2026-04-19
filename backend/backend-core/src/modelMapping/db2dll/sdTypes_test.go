@@ -11,8 +11,8 @@ import (
 
 func TestToDLLModelSDType(t *testing.T) {
 	sdTypeEntity := dbModel.SDTypeEntity{
-		ID:         1,
-		Denotation: "shelly1pro",
+		ID:  1,
+		UID: "shelly1pro",
 		Parameters: sharedUtils.SliceOf(dbModel.SDParameterEntity{
 			ID:         1,
 			SDTypeID:   1,
@@ -26,8 +26,8 @@ func TestToDLLModelSDType(t *testing.T) {
 		}),
 	}
 	expected := dllModel.SDType{
-		ID:         sharedUtils.NewOptionalOf[uint32](1),
-		Denotation: "shelly1pro",
+		ID:  sharedUtils.NewOptionalOf[uint32](1),
+		UID: "shelly1pro",
 		Parameters: sharedUtils.SliceOf(dllModel.SDParameter{
 			ID:         sharedUtils.NewOptionalOf[uint32](1),
 			Denotation: "relay_0_temperature",

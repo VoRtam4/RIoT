@@ -21,6 +21,12 @@ func consumeSDInstanceRegistrationRequestJSONMessages(sdInstanceRegistrationRequ
 	sharedUtils.TerminateOnError(err, errorMessage)
 }
 
+func consumeRawDataPointJSONMessages(rawDataPointISCMessageConsumerFunction func(rawDataPointISCMessageTuple []sharedModel.RawDataPointISCMessage) error, rabbitMQClient rabbitmq.Client) {
+	err := rabbitmq.ConsumeJSONMessages[[]sharedModel.RawDataPointISCMessage](rabbitMQClient, sharedConstants.RawDataPointQueueName, rawDataPointISCMessageConsumerFunction)
+	errorMessage := fmt.Sprintf("[ISC] Consumption of messages from the '%s' queue has failed", sharedConstants.RawDataPointQueueName)
+	sharedUtils.TerminateOnError(err, errorMessage)
+}
+
 func consumeKPIFulfillmentCheckResultJSONMessages(kpiFulfillmentCheckResultConsumerFunction func(kpiFulfillmentCheckResultTuple sharedModel.KPIFulfillmentCheckResultTupleISCMessage) error, rabbitMQClient rabbitmq.Client) {
 	err := rabbitmq.ConsumeJSONMessages[sharedModel.KPIFulfillmentCheckResultTupleISCMessage](rabbitMQClient, sharedConstants.KPIFulfillmentCheckResultsQueueName, kpiFulfillmentCheckResultConsumerFunction)
 	errorMessage := fmt.Sprintf("[ISC] Consumption of messages from the '%s' queue has failed", sharedConstants.KPIFulfillmentCheckResultsQueueName)

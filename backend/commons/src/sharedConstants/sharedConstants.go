@@ -5,6 +5,7 @@ const (
 	MessageProcessingUnitConnectionNotificationsQueueName = "message-processing-unit-connection-notifications"
 	KPIFulfillmentCheckRequestsQueueName                  = "kpi-fulfillment-check-requests"
 	KPIFulfillmentCheckResultsQueueName                   = "kpi-fulfillment-check-results"
+	RawDataPointQueueName                                 = "raw-data-point"
 	SDTypeRegistrationRequestsQueueName                   = "sd-type-registration-requests"
 	SDInstanceRegistrationRequestsQueueName               = "sd-instance-registration-requests"
 	SetOfSDInstancesUpdatesQueueName                      = "set-of-sd-instances-updates"

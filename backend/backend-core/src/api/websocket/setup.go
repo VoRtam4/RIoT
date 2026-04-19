@@ -6,8 +6,6 @@ import (
 
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/websocket/connection"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
-	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/events"
-	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 	"github.com/gorilla/websocket"
 )
@@ -36,30 +34,5 @@ func ServeWebSocket(hub *connection.Hub) http.HandlerFunc {
 		hub.Register(client)
 		go client.WritePump()
 		go client.ReadPump(hub, RouteMessage())
-	}
-}
-
-func EventListener() func(*connection.Hub) {
-	return func(h *connection.Hub) {
-		sub := events.GetEventBus().Subscribe([]events.EventType{
-			events.SDInstanceRegisteredEventType,
-			events.KPIFulfillmentCheckedEventType,
-		}, 128)
-		go func() {
-			for event := range sub.Channel {
-				h.Mutex.RLock()
-				for client := range h.Clients {
-					if !client.Subscriptions[string(event.Type)] {
-						continue
-					}
-					client.SafeSend(sharedModel.WebSocketMessage{
-						Type:    sharedModel.MessageEvent,
-						Topic:   string(event.Type),
-						Payload: event.Payload,
-					})
-				}
-				h.Mutex.RUnlock()
-			}
-		}()
 	}
 }

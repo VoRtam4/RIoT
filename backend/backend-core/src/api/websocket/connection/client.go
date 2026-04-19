@@ -12,14 +12,14 @@ type Client struct {
 	Conn          *websocket.Conn
 	Send          chan sharedModel.WebSocketMessage
 	Ctx           context.Context
-	Subscriptions map[string]bool
+	Subscriptions map[string]func()
 }
 
 func NewClient(conn *websocket.Conn) *Client {
 	return &Client{
 		Conn:          conn,
 		Send:          make(chan sharedModel.WebSocketMessage, 32),
-		Subscriptions: map[string]bool{},
+		Subscriptions: map[string]func(){},
 	}
 }
 

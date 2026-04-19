@@ -13,7 +13,9 @@ services:
       context: ./backend
       dockerfile: backend-core/Dockerfile
     environment:
+      APP_ENV: ${APP_ENV}
       POSTGRES_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB_NAME}
+      BACKEND_CORE_URL: ${BACKEND_CORE_URL}
       INFLUX_URL: ${INFLUX_URL}
       RABBITMQ_URL: ${RABBITMQ_URL}
       INFLUX_TOKEN: ${INFLUX_TOKEN}
@@ -23,7 +25,8 @@ services:
       GOOGLE_OAUTH2_CLIENT_ID: ${GOOGLE_OAUTH2_CLIENT_ID}
       GOOGLE_OAUTH2_CLIENT_SECRET: ${GOOGLE_OAUTH2_CLIENT_SECRET}
       JWT_SECRET: ${JWT_SECRET}
-      ALLOWED_ORIGINS: http://localhost:8080,http://localhost:1234 # Essentially a API client whitelist TODO: Configure this as needed...
+      AUTH_REDIRECT_URL: ${AUTH_REDIRECT_URL}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS} # Essentially a API client whitelist TODO: Configure this as needed...
       # SECURE_COOKIES: "" # Comment this out if you are using http instead of https
       JWT_AUTHENTICATION_MIDDLEWARE_ENABLED: "" # Comment this out if you need unrestricted API access without authentication
     depends_on:
@@ -43,6 +46,7 @@ services:
       context: ./backend
       dockerfile: message-processing-unit/Dockerfile
     environment:
+      APP_ENV: ${APP_ENV}
       BACKEND_CORE_URL: ${BACKEND_CORE_URL}
       RABBITMQ_URL: ${RABBITMQ_URL}
     depends_on:
@@ -66,6 +70,7 @@ services:
   postgres:
     image: postgres:16
     environment:
+      APP_ENV: ${APP_ENV}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB_NAME}
@@ -89,12 +94,15 @@ services:
     ports:
       - "8086:8086"
     environment:
+      - APP_ENV=${APP_ENV}
       - DOCKER_INFLUXDB_INIT_MODE=setup
       - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUX_USER}
       - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUX_PASSWORD}
       - DOCKER_INFLUXDB_INIT_ORG=${INFLUX_ORGANIZATION}
       - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUX_BUCKET}
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=Fgp2ozMxmkYnUBkzwLpkx6ydOVXyQqF4-ZPctGjv8-xkirYPYRvoBtrpAHMCr_joYoJMOqZjl8djjuyOx-MR_A==
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
+    volumes:
+      - ./docker/influxdb-data:/var/lib/influxdb2
     healthcheck:
       test: [ "CMD", "influx", "ping" ]
       interval: 5s
@@ -106,6 +114,7 @@ services:
       context: ./backend
       dockerfile: time-series-store/Dockerfile
     environment:
+      APP_ENV: ${APP_ENV}
       BACKEND_CORE_URL: ${BACKEND_CORE_URL}
       RABBITMQ_URL: ${RABBITMQ_URL}
       INFLUX_ORGANIZATION: ${INFLUX_ORGANIZATION}
@@ -126,6 +135,7 @@ services:
       - "15672:15672"  # Management UI
       - "15692:15692"  # Prometheus (nepovinné)
     environment:
+      APP_ENV: ${APP_ENV}
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
       RABBITMQ_ERLANG_COOKIE: "my_shared_cookie"
@@ -148,6 +158,7 @@ services:
     ports:
       - "3000:3000"
     environment:
+      APP_ENV: ${APP_ENV}
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: password
 
@@ -165,6 +176,7 @@ services:
     ports:
       - "9000:9000"
     environment:
+      APP_ENV: ${APP_ENV}
       MQTT_ADDRESS: mosquitto
       MQTT_TOPIC: topic
       MQTT_USERNAME: admin
@@ -173,3 +185,4 @@ services:
 volumes:
   rabbitmq_data:
   postgres_data:
+

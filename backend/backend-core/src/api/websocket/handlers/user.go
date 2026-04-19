@@ -13,13 +13,11 @@ func GetUserConfig(c *connection.Client, msg sharedModel.WebSocketMessage) {
 	if principal == nil {
 		return
 	}
-
 	result := domainLogicLayer.GetUserConfig(principal.UserID)
 	if result.IsFailure() {
 		sendError(c, msg.ID, result.GetError().Error())
 		return
 	}
-
 	sendSuccess(c, msg.ID, result.GetPayload())
 }
 
@@ -28,19 +26,16 @@ func UpdateUserConfig(c *connection.Client, msg sharedModel.WebSocketMessage) {
 	if principal == nil {
 		return
 	}
-
 	input, err := parsePayload[graphQLModel.UserConfigInput](msg)
 	if err != nil {
 		sendError(c, msg.ID, "invalid payload")
 		return
 	}
-
 	result := domainLogicLayer.UpdateUserConfig(principal.UserID, input)
 	if result.IsFailure() {
 		sendError(c, msg.ID, result.GetError().Error())
 		return
 	}
-
 	sendSuccess(c, msg.ID, result.GetPayload())
 }
 
@@ -49,11 +44,9 @@ func DeleteUserConfig(c *connection.Client, msg sharedModel.WebSocketMessage) {
 	if principal == nil {
 		return
 	}
-
 	if err := domainLogicLayer.DeleteUserConfig(principal.UserID); err != nil {
 		sendError(c, msg.ID, err.Error())
 		return
 	}
-
 	sendSuccess(c, msg.ID, nil)
 }

@@ -32,7 +32,7 @@ func LoadAPIKeyByHash(hash string) sharedUtils.Result[sharedUtils.Optional[dllMo
 }
 
 func LoadAPIKeyByID(userID uint32, id uint32) sharedUtils.Result[graphQLModel.APIKey] {
-	result := dbClient.GetRelationalDatabaseClientInstance().LoadAPIKeyByID(userID)
+	result := dbClient.GetRelationalDatabaseClientInstance().LoadAPIKeyByID(id)
 	if result.IsFailure() {
 		return sharedUtils.NewFailureResult[graphQLModel.APIKey](result.GetError())
 	}
@@ -63,7 +63,8 @@ func CreateAPIKey(userID uint32, input graphQLModel.APIKeyInput) sharedUtils.Res
 			return sharedUtils.NewFailureResult[string](roleResult.GetError())
 		}
 		userRole := roleResult.GetPayload()
-		if err := sharedUtils.ValidatePermissions(userRole.Permissions, input.Permissions); err != nil {
+		err := sharedUtils.ValidatePermissions[graphQLModel.Permission](userRole.Permissions, input.Permissions, func(p graphQLModel.Permission) string { return p.UID })
+		if err != nil {
 			return sharedUtils.NewFailureResult[string](err)
 		}
 	}
@@ -85,6 +86,9 @@ func UpdateAPIKeyForUser(userID uint32, id uint32, input graphQLModel.APIKeyInpu
 	if load.IsFailure() {
 		return load.GetError()
 	}
+	if load.GetPayload().IsEmpty() {
+		return fmt.Errorf("not found")
+	}
 	k := load.GetPayload().GetPayload()
 	if userID != *k.UserID {
 		return fmt.Errorf("not found")
@@ -95,7 +99,8 @@ func UpdateAPIKeyForUser(userID uint32, id uint32, input graphQLModel.APIKeyInpu
 			return roleResult.GetError()
 		}
 		userRole := roleResult.GetPayload()
-		if err := sharedUtils.ValidatePermissions(userRole.Permissions, input.Permissions); err != nil {
+		err := sharedUtils.ValidatePermissions[graphQLModel.Permission](userRole.Permissions, input.Permissions, func(p graphQLModel.Permission) string { return p.UID })
+		if err != nil {
 			return err
 		}
 	}
@@ -113,6 +118,9 @@ func DeleteAPIKeyForUser(userID uint32, id uint32) error {
 	load := db.LoadAPIKeyByID(id)
 	if load.IsFailure() {
 		return load.GetError()
+	}
+	if load.GetPayload().IsEmpty() {
+		return fmt.Errorf("not found")
 	}
 	k := load.GetPayload().GetPayload()
 	if userID != *k.UserID {

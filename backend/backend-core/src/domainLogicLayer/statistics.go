@@ -2,7 +2,6 @@ package domainLogicLayer
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -50,12 +49,12 @@ func Query(input sharedModel.TimeSeriesReadRequest) sharedUtils.Result[[]graphQL
 			sharedConstants.TimeSeriesReadResponseQueueName,
 			correlationId,
 			func(resp sharedModel.TimeSeriesReadResponse, delivery amqp.Delivery) error {
-
+				/*//TODO - tohle je asi správné, ale konfliktuje
 				if resp.Error != "" {
 					outputChannel <- sharedUtils.NewFailureResult[[]sharedModel.TimeSeriesDataPoint](errors.New(resp.Error))
 				} else {
 					outputChannel <- sharedUtils.NewSuccessResult(resp.Data)
-				}
+				}*/
 
 				close(outputChannel)
 				return nil
@@ -99,9 +98,6 @@ func Query(input sharedModel.TimeSeriesReadRequest) sharedUtils.Result[[]graphQL
 
 func Save(input graphQLModel.InputData) sharedUtils.Result[bool] {
 
-	// Save je nyní zbytečné, protože RAW data zapisuje MPU.
-	// Funkci ale necháme kvůli kompatibilitě.
-
 	log.Println("Statistics Save ignored (handled by MPU)")
 	return sharedUtils.NewSuccessResult(true)
 }
@@ -117,22 +113,22 @@ func MapStatisticsInputToReadRequestBody(
 	if simpleSensors != nil {
 		for k := range simpleSensors.Sensors {
 			s := strconv.Itoa(k)
-			req.SDInstanceUID = &s
+			req.SDInstanceUIDs = []string{s}
 			break
 		}
 	}
 
 	if sensorsWithFields != nil {
 		for _, sensor := range sensorsWithFields.Sensors {
-			req.SDInstanceUID = &sensor.Key
+			req.SDInstanceUIDs = []string{sensor.Key}
 			break
 		}
 	}
 
 	if statsInput != nil {
 
-		if statsInput.AggregateMinutes != nil {
-			req.AggregateMinutes = statsInput.AggregateMinutes
+		if statsInput.AggregateSeconds != nil {
+			req.AggregateSeconds = statsInput.AggregateSeconds
 		}
 
 		if statsInput.From != nil {
@@ -161,7 +157,7 @@ func ConvertOutputData(sharedData []sharedModel.TimeSeriesDataPoint) ([]graphQLM
 
 	for _, item := range sharedData {
 
-		timeString := item.Time.Format(time.RFC3339)
+		timeString := item.Time.Format(time.RFC3339Nano)
 
 		dataBytes, err := json.Marshal(item.Data)
 		if err != nil {

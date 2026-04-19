@@ -8,8 +8,8 @@ import (
 
 func ToDLLModelAPIKey(e dbModel.APIKeyEntity) dllModel.APIKey {
 	permissions := make([]string, 0)
-	for _, p := range e.Role.Permissions {
-		permissions = append(permissions, p.Label)
+	for _, p := range e.Permissions {
+		permissions = append(permissions, p.UID)
 	}
 	return dllModel.APIKey{
 		ID:          sharedUtils.NewOptionalOf(e.ID),

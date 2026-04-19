@@ -15,6 +15,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/graphql/gsc"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 	"github.com/gorilla/websocket"
 )
@@ -25,24 +26,67 @@ func GetHandler() http.Handler {
 	graphQLServer.AddTransport(transport.POST{})
 	graphQLServer.AddTransport(transport.Websocket{
 		KeepAlivePingInterval: 10 * time.Second,
-
 		Upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				origin := r.Header.Get("Origin")
 				return allowedOrigins.Contains(origin)
 			},
 		},
-
 		InitFunc: func(ctx context.Context, initPayload transport.InitPayload) (context.Context, *transport.InitPayload, error) {
-			tokenRaw, ok := initPayload["Authorization"]
-			if !ok {
+			if _, ok := auth.PrincipalFromContext(ctx); ok {
+				return ctx, nil, nil
+			}
+
+			apiKeyRaw := strings.TrimSpace(initPayload.GetString("X-API-Key"))
+			if apiKeyRaw == "" {
+				apiKeyRaw = strings.TrimSpace(initPayload.GetString("x-api-key"))
+				if apiKeyRaw == "" {
+					apiKeyRaw = strings.TrimSpace(initPayload.GetString("X-API-KEY"))
+				}
+			}
+			if apiKeyRaw != "" {
+				hash := sharedUtils.GenerateHexHash(apiKeyRaw)
+				apiKeyResult := domainLogicLayer.LoadAPIKeyByHash(hash)
+				if apiKeyResult.IsFailure() {
+					return ctx, nil, fmt.Errorf("unauthorized")
+				}
+				apiKeyOpt := apiKeyResult.GetPayload()
+				if apiKeyOpt.IsEmpty() {
+					return ctx, nil, fmt.Errorf("unauthorized")
+				}
+				apiKey := apiKeyOpt.GetPayload()
+				if apiKey.UserID == nil || apiKey.ID.IsEmpty() {
+					return ctx, nil, fmt.Errorf("invalid api key")
+				}
+				roleResult := domainLogicLayer.LoadUserRole(*apiKey.UserID)
+				if roleResult.IsFailure() {
+					return ctx, nil, fmt.Errorf("unauthorized")
+				}
+				rolePermissions := make(map[string]bool, len(roleResult.GetPayload().Permissions))
+				for _, permission := range roleResult.GetPayload().Permissions {
+					rolePermissions[permission.UID] = true
+				}
+				allowed := make(map[string]bool, len(apiKey.Permissions))
+				for _, permission := range apiKey.Permissions {
+					if rolePermissions[permission] {
+						allowed[permission] = true
+					}
+				}
+				apiKeyID := apiKey.ID.GetPayload()
+				principal := auth.Principal{
+					Type:              auth.PrincipalAPIKey,
+					UserID:            *apiKey.UserID,
+					APIKeyID:          &apiKeyID,
+					AllowedOperations: allowed,
+					SynchronizedAt:    time.Now(),
+				}
+				return auth.ContextWithPrincipal(ctx, &principal), nil, nil
+			}
+
+			tokenStr := strings.TrimPrefix(initPayload.Authorization(), "Bearer ")
+			if tokenStr == "" {
 				return ctx, nil, fmt.Errorf("missing auth")
 			}
-			tokenStr, ok := tokenRaw.(string)
-			if !ok {
-				return ctx, nil, fmt.Errorf("invalid auth format")
-			}
-			tokenStr = strings.TrimPrefix(tokenStr, "Bearer ")
 			token, err := auth.ParseJWT(tokenStr)
 			if err != nil {
 				return ctx, nil, fmt.Errorf("unauthorized")

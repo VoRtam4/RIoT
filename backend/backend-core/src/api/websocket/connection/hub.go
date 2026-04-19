@@ -24,8 +24,11 @@ func (h *Hub) Register(c *Client) {
 func (h *Hub) Unregister(c *Client) {
 	h.Mutex.Lock()
 	delete(h.Clients, c)
-	close(c.Send)
 	h.Mutex.Unlock()
+	for _, closeFn := range c.Subscriptions {
+		closeFn()
+	}
+	close(c.Send)
 }
 
 func (h *Hub) StartEventListener(listener func(h *Hub)) {
