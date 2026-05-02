@@ -17,3 +17,16 @@ debug.sh
 
 pg
 pg_backup
+
+backend/*preprocessor
+backend/*downloader
+
+.sync
+docs
+backend/Lissy
+backend/Analyticity*
+
+# Ignore local testing artifacts
+testing/.state/
+testing/outputs/
+testing/**/__pycache__/

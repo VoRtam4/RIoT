@@ -42,30 +42,27 @@ func main() {
 	defer influx.Close()
 	log.Println("Time Series Store Ready")
 	sharedUtils.WaitForAll(func() {
-		if err := consumeRawRecords(influx); err != nil {
-			log.Println(err.Error())
-		}
+		runConsumerLoop("raw records", func() error { return consumeRawRecords(influx) })
 	}, func() {
-		if err := consumeKPIRecords(influx); err != nil {
-			log.Println(err.Error())
-		}
+		runConsumerLoop("kpi records", func() error { return consumeKPIRecords(influx) })
 	}, func() {
-		if err := consumeReadRequests(influx); err != nil {
-			log.Println(err.Error())
-		}
+		runConsumerLoop("read requests", func() error { return consumeReadRequests(influx) })
 	}, func() {
-		if err := consumeDistinctTagValueRequests(influx); err != nil {
-			log.Println(err.Error())
-		}
+		runConsumerLoop("distinct tag value requests", func() error { return consumeDistinctTagValueRequests(influx) })
 	}, func() {
-		if err := consumeReprocessReadRequests(influx); err != nil {
-			log.Println(err.Error())
-		}
+		runConsumerLoop("reprocess read requests", func() error { return consumeReprocessReadRequests(influx) })
 	}, func() {
-		if err := consumeDeleteRequests(influx); err != nil {
-			log.Println(err.Error())
-		}
+		runConsumerLoop("delete requests", func() error { return consumeDeleteRequests(influx) })
 	})
+}
+
+func runConsumerLoop(name string, consumer func() error) {
+	for {
+		if err := consumer(); err != nil {
+			log.Printf("[TSS] Consumer '%s' stopped: %s", name, err.Error())
+		}
+		time.Sleep(time.Second)
+	}
 }
 
 func consumeRawRecords(influx internal.Influx2Client) error {
@@ -74,9 +71,7 @@ func consumeRawRecords(influx internal.Influx2Client) error {
 	return rabbitmq.ConsumeJSONMessages[[]sharedModel.TimeSeriesRawRecord](
 		rabbitMQClient, sharedConstants.TimeSeriesRawDataQueueName,
 		func(records []sharedModel.TimeSeriesRawRecord) error {
-			for _, record := range records {
-				influx.WriteRaw(record)
-			}
+			influx.WriteRawBatch(records)
 			return nil
 		},
 	)
@@ -88,9 +83,7 @@ func consumeKPIRecords(influx internal.Influx2Client) error {
 	return rabbitmq.ConsumeJSONMessages[[]sharedModel.TimeSeriesKPIResultRecord](
 		rabbitMQClient, sharedConstants.TimeSeriesKPIResultQueueName,
 		func(records []sharedModel.TimeSeriesKPIResultRecord) error {
-			for _, record := range records {
-				influx.WriteKPI(record)
-			}
+			influx.WriteKPIBatch(records)
 			return nil
 		},
 	)
@@ -101,73 +94,82 @@ func consumeReadRequests(influx internal.Influx2Client) error {
 	defer rabbitMQClient.Dispose()
 	return rabbitmq.ConsumeJSONMessagesWithAccessToDelivery[sharedModel.TimeSeriesReadRequest](rabbitMQClient, sharedConstants.TimeSeriesReadRequestQueueName, "",
 		func(req sharedModel.TimeSeriesReadRequest, delivery amqp.Delivery) error {
-			base := map[string]string{
-				"type":      string(req.Type),
-				"sdTypeUID": req.SDTypeUID,
-			}
-			plan := internal.BuildQueryPlan(req)
-			var lastPoint *sharedModel.TimeSeriesDataPoint
-			buildCursor := func(p *sharedModel.TimeSeriesDataPoint) *sharedModel.TimeSeriesCursor {
-				if p == nil {
-					return nil
-				}
-				cursor := &sharedModel.TimeSeriesCursor{
-					Time:          p.Time,
-					SDInstanceUID: p.Tags["sdInstanceUID"],
-				}
-				if plan.IsKPI {
-					if v, ok := p.Tags["kpiDefinitionID"]; ok {
-						if parsed, err := strconv.ParseUint(v, 10, 32); err == nil {
-							kpi := uint32(parsed)
-							cursor.KPIDefinitionID = &kpi
-						}
-					}
-				}
-				return cursor
-			}
-			ch := rabbitMQClient.GetChannel()
-			publish := func(resp sharedModel.TimeSeriesReadResponse) error {
-				jsonData, err := json.Marshal(resp)
-				if err != nil {
-					return err
-				}
-				return ch.PublishWithContext(context.Background(), "", delivery.ReplyTo, false, false, amqp.Publishing{
-					ContentType:   "application/json",
-					Body:          jsonData,
-					CorrelationId: delivery.CorrelationId,
-				})
-			}
-			send := func(rows []sharedModel.TimeSeriesDataPoint, hasMoreBatches bool, hasMoreData bool) error {
-				if len(rows) > 0 {
-					p := rows[len(rows)-1]
-					lastPoint = &p
-				}
-				resp := sharedModel.TimeSeriesReadResponse{
-					Base:           base,
-					Data:           rows,
-					HasMoreBatches: hasMoreBatches,
-					HasMoreData:    hasMoreData,
-				}
-				if !hasMoreBatches {
-					cursor := buildCursor(lastPoint)
-					if cursor == nil && req.Cursor != nil {
-						cursor = req.Cursor
-					}
-					resp.NextCursor = cursor
-				}
-				return publish(resp)
-			}
-			err := influx.StreamRead(plan, send)
-			if err != nil {
-				resp := sharedModel.TimeSeriesReadResponse{
-					Base:  base,
-					Error: err.Error(),
-				}
-				return publish(resp)
-			}
+			go handleReadRequest(influx, req, delivery)
 			return nil
 		},
 	)
+}
+
+func handleReadRequest(influx internal.Influx2Client, req sharedModel.TimeSeriesReadRequest, delivery amqp.Delivery) {
+	rabbitMQClient := rabbitmq.NewClient()
+	defer rabbitMQClient.Dispose()
+
+	base := map[string]string{
+		"type":      string(req.Type),
+		"sdTypeUID": req.SDTypeUID,
+	}
+	plan := internal.BuildQueryPlan(req)
+	var lastPoint *sharedModel.TimeSeriesDataPoint
+	buildCursor := func(p *sharedModel.TimeSeriesDataPoint) *sharedModel.TimeSeriesCursor {
+		if p == nil {
+			return nil
+		}
+		cursor := &sharedModel.TimeSeriesCursor{
+			Time:          p.Time,
+			SDInstanceUID: p.Tags["sdInstanceUID"],
+		}
+		if plan.IsKPI {
+			if v, ok := p.Tags["kpiDefinitionID"]; ok {
+				if parsed, err := strconv.ParseUint(v, 10, 32); err == nil {
+					kpi := uint32(parsed)
+					cursor.KPIDefinitionID = &kpi
+				}
+			}
+		}
+		return cursor
+	}
+	ch := rabbitMQClient.GetChannel()
+	publish := func(resp sharedModel.TimeSeriesReadResponse) error {
+		jsonData, err := json.Marshal(resp)
+		if err != nil {
+			return err
+		}
+		return ch.PublishWithContext(context.Background(), "", delivery.ReplyTo, false, false, amqp.Publishing{
+			ContentType:   "application/json",
+			Body:          jsonData,
+			CorrelationId: delivery.CorrelationId,
+		})
+	}
+	send := func(rows []sharedModel.TimeSeriesDataPoint, hasMoreBatches bool, hasMoreData bool) error {
+		if len(rows) > 0 {
+			p := rows[len(rows)-1]
+			lastPoint = &p
+		}
+		resp := sharedModel.TimeSeriesReadResponse{
+			Base:           base,
+			Data:           rows,
+			HasMoreBatches: hasMoreBatches,
+			HasMoreData:    hasMoreData,
+		}
+		if !hasMoreBatches {
+			cursor := buildCursor(lastPoint)
+			if cursor == nil && req.Cursor != nil {
+				cursor = req.Cursor
+			}
+			resp.NextCursor = cursor
+		}
+		return publish(resp)
+	}
+	err := influx.StreamRead(plan, send)
+	if err != nil {
+		resp := sharedModel.TimeSeriesReadResponse{
+			Base:  base,
+			Error: err.Error(),
+		}
+		if publishErr := publish(resp); publishErr != nil {
+			log.Printf("[TSS] failed to publish read error response: %s", publishErr.Error())
+		}
+	}
 }
 
 func consumeDistinctTagValueRequests(influx internal.Influx2Client) error {

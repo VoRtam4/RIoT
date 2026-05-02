@@ -89,3 +89,21 @@ func StartTimeSeriesExport(c *connection.Client, msg sharedModel.WebSocketMessag
 		"url": url,
 	})
 }
+
+func GetTimeSeriesDistinctTagValues(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	principal := AuthorizeOperation(c, msg, auth.ResourceTimeSeries, auth.OperationRead)
+	if principal == nil {
+		return
+	}
+	input, err := parsePayload[graphQLModel.TimeSeriesDistinctTagValuesInput](msg)
+	if err != nil {
+		sendError(c, msg.ID, "invalid payload")
+		return
+	}
+	result := domainLogicLayer.DistinctTimeSeriesTagValues(principal.UserID, input)
+	if result.IsFailure() {
+		sendError(c, msg.ID, result.GetError().Error())
+		return
+	}
+	sendSuccess(c, msg.ID, result.GetPayload())
+}

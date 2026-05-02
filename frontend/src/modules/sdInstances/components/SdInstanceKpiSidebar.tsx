@@ -66,6 +66,14 @@ export default function SdInstanceKpiSidebar({
     return result;
   }, [kpis, search, sort]);
 
+  const selectedIndex = useMemo(
+    () =>
+      filtered.findIndex(
+        (kpi) => String(kpi.id) === String(selectedKpiId),
+      ),
+    [filtered, selectedKpiId],
+  );
+
   if (loading) {
     return (
       <div className="d-flex h-100 justify-content-center align-items-center">
@@ -80,6 +88,7 @@ export default function SdInstanceKpiSidebar({
       style={{ height: "100%", minHeight: 0 }}
     >
       <h5 className="mb-3">KPIs</h5>
+
       {/* SORT */}
       <div className="mb-3">
         <label className="form-label">Sort</label>
@@ -112,8 +121,12 @@ export default function SdInstanceKpiSidebar({
         <VirtualizedList
           items={filtered}
           rowHeight={84}
+          scrollToIndex={selectedIndex}
+          pinnedIndex={selectedIndex}
           style={{ height: "100%" }}
-          emptyState={<div className="text-muted small form-label">No results</div>}
+          emptyState={
+            <div className="text-muted small form-label">No results</div>
+          }
           renderItem={(kpi) => (
             <SdInstanceKpiCard
               key={kpi.id}

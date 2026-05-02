@@ -235,6 +235,30 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   line-height: 1.5;
 }
 
+.api-docs-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.api-docs-meta-card {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.api-docs-inline-code {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #0b1220;
+  border: 1px solid var(--border-color);
+  color: #d9e2ec;
+}
+
 @media (max-width: 992px) {
   .api-docs-layout {
     grid-template-columns: 1fr;
@@ -243,5 +267,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   .api-docs-sidebar {
     position: static;
     max-height: none;
+  }
+
+  .api-docs-meta-grid {
+    grid-template-columns: 1fr;
   }
 }

@@ -40,9 +40,9 @@ var RolePermissions = map[string]map[string]bool{
 		ResourceSDTypes + "." + OperationDelete:    true,
 		ResourceSDTypes + "." + OperationSubscribe: true,
 
-		ResourceSDInstances + "." + OperationRead:   true,
+		ResourceSDInstances + "." + OperationRead:      true,
 		ResourceSDInstances + "." + OperationSubscribe: true,
-		ResourceSDInstances + "." + OperationUpdate: true,
+		ResourceSDInstances + "." + OperationUpdate:    true,
 
 		ResourceKPIDefinitions + "." + OperationRead:   true,
 		ResourceKPIDefinitions + "." + OperationCreate: true,
@@ -75,7 +75,7 @@ var RolePermissions = map[string]map[string]bool{
 		ResourceSDTypes + "." + OperationRead:      true,
 		ResourceSDTypes + "." + OperationSubscribe: true,
 
-		ResourceSDInstances + "." + OperationRead: true,
+		ResourceSDInstances + "." + OperationRead:      true,
 		ResourceSDInstances + "." + OperationSubscribe: true,
 
 		ResourceKPIDefinitions + "." + OperationRead: true,
@@ -99,9 +99,7 @@ var RolePermissions = map[string]map[string]bool{
 
 		ResourceRoles + "." + OperationRead: true,
 	},
-	RoleGuest: {
-		ResourceTimeSeries + "." + OperationSubscribe: true,
-	},
+	RoleGuest: {},
 }
 
 func GetAllRoleUIDs() []string {

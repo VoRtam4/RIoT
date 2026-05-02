@@ -1,20 +1,23 @@
-import { useQuery } from "@apollo/client/react";
-import { ApiKeysDocument, type ApiKeysQuery } from "../../../generated/graphql";
+import { useEffect } from "react";
+import { useApiKeysStore } from "../stores/apiKeysStore";
 
 export const useApiKeys = () => {
-  const { data, loading, error, refetch } = useQuery<ApiKeysQuery>(
-    ApiKeysDocument,
-    {
-      fetchPolicy: "cache-and-network",
-    },
-  );
+  const ensure = useApiKeysStore((s) => s.ensure);
+  const refresh = useApiKeysStore((s) => s.refresh);
+  const entry = useApiKeysStore((s) => s.entry);
 
-  const apiKeys = data?.apiKeys ?? [];
+  useEffect(() => {
+    if (!entry) {
+      void refresh();
+    } else {
+      void ensure();
+    }
+  }, [entry, ensure, refresh]);
 
   return {
-    apiKeys,
-    loading,
-    error,
-    refetch,
+    entry,
+    apiKeys: entry?.raw ?? [],
+    loading: entry?.isLoading ?? true,
+    error: entry?.error ?? null,
   };
 };

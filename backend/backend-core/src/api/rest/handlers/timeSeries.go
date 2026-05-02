@@ -9,11 +9,8 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
-	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 	"github.com/go-chi/chi/v5"
 )
-
-var address = sharedUtils.GetEnvironmentVariableValue("BACKEND_CORE_URL").GetPayloadOrDefault("http://localhost:9090")
 
 func ReadTimeSeries(w http.ResponseWriter, r *http.Request) {
 	principal := authorizeOperation(w, r, auth.ResourceTimeSeries, auth.OperationRead)
@@ -89,7 +86,7 @@ func StartTimeSeriesExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	json.NewEncoder(w).Encode(map[string]string{
-		"url": address + "/rest/time-series/export/" + url,
+		"url": "/rest/time-series/export/" + url,
 	})
 }
 
@@ -110,12 +107,12 @@ func StartTimeSeriesExportAggregateKpi(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	json.NewEncoder(w).Encode(map[string]string{
-		"url": address + "/rest/time-series/export/" + url,
+		"url": "/rest/time-series/export/" + url,
 	})
 }
 
 func TimeSeriesExport(w http.ResponseWriter, r *http.Request) {
-	if principal := authorizeOperation(w, r, auth.ResourceTimeSeries, auth.OperationSubscribe); principal == nil {
+	if principal := authorizeOperation(w, r, auth.ResourceTimeSeries, auth.OperationRead); principal == nil {
 		return
 	}
 	id := chi.URLParam(r, "id")

@@ -18,7 +18,7 @@ type Instance = {
 type Props = {
   instances?: Instance[];
   selectedInstanceId?: string | null;
-  loading?: any;
+  loading?: boolean;
   onSelect: (id: string) => void;
 };
 
@@ -47,17 +47,17 @@ export default function KpiInstanceSidebar({
     sortOptions.find((o) => o.value === sort) ?? sortOptions[0];
 
   const filtered = useMemo(() => {
-    if (!instances || instances.length === 0) return [];
+    if (!instances.length) return [];
 
-    let result = [...instances];
+    let result = instances;
 
     if (search.trim()) {
-      result = result.filter((i) => {
-        return matchesSearchText(search, i.label, i.uid);
-      });
+      result = result.filter((i) =>
+        matchesSearchText(search, i.label, i.uid),
+      );
     }
 
-    result.sort((a, b) => {
+    result = [...result].sort((a, b) => {
       const aLabel = (a.label ?? a.uid ?? "").toLowerCase();
       const bLabel = (b.label ?? b.uid ?? "").toLowerCase();
 
@@ -70,6 +70,14 @@ export default function KpiInstanceSidebar({
     return result;
   }, [instances, search, sort]);
 
+  const selectedIndex = useMemo(
+    () =>
+      filtered.findIndex(
+        (inst) => String(inst.id) === String(selectedInstanceId),
+      ),
+    [filtered, selectedInstanceId],
+  );
+
   if (loading) {
     return (
       <div className="d-flex h-100 justify-content-center align-items-center">
@@ -81,9 +89,14 @@ export default function KpiInstanceSidebar({
   return (
     <div
       className="card p-3 d-flex flex-column"
-      style={{ height: "100%", minHeight: 0 }}
+      style={{
+        height: "100%",
+        minHeight: 0,
+        overflow: "hidden",
+      }}
     >
       <h5 className="mb-3">Devices</h5>
+
       {/* SORT */}
       <div className="mb-3">
         <label className="form-label">Sort</label>
@@ -112,12 +125,24 @@ export default function KpiInstanceSidebar({
       </div>
 
       {/* LIST */}
-      <Box sx={{ flex: 1, minHeight: 0 }}>
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflow: "hidden",
+        }}
+      >
         <VirtualizedList
           items={filtered}
           rowHeight={84}
+          scrollToIndex={selectedIndex}
+          pinnedIndex={selectedIndex}
           style={{ height: "100%" }}
-          emptyState={<div className="text-muted small form-label">No results</div>}
+          emptyState={
+            <div className="text-muted small form-label">
+              No results
+            </div>
+          }
           renderItem={(inst) => (
             <KpiInstanceCard
               key={inst.id}

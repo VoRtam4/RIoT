@@ -1,27 +1,28 @@
-import { useQuery } from "@apollo/client/react";
-import {
-  SdInstancesByTypeDocument,
-  type SdInstancesByTypeQuery,
-  type SdInstancesByTypeQueryVariables,
-} from "../../../generated/graphql";
+import { useEffect } from "react";
+import { useSdInstancesStore } from "../stores/sdInstancesStore";
 
-export const useSdInstancesByType = (sdTypeID: string | null) => {
-  const { data, loading, error } = useQuery<
-    SdInstancesByTypeQuery,
-    SdInstancesByTypeQueryVariables
-  >(SdInstancesByTypeDocument, {
-    skip: !sdTypeID,
-    variables: {
-      id: sdTypeID ?? "",
-    },
-    fetchPolicy: "cache-and-network",
-  });
+export const useSdInstancesByType = (typeId: string | null) => {
+  const ensure = useSdInstancesStore((s) => s.ensure);
+  const refresh = useSdInstancesStore((s) => s.refresh);
 
-  const sdInstances = data?.sdInstancesByType ?? [];
+  const entry = useSdInstancesStore((s) =>
+    typeId ? s.byType[typeId] : undefined,
+  );
+
+  useEffect(() => {
+    if (!typeId) return;
+
+    if (!entry) {
+      void refresh(typeId);
+    } else {
+      void ensure(typeId);
+    }
+  }, [typeId, entry, ensure, refresh]);
 
   return {
-    sdInstances,
-    loading,
-    error,
+    entry,
+    sdInstances: entry?.rawSortedAsc ?? [],
+    loading: typeId ? entry?.isLoading ?? true : false,
+    error: entry?.error ?? null,
   };
 };

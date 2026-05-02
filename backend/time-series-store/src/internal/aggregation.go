@@ -3,24 +3,12 @@ package internal
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedModel"
 )
-
-func makeKey(sdType string, kpiID uint32) string {
-	return fmt.Sprintf("%s|%d", sdType, kpiID)
-}
-
-func isActive(jobKey string, jobID string) bool {
-	v, ok := activeReprocessJobs.Load(jobKey)
-	if !ok {
-		return false
-	}
-	job, ok := v.(string)
-	return ok && job == jobID
-}
 
 func extractTags(values map[string]interface{}) map[string]string {
 	tags := make(map[string]string)
@@ -69,105 +57,6 @@ func minTime(a, b time.Time) time.Time {
 		return a
 	}
 	return b
-}
-
-func buildTagFilterFlux(node *sharedModel.FilterNode) (string, bool) {
-	if node == nil {
-		return "", false
-	}
-	expr := buildFilterExpr(node)
-	if expr == "" {
-		return "", false
-	}
-	return fmt.Sprintf(`|> filter(fn: (r) => %s)`, expr), true
-}
-
-func buildFilterExpr(node *sharedModel.FilterNode) string {
-	if node == nil {
-		return ""
-	}
-	switch node.Type {
-	case sharedModel.FilterNodeTypeRule:
-		return buildRuleExpr(node.Rule)
-	case sharedModel.FilterNodeTypeLogical:
-		if node.Operator == sharedModel.LogicalNot {
-			if len(node.Nodes) != 1 {
-				return ""
-			}
-			inner := buildFilterExpr(&node.Nodes[0])
-			if inner == "" {
-				return ""
-			}
-			return fmt.Sprintf("not (%s)", inner)
-		}
-		parts := make([]string, 0, len(node.Nodes))
-		for _, n := range node.Nodes {
-			expr := buildFilterExpr(&n)
-			if expr != "" {
-				parts = append(parts, expr)
-			}
-		}
-		if len(parts) == 0 {
-			return ""
-		}
-		op := "and"
-		if node.Operator == sharedModel.LogicalOr {
-			op = "or"
-		}
-		return "(" + strings.Join(parts, " "+op+" ") + ")"
-	}
-	return ""
-}
-
-func buildRuleExpr(rule *sharedModel.FilterRule) string {
-	if rule == nil {
-		return ""
-	}
-
-	tag := fmt.Sprintf(`r["%s"]`, rule.Tag)
-
-	switch rule.Operator {
-	case sharedModel.OpEQ:
-		return fmt.Sprintf(`%s == %q`, tag, rule.Value)
-
-	case sharedModel.OpNEQ:
-		return fmt.Sprintf(`%s != %q`, tag, rule.Value)
-
-	case sharedModel.OpContains:
-		return fmt.Sprintf(`strings.containsStr(v: %s, substr: %q)`, tag, rule.Value)
-
-	case sharedModel.OpPrefix:
-		return fmt.Sprintf(`strings.hasPrefix(v: %s, prefix: %q)`, tag, rule.Value)
-
-	case sharedModel.OpSuffix:
-		return fmt.Sprintf(`strings.hasSuffix(v: %s, suffix: %q)`, tag, rule.Value)
-
-	case sharedModel.OpRegex:
-		return fmt.Sprintf(`%s =~ /%s/`, tag, escapeFluxRegex(rule.Value))
-
-	case sharedModel.OpIn:
-		values := strings.Split(rule.Value, ",")
-		parts := make([]string, 0, len(values))
-		for _, v := range values {
-			v = strings.TrimSpace(v)
-			if v == "" {
-				continue
-			}
-			parts = append(parts, fmt.Sprintf(`%s == %q`, tag, v))
-		}
-		if len(parts) == 0 {
-			return ""
-		}
-		return "(" + strings.Join(parts, " or ") + ")"
-	}
-
-	return ""
-}
-
-func escapeFluxRegex(s string) string {
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	s = strings.ReplaceAll(s, `/`, `\/`)
-	return s
 }
 
 func (s *aggregateSeriesState) addDuration(from, to time.Time) {
@@ -298,6 +187,7 @@ func (c Influx2Client) flushAggregateWindow(plan sharedModel.QueryPlan, state *a
 		series.resetWindow()
 		if plan.Limit > 0 && state.totalSent >= plan.Limit {
 			if len(state.pointsBatch) > 0 {
+				state.needsTerminal = false
 				if err := onBatch(state.pointsBatch, false, hasMoreData); err != nil {
 					return true, err
 				}
@@ -306,6 +196,7 @@ func (c Influx2Client) flushAggregateWindow(plan sharedModel.QueryPlan, state *a
 			return true, nil
 		}
 		if plan.Batch > 0 && len(state.pointsBatch) >= plan.Batch {
+			state.needsTerminal = true
 			if err := onBatch(state.pointsBatch, true, hasMoreData); err != nil {
 				return false, err
 			}
@@ -337,4 +228,125 @@ func (c Influx2Client) advanceAggregateWindows(plan sharedModel.QueryPlan, state
 		state.windowStart = windowEnd
 	}
 	return false, nil
+}
+
+func (c Influx2Client) streamReadAggregated(plan sharedModel.QueryPlan, onBatch func([]sharedModel.TimeSeriesDataPoint, bool, bool) error) error {
+	if !plan.IsKPI {
+		return fmt.Errorf("aggregation only supported for KPI")
+	}
+	if plan.SortDesc {
+		return fmt.Errorf("descending aggregation not implemented yet")
+	}
+	if plan.AggregateSeconds == nil || *plan.AggregateSeconds <= 0 {
+		return fmt.Errorf("invalid aggregate seconds")
+	}
+	if !plan.To.After(plan.From) {
+		return onBatch(nil, false, false)
+	}
+	effectiveFrom, err := c.resolveEffectivePlanFrom(plan)
+	if err != nil {
+		return err
+	}
+	if !plan.To.After(effectiveFrom) {
+		return onBatch(nil, false, false)
+	}
+	windowSize := time.Duration(*plan.AggregateSeconds) * time.Second
+	state := &aggregateStreamState{
+		totalSent:   0,
+		pointsBatch: make([]sharedModel.TimeSeriesDataPoint, 0, plan.Batch),
+		series:      make(map[string]*aggregateSeriesState),
+		seriesOrder: make([]string, 0),
+		windowStart: effectiveFrom.UTC(),
+		windowSize:  windowSize,
+	}
+	snapshotPlan := plan
+	snapshotPlan.From = effectiveFrom
+	snapshotFlux := c.buildSnapshotFlux(snapshotPlan)
+	_, err = c.iterateFluxPoints(snapshotFlux, plan, true, func(p sharedModel.TimeSeriesDataPoint) (bool, error) {
+		key := buildAggregateKey(p.Tags)
+		val, ok := extractFulfilled(p)
+		if !ok {
+			return false, nil
+		}
+		if _, exists := state.series[key]; exists {
+			return false, nil
+		}
+			state.series[key] = &aggregateSeriesState{
+				Key:           key,
+				Tags:          cloneTags(p.Tags),
+				LastBool:      val,
+				LastTime:      effectiveFrom.UTC(),
+				HasLastValue:  true,
+				HasFullWindow: true,
+			}
+		state.seriesOrder = append(state.seriesOrder, key)
+		return false, nil
+	})
+	if err != nil {
+		return err
+	}
+	sort.Strings(state.seriesOrder)
+	hitLimit := false
+	for _, window := range buildTimeWindows(effectiveFrom, plan.To, false) {
+		readFlux := c.buildReadFluxForRange(plan, window.From, window.To)
+		chunkHitLimit, err := c.iterateFluxPoints(readFlux, plan, false, func(p sharedModel.TimeSeriesDataPoint) (bool, error) {
+			t := p.Time.UTC()
+			hitLimit, err := c.advanceAggregateWindows(plan, state, t, onBatch)
+			if err != nil || hitLimit {
+				return hitLimit, err
+			}
+			key := buildAggregateKey(p.Tags)
+			val, ok := extractFulfilled(p)
+			if !ok {
+				return false, nil
+			}
+			series, exists := state.series[key]
+			if !exists {
+				series = &aggregateSeriesState{
+					Key:           key,
+					Tags:          cloneTags(p.Tags),
+					LastBool:      val,
+					LastTime:      t,
+					HasLastValue:  true,
+					HasFullWindow: false,
+				}
+				state.series[key] = series
+				state.seriesOrder = append(state.seriesOrder, key)
+				sort.Strings(state.seriesOrder)
+				return false, nil
+			}
+			if series.HasLastValue && t.After(series.LastTime) {
+				series.addDuration(series.LastTime, t)
+			}
+			series.LastBool = val
+			series.LastTime = t
+			return false, nil
+		})
+		if err != nil {
+			return err
+		}
+		if chunkHitLimit {
+			hitLimit = true
+			return nil
+		}
+	}
+	hitLimit, err = c.advanceAggregateWindows(plan, state, plan.To.UTC(), onBatch)
+	if err != nil {
+		return err
+	}
+	if hitLimit {
+		return nil
+	}
+	if len(state.pointsBatch) > 0 {
+		state.needsTerminal = false
+		return onBatch(state.pointsBatch, false, false)
+	}
+	if state.needsTerminal {
+		state.needsTerminal = false
+		return onBatch(nil, false, false)
+	}
+	if state.totalSent == 0 {
+		return onBatch(nil, false, false)
+	}
+	return nil
 }

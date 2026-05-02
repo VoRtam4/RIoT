@@ -32,19 +32,30 @@ func ProcessIncomingMessageProcessingUnitConnectionNotifications() {
 func ProcessIncomingSDInstanceRegistrationRequests() {
 	rabbitMQClient := rabbitmq.NewClient()
 	defer rabbitMQClient.Dispose()
-	consumeSDInstanceRegistrationRequestJSONMessages(func(msg sharedModel.SDInstanceRegistrationRequestISCMessage) error {
-		log.Printf("SD instance registrace: %s", msg.SDTypeUID)
-		result := dbClient.GetRelationalDatabaseClientInstance().UpsertSDInstance(msg.SDInstanceUID, msg.SDTypeUID, msg.Label)
-		if result.IsSuccess() {
-			instance := result.GetPayload()
-			events.GetEventBus().Publish(events.SDInstanceRegisteredEventType, dll2gql.ToGraphQLModelSDInstance(instance))
+	consumeSDInstanceRegistrationRequestJSONMessages(func(tuple sharedModel.SDInstanceRegistrationRequestTupleISCMessage) error {
+		if len(tuple) == 0 {
 			return nil
 		}
-		err := result.GetError()
-		if errors.Is(err, dbClient.ErrOperationWouldLeadToForeignKeyIntegrityBreach) {
-			return fmt.Errorf("SDType not ready yet for uid=%s type=%s", msg.SDInstanceUID, msg.SDTypeUID)
+		updated := false
+		for _, msg := range tuple {
+			log.Printf("SD instance registrace: %s", msg.SDTypeUID)
+			result := dbClient.GetRelationalDatabaseClientInstance().UpsertSDInstance(msg.SDInstanceUID, msg.SDTypeUID, msg.Label)
+			if result.IsSuccess() {
+				instance := result.GetPayload()
+				events.GetEventBus().Publish(events.SDInstanceRegisteredEventType, dll2gql.ToGraphQLModelSDInstance(instance))
+				updated = true
+				continue
+			}
+			err := result.GetError()
+			if errors.Is(err, dbClient.ErrOperationWouldLeadToForeignKeyIntegrityBreach) {
+				return fmt.Errorf("SDType not ready yet for uid=%s type=%s", msg.SDInstanceUID, msg.SDTypeUID)
+			}
+			return fmt.Errorf("failed to persist SD instance (uid=%s type=%s): %w", msg.SDInstanceUID, msg.SDTypeUID, err)
 		}
-		return fmt.Errorf("failed to persist SD instance (uid=%s type=%s): %w", msg.SDInstanceUID, msg.SDTypeUID, err)
+		if updated {
+			EnqueueMessageRepresentingCurrentSDInstanceConfiguration(rabbitMQClient)
+		}
+		return nil
 	}, rabbitMQClient)
 }
 
@@ -155,8 +166,11 @@ func ProcessIncomingKPIFulfillmentCheckResults() {
 func ProcessIncomingSDTypeRegistrationRequests() {
 	rabbitMQClient := rabbitmq.NewClient()
 	defer rabbitMQClient.Dispose()
-	rabbitmq.ConsumeJSONMessages[sharedModel.SDTypeRegistrationRequestISCMessage](rabbitMQClient, sharedConstants.SDTypeRegistrationRequestsQueueName,
-		func(message sharedModel.SDTypeRegistrationRequestISCMessage) error {
+	consumeSDTypeRegistrationRequestJSONMessages(func(tuple sharedModel.SDTypeRegistrationRequestTupleISCMessage) error {
+		if len(tuple) == 0 {
+			return nil
+		}
+		for _, message := range tuple {
 			params := make([]dllModel.SDParameter, 0)
 			for _, p := range message.Parameters {
 				if message.SDTypeUID == "" {
@@ -178,11 +192,11 @@ func ProcessIncomingSDTypeRegistrationRequests() {
 			if result.IsFailure() {
 				return result.GetError()
 			}
-			EnqueueMessageRepresentingCurrentSDTypeConfiguration(rabbitMQClient)
 			log.Printf("SDType %s registrován (params=%d).", message.SDTypeUID, len(params))
-			return nil
-		},
-	)
+		}
+		EnqueueMessageRepresentingCurrentSDTypeConfiguration(rabbitMQClient)
+		return nil
+	}, rabbitMQClient)
 }
 
 func EnqueueMessageRepresentingCurrentSDTypeConfiguration(rabbitMQClient rabbitmq.Client) {

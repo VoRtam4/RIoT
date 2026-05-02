@@ -2,7 +2,6 @@ package internal
 
 import (
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -15,6 +14,7 @@ func BuildQueryPlan(req sharedModel.TimeSeriesReadRequest) sharedModel.QueryPlan
 	plan.Type = req.Type
 	plan.IsKPI = plan.Type == sharedModel.TimeSeriesTypeKPIResult
 	if req.SortDesc != nil {
+		plan.UseSort = true
 		plan.SortDesc = *req.SortDesc
 	}
 	if req.To == nil {
@@ -37,20 +37,22 @@ func BuildQueryPlan(req sharedModel.TimeSeriesReadRequest) sharedModel.QueryPlan
 		plan.NeedInitial = true
 	}
 	if req.Cursor != nil {
-		plan.Cursor = req.Cursor
-		plan.UseCursor = true
-		if !plan.UseAggregation {
-			if plan.SortDesc {
-				plan.To = req.Cursor.Time.UTC().Add(time.Nanosecond)
-			} else {
-				plan.From = req.Cursor.Time.UTC()
+		if plan.UseSort {
+			plan.Cursor = req.Cursor
+			plan.UseCursor = true
+			if !plan.UseAggregation {
+				if plan.SortDesc {
+					plan.To = req.Cursor.Time.UTC().Add(time.Nanosecond)
+				} else {
+					plan.From = req.Cursor.Time.UTC()
+				}
 			}
 		}
 	}
 	if !plan.From.IsZero() && plan.From.After(plan.To) {
 		plan.From = plan.To
 	}
-	if !plan.SortDesc && !plan.From.IsZero() {
+	if plan.UseSort && !plan.SortDesc && !plan.From.IsZero() {
 		plan.NeedInitial = true
 	}
 	plan.SDTypeUID = req.SDTypeUID
@@ -74,7 +76,11 @@ func BuildQueryPlan(req sharedModel.TimeSeriesReadRequest) sharedModel.QueryPlan
 	if req.Limit != nil && *req.Limit > 0 {
 		plan.Limit = *req.Limit
 	}
-
+	if plan.IsKPI {
+		plan.NeedGrouping = len(plan.KPIDefinitionIDs) != 1 || len(plan.SDInstanceUIDs) != 1
+	} else {
+		plan.NeedGrouping = len(plan.SDInstanceUIDs) != 1
+	}
 	if req.Batch != nil && *req.Batch > 0 {
 		plan.Batch = *req.Batch
 	} else {
@@ -86,13 +92,11 @@ func BuildQueryPlan(req sharedModel.TimeSeriesReadRequest) sharedModel.QueryPlan
 	)
 	if len(plan.SDInstanceUIDs) > 0 {
 		plan.HasInstanceFilter = true
-
 		parts := make([]string, 0, len(plan.SDInstanceUIDs))
 		for _, id := range plan.SDInstanceUIDs {
 			parts = append(parts,
 				fmt.Sprintf(`r["sdInstanceUID"] == "%s"`, id))
 		}
-
 		plan.InstanceFilterFlux = fmt.Sprintf(
 			`|> filter(fn: (r) => %s)`,
 			strings.Join(parts, " or "),
@@ -111,6 +115,5 @@ func BuildQueryPlan(req sharedModel.TimeSeriesReadRequest) sharedModel.QueryPlan
 		plan.TagFilterFlux, plan.HasTagFilter =
 			buildTagFilterFlux(req.Filters)
 	}
-	log.Printf("[TS][PLAN FULL] %+v", plan)
 	return plan
 }

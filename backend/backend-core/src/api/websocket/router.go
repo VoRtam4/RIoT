@@ -59,6 +59,7 @@ var requestHandlers = map[string]RequestHandler{
 	"time-series-export":               handlers.StartTimeSeriesExport,
 	"time-series-aggregate-kpi":        handlers.StreamTimeSeriesAggregateKpi,
 	"time-series-export-aggregate-kpi": handlers.StartTimeSeriesExportAggregateKpi,
+	"time-series-distinct-tag-values":  handlers.GetTimeSeriesDistinctTagValues,
 }
 
 type RequestHandler func(c *connection.Client, msg sharedModel.WebSocketMessage)

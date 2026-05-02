@@ -21,7 +21,7 @@ type Influx2Client struct {
 	organization string
 	bucket       string
 	client       influxdb2.Client
-	writeApi     api.WriteAPIBlocking
+	writeApi     api.WriteAPI
 	queryApi     api.QueryAPI
 }
 
@@ -30,6 +30,7 @@ type streamState struct {
 	pointsBatch  []sharedModel.TimeSeriesDataPoint
 	cursorPassed bool
 	hadAnyData   bool
+	needsTerminal bool
 }
 
 type aggregateSeriesState struct {
@@ -51,6 +52,7 @@ type aggregateStreamState struct {
 	pointsBatch []sharedModel.TimeSeriesDataPoint
 
 	cursorPassed bool
+	needsTerminal bool
 
 	series      map[string]*aggregateSeriesState
 	seriesOrder []string

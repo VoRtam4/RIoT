@@ -52,7 +52,7 @@ export default function KpiEditorForm({ kpiId }: Props) {
     [sdTypes, sdTypeID],
   );
 
-  const { sdInstances, loading: instancesLoading } =
+  const { entry: instancesEntry, loading: instancesLoading } =
     useSdInstancesByType(sdTypeID);
 
   const parameters = useMemo(() => {
@@ -95,12 +95,12 @@ export default function KpiEditorForm({ kpiId }: Props) {
 
   const instanceOptions: Option[] = useMemo(
     () =>
-      sdInstances.map((i) => ({
+      (instancesEntry?.rawSortedAsc ?? []).map((i) => ({
         value: String(i.id),
         label: i.label || i.uid,
         searchText: buildOptionSearchText(i.label, i.uid, String(i.id)),
       })),
-    [sdInstances],
+    [instancesEntry],
   );
 
   const selectedInstanceOptions = useMemo(() => {
@@ -195,7 +195,7 @@ export default function KpiEditorForm({ kpiId }: Props) {
       let result;
 
       if (isEdit && kpiId) {
-        result = await updateKpi(kpiId, input);
+        result = await updateKpi(kpiId, kpi?.sdTypeID ?? "0", input);
         toast.success("KPI updated");
       } else {
         result = await createKpi(input);
@@ -218,7 +218,7 @@ export default function KpiEditorForm({ kpiId }: Props) {
     if (!confirmed) return;
 
     try {
-      const ok = await deleteKpi(kpiId);
+      const ok = await deleteKpi(kpiId, kpi?.sdTypeID ?? "0");
 
       if (!ok) throw new Error("Delete failed");
 

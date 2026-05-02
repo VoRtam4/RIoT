@@ -4,6 +4,7 @@ import {
   type CreateKpiDefinitionMutation,
   type CreateKpiDefinitionMutationVariables,
 } from "../../../generated/graphql";
+import { useKpiDefinitionsBySdTypeStore } from "../stores/kpiDefinitionsBySdTypeStore";
 
 export const useCreateKpi = () => {
   const [createKpiMutation, { loading, error }] = useMutation<
@@ -18,7 +19,15 @@ export const useCreateKpi = () => {
       variables: { input },
     });
 
-    return res.data?.createKPIDefinition ?? null;
+    const created = res.data?.createKPIDefinition ?? null;
+
+    if (created && input.sdTypeID) {
+      await useKpiDefinitionsBySdTypeStore
+        .getState()
+        .refresh(input.sdTypeID);
+    }
+
+    return created;
   };
 
   return {

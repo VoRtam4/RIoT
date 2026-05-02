@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useQuery } from "@apollo/client/react";
 import { RoleDocument, type RoleQuery } from "../../../generated/graphql";
-import { useAuthStore } from "../store/authStore";
+import { useAuthStore } from "../stores/authStore";
 
 export const usePermissions = () => {
   const userId = useAuthStore((s) => s.userId);

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../modules/auth/hooks/useAuth";
-import { useAuthStore } from "../modules/auth/store/authStore";
+import { useAuthStore } from "../modules/auth/stores/authStore";
 
 type Props = {
   children: ReactNode;

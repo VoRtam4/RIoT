@@ -25,15 +25,16 @@ export const useTimeSeries = (input: TimeSeriesReadInput, enabled: boolean) => {
     refetchOnWindowFocus: false,
 
     queryFn: async ({ pageParam }) => {
-      const cursor: TimeSeriesCursorInput | undefined = pageParam
-        ? {
-            time: pageParam.time,
-            sdInstanceUID: pageParam.sdInstanceUID,
-            ...(pageParam.kpiDefinitionID
-              ? { kpiDefinitionID: pageParam.kpiDefinitionID }
-              : {}),
-          }
-        : undefined;
+      let cursor: TimeSeriesCursorInput | undefined;
+      if (input.sortDesc != null && pageParam) {
+        cursor = {
+          time: pageParam.time,
+          sdInstanceUID: pageParam.sdInstanceUID,
+          ...(pageParam.kpiDefinitionID
+            ? { kpiDefinitionID: pageParam.kpiDefinitionID }
+            : {}),
+        };
+      }
 
       const request: TimeSeriesReadInput = {
         ...input,
@@ -57,7 +58,11 @@ export const useTimeSeries = (input: TimeSeriesReadInput, enabled: boolean) => {
     },
 
     getNextPageParam: (lastPage) =>
-      lastPage.hasMoreData ? (lastPage.nextCursor ?? null) : undefined,
+      input.sortDesc == null
+        ? undefined
+        : lastPage.hasMoreData
+          ? (lastPage.nextCursor ?? null)
+          : undefined,
   });
 
   const data = query.data?.pages.flatMap((p) => p.data) ?? [];

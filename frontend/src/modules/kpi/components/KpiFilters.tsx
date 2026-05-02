@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import Select from "react-select";
 import {
   buildOptionSearchText,
@@ -6,11 +6,7 @@ import {
 } from "../../../utils/reactSelectSearch";
 import { virtualizedSelectProps } from "../../../utils/reactSelectVirtualized";
 
-export type SortOption =
-  | "label_asc"
-  | "label_desc"
-  | "type_asc"
-  | "type_desc";
+export type SortOption = "label_asc" | "label_desc";
 
 export type ModeFilter = "ALL_MODES" | "all" | "selected";
 
@@ -60,25 +56,22 @@ export default function KpiFilters({
   const sortOptions: Option[] = [
     { value: "label_asc", label: "Name ↑" },
     { value: "label_desc", label: "Name ↓" },
-    { value: "type_asc", label: "Type ↑" },
-    { value: "type_desc", label: "Type ↓" },
   ];
 
   const modeOptions: Option[] = [
     { value: "ALL_MODES", label: "\u00A0" },
-    { value: "ALL", label: "ALL" },
-    { value: "SELECTED", label: "SELECTED" },
+    { value: "all", label: "ALL" },
+    { value: "selected", label: "SELECTED" },
   ];
 
   return (
     <div className="card p-3 mb-3">
       <div className="row g-3">
-        {/* SEARCH */}
         <div className="col-md-3">
           <label className="form-label">Search</label>
           <input
             className="form-control"
-            placeholder="Name, KPI ID or type..."
+            placeholder="Name or KPI ID..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -87,7 +80,6 @@ export default function KpiFilters({
           />
         </div>
 
-        {/* SD TYPE */}
         <div className="col-md-3">
           <label className="form-label">Model</label>
           <Select<Option, false>
@@ -104,7 +96,6 @@ export default function KpiFilters({
           />
         </div>
 
-        {/* SORT */}
         <div className="col-md-3">
           <label className="form-label">Sort</label>
           <Select<Option, false>
@@ -122,7 +113,6 @@ export default function KpiFilters({
           />
         </div>
 
-        {/* MODE */}
         <div className="col-md-3">
           <label className="form-label">Mode</label>
           <Select<Option, false>

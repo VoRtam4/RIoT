@@ -4,7 +4,7 @@ import {
   UserConfigDocument,
   type UserConfigQuery,
 } from "../../../generated/graphql";
-import { useAuthStore } from "../store/authStore";
+import { useAuthStore } from "../stores/authStore";
 
 export const useAuth = () => {
   const setAuth = useAuthStore((s) => s.setAuth);

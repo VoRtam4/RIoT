@@ -16,8 +16,10 @@ import (
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if isCookieSet(r, SessionJWTCookieIdentifier) || isCookieSet(r, RefreshTokenCookieIdentifier) {
-		http.Error(w, "cannot initiate OAuth2 | OIDC flow while authentication-related cookies are set", http.StatusBadRequest)
-		return
+		if !hasValidSession(r) {
+			clearSessionJWTCookie(w)
+			clearRefreshTokenCookie(w)
+		}
 	}
 	redirectUrl, err := handleRedirectUrl(r)
 	if err != nil {
@@ -30,7 +32,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		RedirectUrl: redirectUrl,
 	})
 	if jsonSerializationResult.IsFailure() {
-		http.Error(w, fmt.Sprintf("failed to serialize OAuth2 | OIDC flow state object to JSON: %s", jsonSerializationResult.GetError().Error()), http.StatusInternalServerError)
+		http.Error(w, "serialization error", http.StatusInternalServerError)
 		return
 	}
 	base64EncodedOAuth2OIDCFlowState := base64.URLEncoding.EncodeToString(jsonSerializationResult.GetPayload())

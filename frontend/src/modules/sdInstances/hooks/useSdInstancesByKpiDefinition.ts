@@ -7,12 +7,13 @@ import {
 
 export const useSdInstancesByKpiDefinition = (
   kpiDefinitionID: string | null,
+  enabled: boolean,
 ) => {
   const { data, loading, error, refetch } = useQuery<
     SdInstancesByKpiDefinitionQuery,
     SdInstancesByKpiDefinitionQueryVariables
   >(SdInstancesByKpiDefinitionDocument, {
-    skip: !kpiDefinitionID,
+    skip: !enabled || !kpiDefinitionID,
     variables: {
       id: kpiDefinitionID ?? "",
     },

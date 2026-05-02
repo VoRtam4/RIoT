@@ -22,7 +22,10 @@ export default function SdInstanceCard({ instance }: Props) {
       sx={{
         height: "100%",
         minHeight: 120,
-        backgroundColor: "var(--bg-card)",
+        backgroundColor: "var(--bg-card)" ,
+        "&:hover": {
+          backgroundColor: "var(--border)",
+        },
       }}
     >
       <CardActionArea

@@ -1698,7 +1698,7 @@ Content-Type: application/json
     id: "time-series",
     title: "History And Export",
     summary:
-      "Read raw or KPI history, paginate through batches, use aggregate KPI reads, and trigger exports for offline analysis.",
+      "Read raw or KPI history, resolve distinct tag values, paginate through batches, use aggregate KPI reads, and trigger exports for offline analysis.",
     actions: [
       {
         id: "read-history",
@@ -1726,11 +1726,16 @@ Content-Type: application/json
       }
     }
   ) {
+    parameters {
+      denotation
+      label
+      role
+    }
+    base
     data {
       time
-      value
       tags
-      fields
+      data
     }
     hasMoreBatches
     hasMoreData
@@ -1762,9 +1767,6 @@ Content-Type: application/json
     "sdInstanceUID": "boiler-sensor-a-17"
   }
 }`,
-            notes: [
-              "If the router still exposes GET only, add the POST route so the body-based request works correctly.",
-            ],
           },
           {
             technology: "websocket",
@@ -1782,6 +1784,80 @@ Content-Type: application/json
     "kpiDefinitionIDs": [9],
     "sortDesc": true,
     "limit": 50
+  }
+}`,
+          },
+        ],
+      },
+      {
+        id: "distinct-tag-values",
+        title: "Get Distinct Tag Values",
+        summary:
+          "Resolve the available values for one tag with optional filters over raw or KPI history.",
+        variants: [
+          {
+            technology: "graphql",
+            label: gql,
+            summary:
+              "Use this query to populate filter dropdowns from the current history slice.",
+            requestExample: `query DistinctTagValues {
+  timeSeriesDistinctTagValues(
+    request: {
+      type: raw
+      sdTypeID: 4
+      sdInstanceIDs: [17, 18]
+      from: "2026-04-01T00:00:00Z"
+      to: "2026-04-14T23:59:59Z"
+      tag: "location"
+    }
+  ) {
+    values
+    error
+  }
+}`,
+          },
+          {
+            technology: "rest",
+            label: rest,
+            summary:
+              "Submit the same request object to the dedicated distinct-tag-values endpoint.",
+            requestExample: `POST /rest/time-series/distinct-tag-values
+Content-Type: application/json
+
+{
+  "type": "raw",
+  "sdTypeID": 4,
+  "sdInstanceIDs": [17, 18],
+  "from": "2026-04-01T00:00:00Z",
+  "to": "2026-04-14T23:59:59Z",
+  "tag": "location"
+}`,
+          },
+          {
+            technology: "websocket",
+            label: ws,
+            summary:
+              "The low-level WebSocket action returns the same distinct-values payload.",
+            requestExample: `{
+  "type": "request",
+  "id": "history-distinct-tag-values",
+  "action": "time-series-distinct-tag-values",
+  "payload": {
+    "type": "raw",
+    "sdTypeID": 4,
+    "sdInstanceIDs": [17, 18],
+    "from": "2026-04-01T00:00:00Z",
+    "to": "2026-04-14T23:59:59Z",
+    "tag": "location"
+  }
+}`,
+            responseExample: `{
+  "type": "response",
+  "id": "history-distinct-tag-values",
+  "success": true,
+  "payload": {
+    "values": ["floor-1", "floor-2"],
+    "error": ""
   }
 }`,
           },
@@ -1806,18 +1882,29 @@ Content-Type: application/json
       sdInstanceIDs: [17, 18]
       from: "2026-04-01T00:00:00Z"
       to: "2026-04-14T23:59:59Z"
-      aggregateWindow: "1h"
-      aggregateFunction: mean
-      sortDesc: false
+      aggregateSeconds: 3600
+      batch: 200
       limit: 200
     }
   ) {
+    parameters {
+      denotation
+      label
+      role
+    }
+    base
     data {
       time
-      value
       tags
+      data
     }
+    hasMoreBatches
     hasMoreData
+    nextCursor {
+      time
+      sdInstanceUID
+      kpiDefinitionID
+    }
   }
 }`,
           },
@@ -1835,20 +1922,16 @@ Content-Type: application/json
   "sdInstanceIDs": [17, 18],
   "from": "2026-04-01T00:00:00Z",
   "to": "2026-04-14T23:59:59Z",
-  "aggregateWindow": "1h",
-  "aggregateFunction": "mean",
-  "sortDesc": false,
+  "aggregateSeconds": 3600,
+  "batch": 200,
   "limit": 200
 }`,
-            notes: [
-              "The backend handler exists. The route has to be registered in the REST router if you want this endpoint available.",
-            ],
           },
           {
             technology: "websocket",
             label: ws,
             summary:
-              "There is a dedicated aggregate WebSocket handler for batch streaming of aggregate KPI reads.",
+              "The aggregate handler streams batches using the same message ID.",
             requestExample: `{
   "type": "request",
   "id": "history-aggregate",
@@ -1859,13 +1942,11 @@ Content-Type: application/json
     "sdInstanceIDs": [17, 18],
     "from": "2026-04-01T00:00:00Z",
     "to": "2026-04-14T23:59:59Z",
-    "aggregateWindow": "1h",
-    "aggregateFunction": "mean"
+    "aggregateSeconds": 3600,
+    "batch": 200,
+    "limit": 200
   }
 }`,
-            notes: [
-              "The handler exists in code. Map it in the WebSocket router to make the action available.",
-            ],
           },
         ],
       },
@@ -1902,7 +1983,7 @@ GET /rest/time-series/export/export-job-123`,
             technology: "rest",
             label: rest,
             summary:
-              "Start the export with a body payload and then poll or download by job ID.",
+              "Start the export with a body payload. The response returns a ready-to-download REST URL.",
             requestExample: `POST /rest/time-series/export
 Content-Type: application/json
 
@@ -1912,18 +1993,16 @@ Content-Type: application/json
   "sdInstanceIDs": [17, 18],
   "sortDesc": true,
   "limit": 1000
-}
-
-GET /rest/time-series/export/{jobId}`,
-            notes: [
-              "The current router already has the file download endpoint. The body-based start route should also be registered.",
-            ],
+}`,
+            responseExample: `{
+  "url": "/rest/time-series/export/export-job-123"
+}`,
           },
           {
             technology: "websocket",
             label: ws,
             summary:
-              "The WebSocket export action returns the created job URL or job ID payload.",
+              "The WebSocket export action returns the created export identifier in the payload URL field.",
             requestExample: `{
   "type": "request",
   "id": "history-export",
@@ -1933,6 +2012,14 @@ GET /rest/time-series/export/{jobId}`,
     "sdTypeID": 4,
     "sdInstanceIDs": [17, 18],
     "limit": 1000
+  }
+}`,
+            responseExample: `{
+  "type": "response",
+  "id": "history-export",
+  "success": true,
+  "payload": {
+    "url": "export-job-123"
   }
 }`,
           },
@@ -1956,8 +2043,7 @@ GET /rest/time-series/export/{jobId}`,
       sdInstanceIDs: [17, 18]
       from: "2026-04-01T00:00:00Z"
       to: "2026-04-14T23:59:59Z"
-      aggregateWindow: "1h"
-      aggregateFunction: mean
+      aggregateSeconds: 3600
     }
   )
 }`,
@@ -1976,18 +2062,17 @@ Content-Type: application/json
   "sdInstanceIDs": [17, 18],
   "from": "2026-04-01T00:00:00Z",
   "to": "2026-04-14T23:59:59Z",
-  "aggregateWindow": "1h",
-  "aggregateFunction": "mean"
+  "aggregateSeconds": 3600
 }`,
-            notes: [
-              "The backend handler exists. Register the route in the REST router to expose it.",
-            ],
+            responseExample: `{
+  "url": "/rest/time-series/export/export-job-456"
+}`,
           },
           {
             technology: "websocket",
             label: ws,
             summary:
-              "The dedicated WebSocket action is available once registered in the request handler map.",
+              "The aggregate export action returns the export identifier through the low-level WebSocket API.",
             requestExample: `{
   "type": "request",
   "id": "history-export-aggregate",
@@ -1996,8 +2081,15 @@ Content-Type: application/json
     "sdTypeID": 4,
     "kpiDefinitionIDs": [9],
     "sdInstanceIDs": [17, 18],
-    "aggregateWindow": "1h",
-    "aggregateFunction": "mean"
+    "aggregateSeconds": 3600
+  }
+}`,
+            responseExample: `{
+  "type": "response",
+  "id": "history-export-aggregate",
+  "success": true,
+  "payload": {
+    "url": "export-job-456"
   }
 }`,
           },

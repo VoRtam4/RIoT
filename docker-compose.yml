@@ -24,6 +24,7 @@ services:
     build:
       context: ./backend
       dockerfile: backend-core/Dockerfile
+    restart: unless-stopped
     environment:
       APP_ENV: ${APP_ENV}
       POSTGRES_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB_NAME}
@@ -57,6 +58,7 @@ services:
     build:
       context: ./backend
       dockerfile: message-processing-unit/Dockerfile
+    restart: unless-stopped
     environment:
       APP_ENV: ${APP_ENV}
       BACKEND_CORE_URL: ${BACKEND_CORE_URL}
@@ -75,8 +77,8 @@ services:
       - "9001:9001"
       - "1883:1883"
     volumes:
-        - ./docker/mosquitto-config:/mosquitto/config
-        - ./docker/mosquitto-data:/mosquitto/data
+        - ./config/mosquitto-config:/mosquitto/config
+        - ./config/mosquitto-data:/mosquitto/data
         - ./docker/mosquitto-log:/mosquitto/log
 
   postgres:
@@ -125,6 +127,7 @@ services:
     build:
       context: ./backend
       dockerfile: time-series-store/Dockerfile
+    restart: unless-stopped
     environment:
       APP_ENV: ${APP_ENV}
       BACKEND_CORE_URL: ${BACKEND_CORE_URL}
@@ -164,9 +167,9 @@ services:
     image: grafana/grafana-enterprise
     profiles: ["dev"]
     volumes:
-      - ./docker/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
-      - ./docker/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
-      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards
+      - ./config/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./config/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards
     ports:
       - "3000:3000"
     environment:
@@ -178,7 +181,7 @@ services:
     image: prom/prometheus
     profiles: ["dev"]
     volumes:
-      - "./docker/prometheus.yml:/etc/prometheus/prometheus.yml"
+      - "./config/prometheus.yml:/etc/prometheus/prometheus.yml"
     ports:
       - "9091:9090"
 

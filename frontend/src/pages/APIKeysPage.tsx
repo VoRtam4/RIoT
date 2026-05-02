@@ -3,14 +3,19 @@ import APIKeyList from "../modules/apiKeys/components/APIKeyList";
 import APIKeyForm from "../modules/apiKeys/components/APIKeyForm";
 import APIKeyCreatedBox from "../modules/apiKeys/components/APIKeyCreatedBox";
 import { useApiKeys } from "../modules/apiKeys/hooks/useApiKeys";
-import { useApiKeyMutations } from "../modules/apiKeys/hooks/useApiKeyMutations";
+import { useCreateApiKey } from "../modules/apiKeys/hooks/useCreateApiKey";
+import { useUpdateApiKey } from "../modules/apiKeys/hooks/useUpdateApiKey";
+import { useDeleteApiKey } from "../modules/apiKeys/hooks/useDeleteApiKey";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 
 export default function APIKeysPage() {
   const navigate = useNavigate();
-  const { apiKeys, loading, refetch } = useApiKeys();
-  const { createApiKey, updateApiKey, deleteApiKey } = useApiKeyMutations();
+
+  const { apiKeys, loading } = useApiKeys();
+  const { createApiKey } = useCreateApiKey();
+  const { updateApiKey } = useUpdateApiKey();
+  const { deleteApiKey } = useDeleteApiKey();
 
   const [mode, setMode] = useState<"empty" | "create" | "detail" | "created">(
     "empty",
@@ -77,9 +82,10 @@ export default function APIKeysPage() {
                     const res = await createApiKey({
                       variables: { input: data },
                     });
+
                     setCreatedKey(res.data?.createAPIKey ?? null);
                     setMode("created");
-                    await refetch();
+
                     toast.success("Created");
                   } catch {
                     toast.error("Error");
@@ -97,7 +103,7 @@ export default function APIKeysPage() {
                     await updateApiKey({
                       variables: { id: selected.id, input: data },
                     });
-                    await refetch();
+
                     toast.success("Saved");
                   } catch {
                     toast.error("Error");
@@ -108,9 +114,10 @@ export default function APIKeysPage() {
                     await deleteApiKey({
                       variables: { id: selected.id },
                     });
+
                     setMode("empty");
                     setSelectedId(null);
-                    await refetch();
+
                     toast.success("Deleted");
                   } catch {
                     toast.error("Error");

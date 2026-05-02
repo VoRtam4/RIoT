@@ -1,28 +1,23 @@
-import { useMemo } from "react";
-import { useQuery } from "@apollo/client/react";
-import { SdTypesDocument, type SdTypesQuery } from "../../../generated/graphql";
+import { useEffect } from "react";
+import { useSdTypesStore } from "../stores/sdTypesStore";
 
 export const useSdTypes = () => {
-  const { data, loading, error, refetch } = useQuery<SdTypesQuery>(
-    SdTypesDocument,
-    {
-      fetchPolicy: "cache-and-network",
-    },
-  );
+  const ensure = useSdTypesStore((s) => s.ensure);
+  const refresh = useSdTypesStore((s) => s.refresh);
+  const entry = useSdTypesStore((s) => s.entry);
 
-  const sdTypes = data?.sdTypes ?? [];
-
-  const sdTypeMap = useMemo(() => {
-    return new Map(
-      sdTypes.map((t) => [String(t.id), t.label ?? t.uid ?? String(t.id)]),
-    );
-  }, [sdTypes]);
+  useEffect(() => {
+    if (!entry) {
+      void refresh();
+    } else {
+      void ensure();
+    }
+  }, [entry, ensure, refresh]);
 
   return {
-    sdTypes,
-    sdTypeMap,
-    loading,
-    error,
-    refetch,
+    entry,
+    sdTypes: entry?.rawSortedAsc ?? [],
+    loading: entry?.isLoading ?? true,
+    error: entry?.error ?? null,
   };
 };

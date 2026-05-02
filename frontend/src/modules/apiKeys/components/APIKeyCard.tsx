@@ -24,15 +24,12 @@ export default function APIKeyCard({ apiKey, selected, onClick }: Props) {
         height: "100%",
         overflow: "hidden",
         backgroundColor: selected
-          ? "var(--primary)"
+          ? "var(--border-input)"
           : "var(--bg-card)",
-        transition: "all 0.15s",
-        border: selected
-          ? "1px solid var(--bs-primary)"
-          : "1px solid transparent",
         "&:hover": {
-          transform: "translateY(-1px)",
-          boxShadow: 3,
+          backgroundColor: selected
+          ? "var(--border-input)"
+          : "var(--border)",
         },
       }}
     >

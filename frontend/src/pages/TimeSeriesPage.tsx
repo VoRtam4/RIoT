@@ -28,7 +28,7 @@ export default function TimeSeriesPage() {
     return {
       type,
       sortDesc: true,
-      limit: 50,
+      limit: 200,
 
       sdTypeID: sdTypeID ?? undefined,
       sdInstanceIDs: sdInstanceID ? [sdInstanceID] : [],

@@ -1,38 +1,41 @@
 import { useNavigate } from "react-router-dom";
+import { useMemo, useState, useEffect } from "react";
+
 import { useSdTypes } from "../modules/sdTypes/hooks/useSdTypes";
 import { useSdInstancesByType } from "../modules/sdInstances/hooks/useSdInstancesByType";
 
 import SdInstanceList from "../modules/sdInstances/components/SdInstanceList";
 import SdInstanceFilters from "../modules/sdInstances/components/SdInstanceFilters";
-import { buildOptionSearchText } from "../utils/reactSelectSearch";
+import {
+  buildOptionSearchText,
+  matchesSearchText,
+} from "../utils/reactSelectSearch";
 import { useDebouncedValue } from "../utils/useDebouncedValue";
-import { useMemo, useState } from "react";
 
 type SortOption = "label_asc" | "label_desc";
-const SEARCH_DEBOUNCE_MS = 150;
 
 export default function SdInstancesPage() {
   const navigate = useNavigate();
 
   const { sdTypes, loading: typesLoading } = useSdTypes();
-  const firstSdTypeId = sdTypes[0] ? String(sdTypes[0].id) : null;
 
   const [selectedSdType, setSelectedSdType] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortOption>("label_asc");
-  const debouncedSearch = useDebouncedValue(search, SEARCH_DEBOUNCE_MS);
-  const activeSdType = selectedSdType ?? firstSdTypeId;
+
+  const debouncedSearch = useDebouncedValue(search, 150);
+
+  useEffect(() => {
+    if (!sdTypes.length) return;
+    if (selectedSdType) return;
+
+    setSelectedSdType(String(sdTypes[0].id));
+  }, [sdTypes, selectedSdType]);
 
   const { sdInstances, loading: instancesLoading } =
-    useSdInstancesByType(activeSdType);
+    useSdInstancesByType(selectedSdType);
 
   const filteredInstances = useMemo(() => {
-    const searchTerms = debouncedSearch
-      .trim()
-      .toLowerCase()
-      .split(/\s+/)
-      .filter(Boolean);
-
     let result = (sdInstances ?? []).map((instance: any) => ({
       instance,
       searchText: buildOptionSearchText(
@@ -43,32 +46,32 @@ export default function SdInstancesPage() {
       sortLabel: (instance.label ?? instance.uid ?? "").toLowerCase(),
     }));
 
-    if (searchTerms.length > 0) {
+    if (debouncedSearch.trim()) {
       result = result.filter(({ searchText }) =>
-        searchTerms.every((term) => searchText.includes(term))
+        matchesSearchText(debouncedSearch, searchText),
       );
     }
 
     if (sort === "label_asc") {
-      result = [...result].sort((a, b) =>
-        a.sortLabel < b.sortLabel ? -1 : 1
+      result.sort((a, b) =>
+        a.sortLabel < b.sortLabel ? -1 : 1,
       );
-    } else if (sort === "label_desc") {
-      result = [...result].sort((a, b) =>
-        a.sortLabel > b.sortLabel ? -1 : 1
+    } else {
+      result.sort((a, b) =>
+        a.sortLabel > b.sortLabel ? -1 : 1,
       );
     }
 
-    return result.map(({ instance }) => instance);
-  }, [debouncedSearch, sdInstances, sort]);
+    return result.map((r) => r.instance);
+  }, [sdInstances, debouncedSearch, sort]);
 
-  const loading = typesLoading || (activeSdType !== null && instancesLoading);
+  const loading = typesLoading || (selectedSdType !== null && instancesLoading);
 
   return (
     <div className="container mt-3">
       <SdInstanceFilters
         sdTypes={sdTypes}
-        selectedSdType={activeSdType}
+        selectedSdType={selectedSdType}
         onSdTypeChange={setSelectedSdType}
         search={search}
         onSearchChange={setSearch}
@@ -79,7 +82,7 @@ export default function SdInstancesPage() {
       <SdInstanceList
         instances={filteredInstances}
         loading={loading}
-        onOpen={(id: string) => navigate(`/sd-instance/${id}`)}
+        onOpen={(id) => navigate(`/sd-instance/${id}`)}
       />
     </div>
   );

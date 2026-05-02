@@ -4,6 +4,7 @@ import {
   type DeleteKpiDefinitionMutation,
   type DeleteKpiDefinitionMutationVariables,
 } from "../../../generated/graphql";
+import { useKpiDefinitionsBySdTypeStore } from "../stores/kpiDefinitionsBySdTypeStore";
 
 export const useDeleteKpi = () => {
   const [deleteMutation, { loading, error }] = useMutation<
@@ -11,12 +12,18 @@ export const useDeleteKpi = () => {
     DeleteKpiDefinitionMutationVariables
   >(DeleteKpiDefinitionDocument);
 
-  const deleteKpi = async (id: string) => {
+  const deleteKpi = async (id: string, sdTypeID: string) => {
     const res = await deleteMutation({
       variables: { id },
     });
 
-    return res.data?.deleteKPIDefinition ?? false;
+    const ok = res.data?.deleteKPIDefinition ?? false;
+
+    if (ok) {
+      await useKpiDefinitionsBySdTypeStore.getState().refresh(sdTypeID);
+    }
+
+    return ok;
   };
 
   return {

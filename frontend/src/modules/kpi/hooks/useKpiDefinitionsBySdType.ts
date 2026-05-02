@@ -1,28 +1,28 @@
-import { useQuery } from "@apollo/client/react";
-import {
-  KpiDefinitionsBySdTypeDocument,
-  type KpiDefinitionsBySdTypeQuery,
-  type KpiDefinitionsBySdTypeQueryVariables,
-} from "../../../generated/graphql";
+import { useEffect } from "react";
+import { useKpiDefinitionsBySdTypeStore } from "../stores/kpiDefinitionsBySdTypeStore";
 
-export const useKpiDefinitionsBySdType = (sdTypeID: string | null) => {
-  const { data, loading, error, refetch } = useQuery<
-    KpiDefinitionsBySdTypeQuery,
-    KpiDefinitionsBySdTypeQueryVariables
-  >(KpiDefinitionsBySdTypeDocument, {
-    skip: !sdTypeID,
-    variables: {
-      id: sdTypeID ?? "",
-    },
-    fetchPolicy: "cache-and-network",
-  });
+export const useKpiDefinitionsBySdType = (id: string | null) => {
+  const ensure = useKpiDefinitionsBySdTypeStore((s) => s.ensure);
+  const refresh = useKpiDefinitionsBySdTypeStore((s) => s.refresh);
 
-  const kpiDefinitions = data?.kpiDefinitionsBySdType ?? [];
+  const entry = useKpiDefinitionsBySdTypeStore((s) =>
+    id ? s.byTypeId[id] : undefined,
+  );
+
+  useEffect(() => {
+    if (!id) return;
+
+    if (!entry) {
+      void refresh(id);
+    } else {
+      void ensure(id);
+    }
+  }, [id, entry, ensure, refresh]);
 
   return {
-    kpiDefinitions,
-    loading,
-    error,
-    refetch,
+    entry,
+    kpiDefinitions: entry?.rawSortedAsc ?? [],
+    loading: entry?.isLoading ?? true,
+    error: entry?.error ?? null,
   };
 };

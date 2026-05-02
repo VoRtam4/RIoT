@@ -36,16 +36,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   fontSize: "14px",
                 },
                 success: {
-                  iconTheme: {
-                    primary: "var(--)",
-                    secondary: "white",
-                  },
+                  icon: <i className="fa-solid fa-check" style={{ color: "var(--success)" }} />,
                 },
                 error: {
-                  iconTheme: {
-                    primary: "var(--error)",
-                    secondary: "white",
-                  },
+                  icon: <i className="fa-solid fa-xmark" style={{ color: "var(--error)" }} />,
                 },
               }}
             />

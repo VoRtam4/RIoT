@@ -4,6 +4,7 @@ import {
   type UpdateKpiDefinitionMutation,
   type UpdateKpiDefinitionMutationVariables,
 } from "../../../generated/graphql";
+import { useKpiDefinitionsBySdTypeStore } from "../stores/kpiDefinitionsBySdTypeStore";
 
 export const useUpdateKpi = () => {
   const [mutation, { loading, error }] = useMutation<
@@ -13,13 +14,26 @@ export const useUpdateKpi = () => {
 
   const updateKpi = async (
     id: string,
+    previousSdTypeID: string,
     input: UpdateKpiDefinitionMutationVariables["input"],
   ) => {
     const res = await mutation({
       variables: { id, input },
     });
 
-    return res.data?.updateKPIDefinition ?? null;
+    const updated = res.data?.updateKPIDefinition ?? null;
+
+    if (updated) {
+      const store = useKpiDefinitionsBySdTypeStore.getState();
+
+      await store.refresh(previousSdTypeID);
+
+      if (input.sdTypeID && input.sdTypeID !== previousSdTypeID) {
+        await store.refresh(input.sdTypeID);
+      }
+    }
+
+    return updated;
   };
 
   return {

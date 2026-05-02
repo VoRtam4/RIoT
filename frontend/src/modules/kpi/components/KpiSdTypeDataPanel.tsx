@@ -59,6 +59,14 @@ export default function KpiSdTypeDataPanel({ sdInstanceID, sdType }: Props) {
   const { latest } = useRawDataSubscription(sdType?.id, sdInstanceID);
 
   const effectiveData = latest ?? rawDataPoint;
+  const effectiveEventTime =
+    latest?.eventTime ??
+    rawDataPoint?.eventTime ??
+    (typeof effectiveData?.payload === "object" &&
+    effectiveData?.payload !== null &&
+    "eventTime" in effectiveData.payload
+      ? String((effectiveData.payload as Record<string, unknown>).eventTime ?? "")
+      : "");
   
   const parsed = useMemo(() => {
     if (!effectiveData?.payload) return {};
@@ -73,9 +81,7 @@ export default function KpiSdTypeDataPanel({ sdInstanceID, sdType }: Props) {
   }, [effectiveData]);
   
   const rows: Row[] = useMemo(() => {
-    if (!sdType?.parameters) return [];
-
-    return sdType.parameters.map((p) => {
+    const dataRows = (sdType?.parameters ?? []).map((p) => {
       const val = parsed[p.denotation];
 
       let formattedValue = "";
@@ -96,7 +102,20 @@ export default function KpiSdTypeDataPanel({ sdInstanceID, sdType }: Props) {
         type: p.type,
       };
     });
-  }, [parsed, sdType]);
+
+    if (!effectiveEventTime) {
+      return dataRows;
+    }
+
+    return [
+      {
+        parameter: "Time",
+        value: formatDate(effectiveEventTime),
+        type: "",
+      },
+      ...dataRows,
+    ];
+  }, [effectiveEventTime, parsed, sdType]);
 
   const columns = useMemo(
     () => [

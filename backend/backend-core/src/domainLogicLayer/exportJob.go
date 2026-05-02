@@ -202,7 +202,7 @@ func GetExportJob(id string) (*ExportJob, bool) {
 }
 
 func cleanupJob(id string) {
-	time.Sleep(10 * time.Minute)
+	time.Sleep(30 * time.Minute)
 	exportJobsMu.Lock()
 	job := exportJobs[id]
 	delete(exportJobs, id)

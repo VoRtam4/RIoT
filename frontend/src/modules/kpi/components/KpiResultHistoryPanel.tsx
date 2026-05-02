@@ -1,9 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { LineChart } from "@mui/x-charts/LineChart";
 
 import { useKpiResult } from "../hooks/useKpiResult";
 import { useKpiSubscription } from "../hooks/useKpiSubscription";
 import { useTimeSeriesAggregateKpi } from "../../timeSeries/hooks/useTimeSeriesAggregateKpi";
+import {
+  minusDaysLocal,
+  nowLocal,
+  toUTCString,
+} from "../utils/dateTimeUtils";
 
 import { colors } from "../../../theme/colors";
 
@@ -12,26 +17,6 @@ type Props = {
   sdInstanceID?: string | null;
   sdTypeID?: string | null;
 };
-
-function toLocalInputValue(date: Date) {
-  const offset = date.getTimezoneOffset();
-  const local = new Date(date.getTime() - offset * 60000);
-  return local.toISOString().slice(0, 19);
-}
-
-function toUTCString(localValue: string) {
-  return new Date(localValue).toISOString();
-}
-
-function nowLocal() {
-  return toLocalInputValue(new Date());
-}
-
-function minus7DaysLocal() {
-  const d = new Date();
-  d.setDate(d.getDate() - 7);
-  return toLocalInputValue(d);
-}
 
 function computeAggregateSeconds(from: string, to: string) {
   const diff =
@@ -47,25 +32,16 @@ export default function KpiResultHistoryPanel({
   sdInstanceID,
   sdTypeID,
 }: Props) {
-  const [from, setFrom] = useState(minus7DaysLocal());
+  const [from, setFrom] = useState(minusDaysLocal(1));
   const [to, setTo] = useState(nowLocal());
 
   const [debouncedFrom, setDebouncedFrom] = useState(from);
   const [debouncedTo, setDebouncedTo] = useState(to);
 
-  const fromRef = useRef<HTMLInputElement | null>(null);
-  const toRef = useRef<HTMLInputElement | null>(null);
-
   useEffect(() => {
     const t = setTimeout(() => {
-      const isTyping =
-        document.activeElement === fromRef.current ||
-        document.activeElement === toRef.current;
-
-      if (!isTyping) {
-        setDebouncedFrom(from);
-        setDebouncedTo(to);
-      }
+      setDebouncedFrom(from);
+      setDebouncedTo(to);
     }, 800);
 
     return () => clearTimeout(t);
@@ -169,7 +145,7 @@ export default function KpiResultHistoryPanel({
 
   if (!sdInstanceID || ! kpiDefinitionID) {
     return <div className="d-flex justify-content-center align-items-center">
-      <span className="form-label">Select the device item to view the KPI definition evaluation historyVyberte položku pro zobrazení historie</span>
+      <span className="form-label">Select the device item to view the KPI definition evaluation history</span>
     </div>;
   }
 
@@ -204,9 +180,8 @@ export default function KpiResultHistoryPanel({
 
         {/* FROM */}
         <div className="col-md-4">
-          <label className="form-label">Od</label>
+          <label className="form-label">From</label>
           <input
-            ref={fromRef}
             type="datetime-local"
             step="1"
             className="form-control"
@@ -217,9 +192,8 @@ export default function KpiResultHistoryPanel({
 
         {/* TO */}
         <div className="col-md-4">
-          <label className="form-label">Do</label>
+          <label className="form-label">To</label>
           <input
-            ref={toRef}
             type="datetime-local"
             step="1"
             className="form-control"

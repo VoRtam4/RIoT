@@ -82,7 +82,7 @@ func (r *mutationResolver) DeleteKPIDefinition(ctx context.Context, id uint32) (
 }
 
 func (r *mutationResolver) CreateSDInstanceGroup(ctx context.Context, input graphQLModel.SDInstanceGroupInput) (graphQLModel.SDInstanceGroup, error) {
-	if _, err := authorizeOperation(ctx, auth.ResourceSDInstances, auth.OperationUpdate); err != nil {
+	if _, err := authorizeOperation(ctx, auth.ResourceSDInstances, auth.OperationCreate); err != nil {
 		return graphQLModel.SDInstanceGroup{}, err
 	}
 	createSDInstanceGroupResult := domainLogicLayer.CreateSDInstanceGroup(input)
@@ -104,7 +104,7 @@ func (r *mutationResolver) UpdateSDInstanceGroup(ctx context.Context, id uint32,
 }
 
 func (r *mutationResolver) DeleteSDInstanceGroup(ctx context.Context, id uint32) (bool, error) {
-	if _, err := authorizeOperation(ctx, auth.ResourceSDInstances, auth.OperationUpdate); err != nil {
+	if _, err := authorizeOperation(ctx, auth.ResourceSDInstances, auth.OperationDelete); err != nil {
 		return false, err
 	}
 	if err := domainLogicLayer.DeleteSDInstanceGroup(id); err != nil {

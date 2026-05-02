@@ -309,7 +309,6 @@ func loadParametersFromDB(Type graphQLModel.TimeSeriesType, SdTypeID *uint32) []
 		if Type == graphQLModel.TimeSeriesTypeKpi && p.Role == dllModel.SDParameterRoleField {
 			continue
 		}
-
 		params = append(params, graphQLModel.TimeSeriesParameter{
 			Denotation: p.Denotation,
 			Label:      p.Label,
@@ -401,11 +400,9 @@ func validateDistinctTagInput(userID uint32, input graphQLModel.TimeSeriesDistin
 		sdType = sdRes.GetPayload()
 		loaded = true
 	}
-
 	if !loaded {
 		return fmt.Errorf("unable to resolve sdType for tag validation")
 	}
-
 	allowedTags := map[string]bool{
 		"sdInstanceUID": true,
 	}
@@ -417,11 +414,9 @@ func validateDistinctTagInput(userID uint32, input graphQLModel.TimeSeriesDistin
 			allowedTags[parameter.Denotation] = true
 		}
 	}
-
 	if !allowedTags[input.Tag] {
 		return fmt.Errorf("tag %q is not allowed for sdType %s", input.Tag, sdType.UID)
 	}
-
 	return nil
 }
 
@@ -483,19 +478,15 @@ func resolveAndValidate(userID uint32, Type graphQLModel.TimeSeriesType, SdTypeI
 	var instanceUIDs []string
 	if len(SdInstanceIDs) > 0 {
 		instanceUIDs = make([]string, 0, len(SdInstanceIDs))
-
 		for _, id := range SdInstanceIDs {
 			res := db.LoadSDInstance(id)
 			if res.IsFailure() {
 				return "", nil, res.GetError()
 			}
-
 			inst := res.GetPayload()
-
 			if sdTypeID != nil && inst.SDType.ID.GetPayload() != *sdTypeID {
 				return "", nil, fmt.Errorf("sdInstance %d does not belong to sdType", id)
 			}
-
 			instanceUIDs = append(instanceUIDs, inst.UID)
 		}
 	}

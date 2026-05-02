@@ -33,11 +33,18 @@ func kickstartISC() {
 	isc.SetupRabbitMQInfrastructureForISC(rabbitMQClient)
 	isc.EnqueueMessageRepresentingCurrentSDTypeConfiguration(rabbitMQClient)
 	isc.EnqueueMessageRepresentingCurrentSDInstanceConfiguration(rabbitMQClient)
-	go isc.ProcessIncomingMessageProcessingUnitConnectionNotifications()
-	go isc.ProcessIncomingSDTypeRegistrationRequests()
-	go isc.ProcessIncomingSDInstanceRegistrationRequests()
-	go isc.ProcessIncomingRawDataPoints()
-	go isc.ProcessIncomingKPIFulfillmentCheckResults()
+	go runISCLoop(isc.ProcessIncomingMessageProcessingUnitConnectionNotifications)
+	go runISCLoop(isc.ProcessIncomingSDTypeRegistrationRequests)
+	go runISCLoop(isc.ProcessIncomingSDInstanceRegistrationRequests)
+	go runISCLoop(isc.ProcessIncomingRawDataPoints)
+	go runISCLoop(isc.ProcessIncomingKPIFulfillmentCheckResults)
+}
+
+func runISCLoop(worker func()) {
+	for {
+		worker()
+		time.Sleep(time.Second)
+	}
 }
 
 func main() {

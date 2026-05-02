@@ -153,3 +153,15 @@ func resolveRoleID(email string) (uint32, error) {
 	}
 	return UserRoleID, nil
 }
+
+func hasValidSession(r *http.Request) bool {
+	if !isCookieSet(r, SessionJWTCookieIdentifier) {
+		return false
+	}
+	sessionJWTString := getSessionJWTCookieValue(r).GetPayload()
+	sessionJWT, err := ParseJWT(sessionJWTString)
+	if err != nil {
+		return false
+	}
+	return IsJWTValid(sessionJWT)
+}

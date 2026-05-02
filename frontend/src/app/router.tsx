@@ -10,7 +10,7 @@ import SdInstancePage from "../pages/SdInstancePage";
 import SdInstanceDetailPage from "../pages/SdInstanceDetailPage";
 import { ProtectedRoute } from "./ProtectedRoute";
 import Layout from "../components/layout/Layout";
-import ApiDocsPage from "../pages/ApiDocsPage";
+import ApiDocsPage from "../pages/APIDocsPages";
 
 export const router = createBrowserRouter([
   {

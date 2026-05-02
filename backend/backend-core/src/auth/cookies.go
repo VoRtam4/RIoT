@@ -50,13 +50,19 @@ func getCookieValue(r *http.Request, identifier string) sharedUtils.Optional[str
 }
 
 func clearHttpOnlyCookie(w http.ResponseWriter, identifier string, path string) {
+	sameSite := http.SameSiteNoneMode
+	secure := true
+	if env == "dev" {
+		sameSite = http.SameSiteLaxMode
+		secure = false
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     identifier,
 		Value:    "",
 		Path:     path,
 		HttpOnly: true,
-		Secure:   secureCookies,
-		SameSite: http.SameSiteDefaultMode,
+		Secure:   secure,
+		SameSite: sameSite,
 		Expires:  time.Unix(0, 0),
 		MaxAge:   -1,
 	})

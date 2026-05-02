@@ -17,25 +17,11 @@ import (
 func checkForKPIFulfilmentCheckRequests() {
 	rabbitMQClient := rabbitmq.NewClient()
 	defer rabbitMQClient.Dispose()
-	err := rabbitmq.ConsumeJSONMessages[sharedModel.KPIFulfillmentCheckRequestISCMessage](
+	err := rabbitmq.ConsumeJSONMessages[sharedModel.KPIFulfillmentCheckRequestTupleISCMessage](
 		rabbitMQClient,
 		sharedConstants.KPIFulfillmentCheckRequestsQueueName,
-		func(messagePayload sharedModel.KPIFulfillmentCheckRequestISCMessage) error {
-			eventTime := messagePayload.EventTime
-			if eventTime.IsZero() {
-				eventTime = time.Now().UTC()
-			}
-			params := map[string]interface{}{}
-			switch p := messagePayload.Parameters.(type) {
-			case map[string]interface{}:
-				params = p
-			default:
-				log.Printf("Unsupported parameters type")
-			}
-			if !processing.ProcessRaw(rabbitMQClient, messagePayload, params, eventTime) {
-				return nil
-			}
-			return processing.ProcessKPI(rabbitMQClient, messagePayload, params, eventTime)
+		func(tuple sharedModel.KPIFulfillmentCheckRequestTupleISCMessage) error {
+			return processing.ProcessKPIFulfillmentCheckRequestTuple(rabbitMQClient, tuple)
 		},
 	)
 	if err != nil {
@@ -48,16 +34,19 @@ func checkForKPIFulfilmentCheckRequests() {
 }
 
 func checkForKPIReprocessRequests() {
-	rabbitMQClient := rabbitmq.NewClient()
-	defer rabbitMQClient.Dispose()
-	err := rabbitmq.ConsumeJSONMessages[sharedModel.KPIReprocessRequestISCMessage](rabbitMQClient, sharedConstants.KPIReprocessRequestQueueName,
-		func(req sharedModel.KPIReprocessRequestISCMessage) error {
-			log.Printf("Starting KPI reprocess for KPI definition %d", req.KPIDefinitionID)
-			return processing.ReprocessKPI(req)
-		},
-	)
-	if err != nil {
-		log.Printf("Failed consuming KPI reprocess queue: %s", err.Error())
+	for {
+		rabbitMQClient := rabbitmq.NewClient()
+		err := rabbitmq.ConsumeJSONMessages[sharedModel.KPIReprocessRequestISCMessage](rabbitMQClient, sharedConstants.KPIReprocessRequestQueueName,
+			func(req sharedModel.KPIReprocessRequestISCMessage) error {
+				log.Printf("Starting KPI reprocess for KPI definition %d", req.KPIDefinitionID)
+				return processing.ReprocessKPI(req)
+			},
+		)
+		rabbitMQClient.Dispose()
+		if err != nil {
+			log.Printf("Failed consuming KPI reprocess queue: %s", err.Error())
+		}
+		time.Sleep(time.Second)
 	}
 }
 
@@ -90,11 +79,14 @@ func checkForSDTypeUpdates() {
 }
 
 func checkForKPIDeleteRequests() {
-	rabbitMQClient := rabbitmq.NewClient()
-	defer rabbitMQClient.Dispose()
-	err := rabbitmq.ConsumeJSONMessages[sharedModel.KPIDeleteResultsRequestISCMessage](rabbitMQClient, sharedConstants.MPUDeleteQueueName, processing.ProcessDelete)
-	if err != nil {
-		log.Printf("[MPU][DELETE] Failed consuming delete requests: %s", err.Error())
+	for {
+		rabbitMQClient := rabbitmq.NewClient()
+		err := rabbitmq.ConsumeJSONMessages[sharedModel.KPIDeleteResultsRequestISCMessage](rabbitMQClient, sharedConstants.MPUDeleteQueueName, processing.ProcessDelete)
+		rabbitMQClient.Dispose()
+		if err != nil {
+			log.Printf("[MPU][DELETE] Failed consuming delete requests: %s", err.Error())
+		}
+		time.Sleep(time.Second)
 	}
 }
 
@@ -109,4 +101,5 @@ func main() {
 	processing.InitializeProcessing()
 	sharedUtils.StartLoggingProfilingInformationPeriodically(time.Minute)
 	sharedUtils.WaitForAll(checkForKPIDefinitionsBySDTypeDenotationMapUpdates, checkForKPIFulfilmentCheckRequests, checkForKPIReprocessRequests, checkForSDTypeUpdates, checkForKPIDeleteRequests)
+	processing.StartCacheCleanup(25*time.Hour, time.Hour)
 }

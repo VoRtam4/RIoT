@@ -1,80 +1,66 @@
 import { useMemo, useRef, useState } from "react";
-import type { KpiDefinitionsQuery } from "../../../generated/graphql";
+import type { SdTypesQuery } from "../../../generated/graphql";
 import KpiCard from "./KpiCard";
 import KpiFilters, { type ModeFilter, type SortOption } from "./KpiFilters";
 import VirtualizedCardGrid from "../../../components/virtualization/VirtualizedCardGrid";
-import { buildOptionSearchText } from "../../../utils/reactSelectSearch";
 import { useDebouncedValue } from "../../../utils/useDebouncedValue";
+import {
+  buildOptionSearchText,
+  matchesSearchText,
+} from "../../../utils/reactSelectSearch";
 
-type Props = {
-  kpis: KpiDefinitionsQuery["kpiDefinitions"];
-  sdTypes: Array<{
-    id: string | number;
-    label?: string | null;
-    uid?: string | null;
-  }>;
-  sdTypeMap: Map<string, string>;
-  loading?: any;
+type Raw = {
+  id: string;
+  label?: string | null;
+  sdTypeID: string;
+  sdInstanceMode?: string | null;
 };
 
-export default function KpiList({ kpis, sdTypes, sdTypeMap, loading }: Props) {
+type Props = {
+  entry?: {
+    rawSortedAsc: Raw[];
+    rawSortedDesc: Raw[];
+  };
+  sdTypes: SdTypesQuery["sdTypes"];
+  selectedSdType: string | null;
+  onSdTypeChange: (value: string | null) => void;
+  loading?: boolean;
+};
+
+export default function KpiList({
+  entry,
+  sdTypes,
+  selectedSdType,
+  onSdTypeChange,
+  loading,
+}: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortOption>("label_asc");
   const [mode, setMode] = useState<ModeFilter>("ALL_MODES");
-  const [sdTypeFilter, setSdTypeFilter] = useState<string | null>(null);
+
   const debouncedSearch = useDebouncedValue(search, 150);
-  const activeSdTypeFilter =
-    sdTypeFilter ?? (sdTypes[0] ? String(sdTypes[0].id) : null);
+
+  const base =
+    sort === "label_desc"
+      ? entry?.rawSortedDesc ?? []
+      : entry?.rawSortedAsc ?? [];
 
   const filtered = useMemo(() => {
-    const searchTerms = debouncedSearch
-      .trim()
-      .toLowerCase()
-      .split(/\s+/)
-      .filter(Boolean);
+    if (!base.length) return [];
 
-    let result = kpis.map((kpi) => ({
-      kpi,
-      searchText: buildOptionSearchText(
-        kpi.label,
-        String(kpi.id),
-        kpi.sdTypeUID,
-        sdTypeMap.get(kpi.sdTypeID),
-      ).toLowerCase(),
-      labelSort: kpi.label.toLowerCase(),
-      typeSort: (kpi.sdTypeUID ?? "").toLowerCase(),
-    }));
+    return base.filter((kpi) => {
+      if (mode !== "ALL_MODES" && kpi.sdInstanceMode !== mode) {
+        return false;
+      }
 
-    if (searchTerms.length > 0) {
-      result = result.filter(({ searchText }) =>
-        searchTerms.every((term) => searchText.includes(term)),
+      return matchesSearchText(
+        debouncedSearch,
+        buildOptionSearchText(kpi.label, kpi.id, kpi.sdTypeID),
       );
-    }
-
-    if (activeSdTypeFilter) {
-      result = result.filter(
-        ({ kpi }) => String(kpi.sdTypeID) === activeSdTypeFilter,
-      );
-    }
-
-    if (mode !== "ALL_MODES") {
-      result = result.filter(({ kpi }) => kpi.sdInstanceMode === mode);
-    }
-
-    result.sort((a, b) => {
-      if (sort === "label_asc") return a.labelSort.localeCompare(b.labelSort);
-      if (sort === "label_desc") return b.labelSort.localeCompare(a.labelSort);
-
-      if (sort === "type_asc") return a.typeSort.localeCompare(b.typeSort);
-
-      if (sort === "type_desc") return b.typeSort.localeCompare(a.typeSort);
-
-      return 0;
     });
-
-    return result.map(({ kpi }) => kpi);
-  }, [activeSdTypeFilter, debouncedSearch, kpis, mode, sdTypeMap, sort]);
+  }, [base, debouncedSearch, mode]);
 
   if (loading) {
     return (
@@ -88,11 +74,11 @@ export default function KpiList({ kpis, sdTypes, sdTypeMap, loading }: Props) {
     <>
       <KpiFilters
         sdTypes={sdTypes}
-        selectedSdType={activeSdTypeFilter}
+        selectedSdType={selectedSdType}
         onSearchChange={setSearch}
         onSortChange={setSort}
         onModeChange={setMode}
-        onSdTypeChange={setSdTypeFilter}
+        onSdTypeChange={onSdTypeChange}
       />
 
       <div ref={containerRef}>
@@ -103,7 +89,7 @@ export default function KpiList({ kpis, sdTypes, sdTypeMap, loading }: Props) {
           style={{ height: "calc(100vh - 220px)" }}
           emptyState={<div className="text-muted form-label">No results</div>}
           renderItem={(kpi) => (
-            <KpiCard key={kpi.id} kpi={kpi} sdTypeMap={sdTypeMap} />
+            <KpiCard key={kpi.id} kpi={kpi} />
           )}
         />
       </div>

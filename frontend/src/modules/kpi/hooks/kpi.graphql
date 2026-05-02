@@ -13,6 +13,7 @@ query KpiDefinitionsBySdType($id: ID!) {
     id
     label
     sdTypeID
+    sdInstanceMode
   }
 }
 

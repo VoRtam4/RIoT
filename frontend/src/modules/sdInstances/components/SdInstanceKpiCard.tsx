@@ -24,15 +24,12 @@ export default function SdInstanceKpiCard({
         height: "100%",
         overflow: "hidden",
         backgroundColor: selected
-          ? "var(--primary)"
+          ? "var(--border-input)"
           : "var(--bg-card)",
-        transition: "all 0.15s",
-        border: selected
-          ? "1px solid var(--bs-primary)"
-          : "1px solid transparent",
         "&:hover": {
-          transform: "translateY(-1px)",
-          boxShadow: 3,
+          backgroundColor: selected
+          ? "var(--border-input)"
+          : "var(--border)",
         },
       }}
     >
@@ -40,12 +37,6 @@ export default function SdInstanceKpiCard({
         onClick={onClick}
         sx={{
           height: "100%",
-          backgroundColor: selected
-            ? "rgba(0,123,255,0.1)"
-            : "transparent",
-          "&:hover": {
-            backgroundColor: "rgba(0,123,255,0.2)",
-          },
         }}
       >
         <CardContent

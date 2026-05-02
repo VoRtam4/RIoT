@@ -11,6 +11,12 @@ import {
   filterSelectOption,
 } from "../../../utils/reactSelectSearch";
 import { virtualizedSelectProps } from "../../../utils/reactSelectVirtualized";
+import {
+  minusDaysLocal,
+  nowLocal,
+  toLocalInputValue,
+  toUTCString,
+} from "../../kpi/utils/dateTimeUtils";
 
 type Option = {
   value: string;
@@ -19,8 +25,8 @@ type Option = {
 };
 
 type SortOption = {
-  value: "DESC" | "ASC";
-  label: "DESC" | "ASC";
+  value: "DESC" | "ASC" | "NONE";
+  label: "DESC" | "ASC" | "NONE";
 };
 
 type Props = {
@@ -40,8 +46,10 @@ export default function TimeSeriesFilters({
     initialInput ?? {
       type: "raw",
       sortDesc: true,
-      limit: 50,
+      limit: 200,
       sdInstanceIDs: [],
+      from: toUTCString(minusDaysLocal(1)),
+      to: toUTCString(nowLocal()),
     },
   );
 
@@ -53,8 +61,8 @@ export default function TimeSeriesFilters({
     initialInput?.kpiDefinitionIDs ?? [],
   );
 
-  const { kpiDefinitions } = useKpiDefinitionsBySdType(selectedSdType);
-  const { sdInstances } = useSdInstancesByType(selectedSdType);
+  const { entry: kpiEntry } = useKpiDefinitionsBySdType(selectedSdType);
+  const { entry: instancesEntry } = useSdInstancesByType(selectedSdType);
 
   useEffect(() => {
     if (!initialInput) return;
@@ -93,22 +101,22 @@ export default function TimeSeriesFilters({
 
   const kpiOptions: Option[] = useMemo(
     () =>
-      (kpiDefinitions ?? []).map((k: any) => ({
+      (kpiEntry?.rawSortedAsc ?? []).map((k) => ({
         value: String(k.id),
         label: k.label || k.id,
         searchText: buildOptionSearchText(k.label, String(k.id)),
       })),
-    [kpiDefinitions],
+    [kpiEntry],
   );
 
   const instancesOptions: Option[] = useMemo(
     () =>
-      (sdInstances ?? []).map((i: any) => ({
+      (instancesEntry?.rawSortedAsc ?? []).map((i) => ({
         value: String(i.id),
         label: i.label || i.uid,
         searchText: buildOptionSearchText(i.label, i.uid, String(i.id)),
       })),
-    [sdInstances],
+    [instancesEntry],
   );
 
   const tagParameters = useMemo(() => {
@@ -147,7 +155,7 @@ export default function TimeSeriesFilters({
               setInput((s) => ({
                 type,
                 sortDesc: true,
-                limit: 50,
+                limit: 200,
                 sdInstanceIDs: [],
                 from: s.from,
                 to: s.to,
@@ -243,17 +251,11 @@ export default function TimeSeriesFilters({
             type="datetime-local"
             step="1"
             className="form-control"
-            value={
-              input.from
-                ? new Date(input.from).toISOString().slice(0, 19)
-                : ""
-            }
+            value={input.from ? toLocalInputValue(new Date(input.from)) : ""}
             onChange={(e) =>
               setInput((s) => ({
                 ...s,
-                from: e.target.value
-                  ? new Date(e.target.value).toISOString()
-                  : undefined,
+                from: e.target.value ? toUTCString(e.target.value) : undefined,
               }))
             }
           />
@@ -266,17 +268,11 @@ export default function TimeSeriesFilters({
             type="datetime-local"
             step="1"
             className="form-control"
-            value={
-              input.to
-                ? new Date(input.to).toISOString().slice(0, 19)
-                : ""
-            }
+            value={input.to ? toLocalInputValue(new Date(input.to)) : ""}
             onChange={(e) =>
               setInput((s) => ({
                 ...s,
-                to: e.target.value
-                  ? new Date(e.target.value).toISOString()
-                  : undefined,
+                to: e.target.value ? toUTCString(e.target.value) : undefined,
               }))
             }
           />
@@ -290,17 +286,31 @@ export default function TimeSeriesFilters({
             options={[
               { value: "DESC", label: "DESC" },
               { value: "ASC", label: "ASC" },
+              { value: "NONE", label: "NONE" },
             ]}
-            value={{
-              value: input.sortDesc ? "DESC" : "ASC",
-              label: input.sortDesc ? "DESC" : "ASC",
-            }}
-            onChange={(v: SingleValue<SortOption>) =>
-              setInput((s) => ({
-                ...s,
-                sortDesc: v?.value === "DESC",
-              }))
+            value={
+              input.sortDesc == null
+                ? { value: "NONE", label: "NONE" }
+                : input.sortDesc
+                  ? { value: "DESC", label: "DESC" }
+                  : { value: "ASC", label: "ASC" }
             }
+            onChange={(v: SingleValue<SortOption>) => {
+              setInput((s) => {
+                if (v?.value === "NONE") {
+                  return {
+                    ...s,
+                    sortDesc: undefined,
+                    limit: undefined,
+                  };
+                }
+                return {
+                  ...s,
+                  sortDesc: v?.value === "DESC",
+                  limit: s.limit ?? 50,
+                };
+              });
+            }}
             {...virtualizedSelectProps}
           />
         </div>

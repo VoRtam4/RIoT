@@ -15,8 +15,14 @@ func consumeMessageProcessingUnitConnectionNotificationJSONMessages(messageProce
 	sharedUtils.TerminateOnError(err, errorMessage)
 }
 
-func consumeSDInstanceRegistrationRequestJSONMessages(sdInstanceRegistrationRequestConsumerFunction func(sdInstanceRegistrationRequest sharedModel.SDInstanceRegistrationRequestISCMessage) error, rabbitMQClient rabbitmq.Client) {
-	err := rabbitmq.ConsumeJSONMessages[sharedModel.SDInstanceRegistrationRequestISCMessage](rabbitMQClient, sharedConstants.SDInstanceRegistrationRequestsQueueName, sdInstanceRegistrationRequestConsumerFunction)
+func consumeSDTypeRegistrationRequestJSONMessages(sdTypeRegistrationRequestConsumerFunction func(sdTypeRegistrationRequests sharedModel.SDTypeRegistrationRequestTupleISCMessage) error, rabbitMQClient rabbitmq.Client) {
+	err := rabbitmq.ConsumeJSONMessages[sharedModel.SDTypeRegistrationRequestTupleISCMessage](rabbitMQClient, sharedConstants.SDTypeRegistrationRequestsQueueName, sdTypeRegistrationRequestConsumerFunction)
+	errorMessage := fmt.Sprintf("[ISC] Consumption of messages from the '%s' queue has failed", sharedConstants.SDTypeRegistrationRequestsQueueName)
+	sharedUtils.TerminateOnError(err, errorMessage)
+}
+
+func consumeSDInstanceRegistrationRequestJSONMessages(sdInstanceRegistrationRequestConsumerFunction func(sdInstanceRegistrationRequests sharedModel.SDInstanceRegistrationRequestTupleISCMessage) error, rabbitMQClient rabbitmq.Client) {
+	err := rabbitmq.ConsumeJSONMessages[sharedModel.SDInstanceRegistrationRequestTupleISCMessage](rabbitMQClient, sharedConstants.SDInstanceRegistrationRequestsQueueName, sdInstanceRegistrationRequestConsumerFunction)
 	errorMessage := fmt.Sprintf("[ISC] Consumption of messages from the '%s' queue has failed", sharedConstants.SDInstanceRegistrationRequestsQueueName)
 	sharedUtils.TerminateOnError(err, errorMessage)
 }

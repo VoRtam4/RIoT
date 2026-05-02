@@ -482,6 +482,11 @@ func (r *relationalDatabaseClientImpl) LoadKPIDefinitionsBySDType(userID uint32,
 func (r *relationalDatabaseClientImpl) LoadKPIDefinitionsBySDInstance(userID uint32, sdInstanceID uint32) sharedUtils.Result[[]sharedModel.KPIDefinition] {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	sdInstanceResult := dbUtil.LoadEntityFromDB[dbModel.SDInstanceEntity](r.db, dbUtil.Where("id = ?", sdInstanceID))
+	if sdInstanceResult.IsFailure() {
+		return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](sdInstanceResult.GetError())
+	}
+	sdInstance := sdInstanceResult.GetPayload()
 	result := dbUtil.LoadEntitiesFromDB[dbModel.KPIDefinitionEntity](r.db, dbUtil.Where("user_id = ?", userID), dbUtil.Preload("SDType"), dbUtil.Preload("SDInstanceKPIDefinitionRelationshipRecords"))
 	if result.IsFailure() {
 		return sharedUtils.NewFailureResult[[]sharedModel.KPIDefinition](result.GetError())
@@ -489,6 +494,9 @@ func (r *relationalDatabaseClientImpl) LoadKPIDefinitionsBySDInstance(userID uin
 	entities := result.GetPayload()
 	filtered := make([]dbModel.KPIDefinitionEntity, 0)
 	for _, e := range entities {
+		if e.SDTypeID != sdInstance.SDTypeID {
+			continue
+		}
 		if e.SDInstanceMode == string(sharedModel.ALL) {
 			filtered = append(filtered, e)
 			continue
@@ -832,6 +840,7 @@ func (r *relationalDatabaseClientImpl) PersistRawDataPoints(points []dllModel.Ra
 	if len(points) == 0 {
 		return sharedUtils.NewSuccessResult([]dllModel.RawDataPoint{})
 	}
+	points = dedupeRawDataPoints(points)
 	entities := sharedUtils.Map(points, dll2db.ToDBModelRawDataPoint)
 	tx := r.db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{
@@ -883,6 +892,7 @@ func (r *relationalDatabaseClientImpl) PersistKPIFulfillmentCheckResults(points 
 	if len(points) == 0 {
 		return sharedUtils.NewSuccessResult([]dllModel.KPIFulfillmentCheckResult{})
 	}
+	points = dedupeKPIFulfillmentCheckResults(points)
 	entities := sharedUtils.Map(points, dll2db.ToDBModelEntityKPIFulfillmentCheckResult)
 	tx := &gorm.DB{}
 	if reprocess {
@@ -917,6 +927,44 @@ func (r *relationalDatabaseClientImpl) PersistKPIFulfillmentCheckResults(points 
 		return sharedUtils.NewFailureResult[[]dllModel.KPIFulfillmentCheckResult](tx.Error)
 	}
 	return sharedUtils.NewSuccessResult(points)
+}
+
+func dedupeRawDataPoints(points []dllModel.RawDataPoint) []dllModel.RawDataPoint {
+	latestByInstance := make(map[uint32]dllModel.RawDataPoint, len(points))
+	for _, point := range points {
+		current, exists := latestByInstance[point.SDInstanceID]
+		if !exists || point.EventTime.After(current.EventTime) {
+			latestByInstance[point.SDInstanceID] = point
+		}
+	}
+	deduped := make([]dllModel.RawDataPoint, 0, len(latestByInstance))
+	for _, point := range latestByInstance {
+		deduped = append(deduped, point)
+	}
+	return deduped
+}
+
+func dedupeKPIFulfillmentCheckResults(points []dllModel.KPIFulfillmentCheckResult) []dllModel.KPIFulfillmentCheckResult {
+	type key struct {
+		KPIDefinitionID uint32
+		SDInstanceID    uint32
+	}
+	latestByKey := make(map[key]dllModel.KPIFulfillmentCheckResult, len(points))
+	for _, point := range points {
+		k := key{
+			KPIDefinitionID: point.KPIDefinitionID,
+			SDInstanceID:    point.SDInstanceID,
+		}
+		current, exists := latestByKey[k]
+		if !exists || point.EventTime.After(current.EventTime) {
+			latestByKey[k] = point
+		}
+	}
+	deduped := make([]dllModel.KPIFulfillmentCheckResult, 0, len(latestByKey))
+	for _, point := range latestByKey {
+		deduped = append(deduped, point)
+	}
+	return deduped
 }
 
 func (r *relationalDatabaseClientImpl) LoadKPIFulfillmentCheckResults(userID uint32) sharedUtils.Result[[]dllModel.KPIFulfillmentCheckResult] {

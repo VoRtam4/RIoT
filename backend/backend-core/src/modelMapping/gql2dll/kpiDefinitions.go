@@ -168,7 +168,7 @@ func kpiNodeInputToKPINode(kpiNodeInput graphQLModel.KPINodeInput) sharedUtils.R
 			})
 		}
 	}
-	panic(fmt.Errorf("unpexted model mapping failure – shouldn't happen"))
+	return sharedUtils.NewFailureResult[sharedModel.KPINode](fmt.Errorf("unexpected model mapping failure for KPI node type %q", nodeType))
 }
 
 func constructKPINodeByIDMap(kpiNodeInputs []graphQLModel.KPINodeInput) sharedUtils.Result[map[uint32]sharedModel.KPINode] {

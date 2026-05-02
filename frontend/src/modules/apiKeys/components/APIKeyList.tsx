@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import Select from "react-select";
+import { matchesSearchText } from "../../../utils/reactSelectSearch";
 import { virtualizedSelectProps } from "../../../utils/reactSelectVirtualized";
 import VirtualizedList from "../../../components/virtualization/VirtualizedList";
 
@@ -22,7 +23,12 @@ type SortOption = {
   label: string;
 };
 
-export default function APIKeyList({ apiKeys, selectedId, loading, onSelect }: Props) {
+export default function APIKeyList({
+  apiKeys,
+  selectedId,
+  loading,
+  onSelect,
+}: Props) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterOption["value"]>("all");
   const [sort, setSort] = useState<SortOption["value"]>("label_asc");
@@ -46,7 +52,7 @@ export default function APIKeyList({ apiKeys, selectedId, loading, onSelect }: P
 
     if (search.trim()) {
       result = result.filter((k) =>
-        (k.label ?? "").toLowerCase().includes(search.toLowerCase()),
+        matchesSearchText(search, k.label),
       );
     }
 
@@ -71,6 +77,11 @@ export default function APIKeyList({ apiKeys, selectedId, loading, onSelect }: P
     return result;
   }, [apiKeys, search, filter, sort]);
 
+  const selectedIndex = useMemo(
+    () => filtered.findIndex((k) => k.id === selectedId),
+    [filtered, selectedId],
+  );
+
   if (loading) {
     return (
       <div className="d-flex vh-100 justify-content-center align-items-center">
@@ -86,19 +97,10 @@ export default function APIKeyList({ apiKeys, selectedId, loading, onSelect }: P
         flexDirection: "column",
         gap: 8,
         height: "100%",
+        minHeight: 0,
+        overflow: "hidden",
       }}
     >
-      {/* SEARCH */}
-      <div className="mb-2">
-        <label className="form-label">Search</label>
-        <input
-          className="form-control"
-          placeholder="Hledat..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
-
       {/* FILTER */}
       <div className="mb-2">
         <label className="form-label">Filter</label>
@@ -125,11 +127,24 @@ export default function APIKeyList({ apiKeys, selectedId, loading, onSelect }: P
         />
       </div>
 
+      {/* SEARCH */}
+      <div className="mb-2">
+        <label className="form-label">Search</label>
+        <input
+          className="form-control"
+          placeholder="Hledat..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
       {/* LIST */}
       <VirtualizedList
         items={filtered}
         rowHeight={92}
-        style={{ flex: 1 }}
+        scrollToIndex={selectedIndex}
+        pinnedIndex={selectedIndex}
+        style={{ flex: 1, minHeight: 0 }}
         emptyState={<div className="text-muted small form-label">No results</div>}
         renderItem={(k) => (
           <APIKeyCard

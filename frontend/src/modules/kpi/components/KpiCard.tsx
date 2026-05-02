@@ -1,6 +1,4 @@
 import { useNavigate } from "react-router-dom";
-import type { KpiDefinitionsQuery } from "../../../generated/graphql";
-
 import Card from "@mui/material/Card";
 import CardActionArea from "@mui/material/CardActionArea";
 import CardContent from "@mui/material/CardContent";
@@ -9,15 +7,15 @@ import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
 
 type Props = {
-  kpi: KpiDefinitionsQuery["kpiDefinitions"][number];
-  sdTypeMap: Map<string, string>;
+  kpi: {
+    id: string;
+    label?: string | null;
+    sdTypeID: string;
+    sdInstanceMode?: any;
+  };
 };
-
-export default function KpiCard({ kpi, sdTypeMap }: Props) {
+export default function KpiCard({ kpi }: Props) {
   const navigate = useNavigate();
-
-  const typeLabel =
-    kpi.sdTypeUID || sdTypeMap.get(kpi.sdTypeID) || kpi.sdTypeID || "\u00A0";
 
   return (
     <Card
@@ -25,6 +23,9 @@ export default function KpiCard({ kpi, sdTypeMap }: Props) {
         height: "100%",
         minHeight: 120,
         backgroundColor: "var(--bg-card)",
+        "&:hover": {
+          backgroundColor: "var(--border)",
+        },
       }}
     >
       <CardActionArea
@@ -43,19 +44,17 @@ export default function KpiCard({ kpi, sdTypeMap }: Props) {
             width: "100%",
           }}
         >
-          {/* TITLE */}
           <Typography variant="h6" className="color-label">
-            {kpi.label}
+            {kpi.label ?? "\u00A0"}
           </Typography>
 
-          {/* META */}
           <Box sx={{ mt: 1 }}>
             <Typography
               variant="body2"
               sx={{ opacity: 0.7 }}
               className="color-label"
             >
-              {typeLabel}
+              {kpi.id ?? "\u00A0"}
             </Typography>
 
             <Box sx={{ mt: 1 }}>
