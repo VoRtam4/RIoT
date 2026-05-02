@@ -1,0 +1,255 @@
+sources:
+  waze:
+    enabled: true
+    label: "WAZE"
+    sd_type_uid: "WAZE_JAM_LOCATION"
+    sd_type_label: "Waze Jam Location"
+    instance_count: 10000
+    identifier_prefix: "WAZE_JAM"
+    profiles:
+      normal:
+        events_per_second: 8
+        change_probability: 0.30
+      high:
+        events_per_second: 20
+        change_probability: 0.45
+      stress:
+        events_per_second: 45
+        change_probability: 0.70
+    parameters:
+      tags:
+        - denotation: "country"
+          label: "Country"
+          type: "string"
+        - denotation: "city"
+          label: "City"
+          type: "string"
+        - denotation: "street"
+          label: "Street"
+          type: "string"
+        - denotation: "roadType"
+          label: "Road Type"
+          type: "string"
+        - denotation: "segmentId"
+          label: "Segment ID"
+          type: "string"
+        - denotation: "fromNode"
+          label: "From Node"
+          type: "string"
+        - denotation: "toNode"
+          label: "To Node"
+          type: "string"
+        - denotation: "isForward"
+          label: "Is Forward"
+          type: "string"
+      fields:
+        - denotation: "delay"
+          label: "Delay"
+          type: "number"
+        - denotation: "length"
+          label: "Length"
+          type: "number"
+        - denotation: "level"
+          label: "Level"
+          type: "number"
+        - denotation: "speed"
+          label: "Speed"
+          type: "number"
+        - denotation: "speedKPH"
+          label: "Speed KPH"
+          type: "number"
+        - denotation: "jamCount"
+          label: "Jam Count"
+          type: "number"
+        - denotation: "pubMillisLatest"
+          label: "Latest Publication Time"
+          type: "number"
+        - denotation: "rawJams"
+          label: "Raw Jams"
+          type: "string"
+
+  ndic:
+    enabled: true
+    label: "NDIC"
+    sd_type_uid: "NDIC_TRAFFIC"
+    sd_type_label: "NDIC Traffic"
+    instance_count: 3000
+    identifier_prefix: "NDIC_TRAFFIC"
+    profiles:
+      normal:
+        events_per_second: 10
+        change_probability: 0.20
+      high:
+        events_per_second: 25
+        change_probability: 0.35
+      stress:
+        events_per_second: 55
+        change_probability: 0.60
+    parameters:
+      tags:
+        - denotation: "sourceIdentification"
+          label: "Source Identification"
+          type: "string"
+        - denotation: "primaryLocationCode"
+          label: "Primary Location Code"
+          type: "string"
+        - denotation: "secondaryLocationCode"
+          label: "Secondary Location Code"
+          type: "string"
+        - denotation: "alertCDirection"
+          label: "Alert-C Direction"
+          type: "string"
+        - denotation: "tmcLocationCode"
+          label: "TMC Location Code"
+          type: "string"
+        - denotation: "tmcPointName"
+          label: "TMC Point Name"
+          type: "string"
+        - denotation: "tmcAreaRef"
+          label: "TMC Area Ref"
+          type: "string"
+        - denotation: "tmcAreaName"
+          label: "TMC Area Name"
+          type: "string"
+        - denotation: "tmcRoadLCD"
+          label: "TMC Road LCD"
+          type: "string"
+        - denotation: "tmcSegmentLCD"
+          label: "TMC Segment LCD"
+          type: "string"
+        - denotation: "tmcRoadNumber"
+          label: "TMC Road Number"
+          type: "string"
+        - denotation: "tmcRoadName"
+          label: "TMC Road Name"
+          type: "string"
+      fields:
+        - denotation: "trafficSpeedAnyVehicle"
+          label: "Traffic Speed"
+          type: "number"
+        - denotation: "travelTimeAnyVehicle"
+          label: "Travel Time"
+          type: "number"
+        - denotation: "trafficLevelAnyVehicle"
+          label: "Traffic Level"
+          type: "number"
+        - denotation: "publicationTimestamp"
+          label: "Publication Timestamp"
+          type: "number"
+        - denotation: "isInactive"
+          label: "Is Inactive"
+          type: "boolean"
+        - denotation: "tmcLatitude"
+          label: "TMC Latitude"
+          type: "number"
+        - denotation: "tmcLongitude"
+          label: "TMC Longitude"
+          type: "number"
+
+  mhd:
+    enabled: true
+    label: "MHD"
+    sd_type_uid: "MHD_TRIP"
+    sd_type_label: "MHD Trip"
+    instance_count: 16000
+    identifier_prefix: "MHD_TRIP"
+    profiles:
+      normal:
+        events_per_second: 12
+        change_probability: 0.25
+      high:
+        events_per_second: 28
+        change_probability: 0.40
+      stress:
+        events_per_second: 60
+        change_probability: 0.65
+    parameters:
+      tags:
+        - denotation: "lineid"
+          label: "Line ID"
+          type: "string"
+        - denotation: "routeid"
+          label: "Route ID"
+          type: "string"
+        - denotation: "service_date"
+          label: "Service Date"
+          type: "string"
+        - denotation: "trip_id"
+          label: "Trip ID"
+          type: "string"
+        - denotation: "route_id"
+          label: "GTFS Route ID"
+          type: "string"
+        - denotation: "direction_id"
+          label: "Direction ID"
+          type: "string"
+        - denotation: "departure_time"
+          label: "Departure Time"
+          type: "string"
+        - denotation: "from_stop_id"
+          label: "From Stop ID"
+          type: "string"
+        - denotation: "to_stop_id"
+          label: "To Stop ID"
+          type: "string"
+        - denotation: "segment_index"
+          label: "Segment Index"
+          type: "string"
+        - denotation: "segment_from_stop_id"
+          label: "Segment From Stop ID"
+          type: "string"
+        - denotation: "segment_to_stop_id"
+          label: "Segment To Stop ID"
+          type: "string"
+        - denotation: "finalstopid"
+          label: "Final Stop ID"
+          type: "string"
+        - denotation: "vtype"
+          label: "Vehicle Type"
+          type: "string"
+        - denotation: "serviceDays"
+          label: "Service Days"
+          type: "string"
+      fields:
+        - denotation: "globalid"
+          label: "Global ID"
+          type: "string"
+        - denotation: "id"
+          label: "Vehicle Runtime ID"
+          type: "string"
+        - denotation: "linename"
+          label: "Line Name"
+          type: "string"
+        - denotation: "course"
+          label: "Course"
+          type: "string"
+        - denotation: "ltype"
+          label: "Line Type"
+          type: "string"
+        - denotation: "lf"
+          label: "Low Floor"
+          type: "string"
+        - denotation: "laststopid"
+          label: "Last Stop ID"
+          type: "string"
+        - denotation: "lastupdate"
+          label: "Last Update"
+          type: "number"
+        - denotation: "lat"
+          label: "Latitude"
+          type: "number"
+        - denotation: "lng"
+          label: "Longitude"
+          type: "number"
+        - denotation: "bearing"
+          label: "Bearing"
+          type: "number"
+        - denotation: "delay"
+          label: "Delay"
+          type: "number"
+        - denotation: "segment_progress"
+          label: "Segment Progress"
+          type: "number"
+        - denotation: "isinactive"
+          label: "Is Inactive"
+          type: "boolean"

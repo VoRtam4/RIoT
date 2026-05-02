@@ -1,0 +1,147 @@
+experiments:
+  - id: "E1"
+    type: "ingest"
+    enabled: true
+    repetitions: 3
+    description: "Measure end-to-end ingest throughput from all simulated sources."
+    scenarios:
+      - id: "I1"
+        load_profile: "normal"
+        duration_minutes: 10
+        metadata:
+          note: "baseline realistic load"
+      - id: "I2"
+        load_profile: "high"
+        duration_minutes: 10
+        metadata:
+          note: "elevated sustained load"
+      - id: "I3"
+        load_profile: "stress"
+        duration_minutes: 5
+        metadata:
+          note: "short stress run"
+
+  - id: "E2"
+    type: "reprocess"
+    enabled: true
+    repetitions: 3
+    description: "Measure reprocessing throughput on different history sizes and KPI scopes."
+    scenarios:
+      - id: "R1"
+        dataset_id: "D1"
+        kpi_id: "K1"
+      - id: "R2"
+        dataset_id: "D2"
+        kpi_id: "K1"
+      - id: "R3"
+        dataset_id: "D3"
+        kpi_id: "K1"
+      - id: "R4"
+        dataset_id: "D2"
+        kpi_id: "K4"
+      - id: "R5"
+        dataset_id: "D2"
+        kpi_id: "K4B"
+      - id: "R6"
+        dataset_id: "D2"
+        kpi_id: "K6"
+      - id: "R7"
+        dataset_id: "D3"
+        kpi_id: "K4"
+
+  - id: "E3"
+    type: "history_read"
+    enabled: true
+    repetitions: 1
+    description: "Measure historical export performance over REST."
+    scenarios:
+      - id: "H1"
+        dataset_id: "D3"
+        source: "waze"
+        data_type: "raw"
+        interval_hours: 24
+        filter_mode: "single_instance"
+      - id: "H2"
+        dataset_id: "D3"
+        source: "waze"
+        data_type: "raw"
+        interval_hours: 168
+        filter_mode: "single_instance"
+      - id: "H3"
+        dataset_id: "D3"
+        source: "waze"
+        data_type: "raw"
+        interval_hours: 720
+        filter_mode: "single_instance"
+      - id: "H4"
+        dataset_id: "D3"
+        source: "ndic"
+        data_type: "raw"
+        interval_hours: 168
+        filter_mode: "multi_instance"
+      - id: "H5"
+        dataset_id: "D3"
+        source: "ndic"
+        data_type: "raw"
+        interval_hours: 168
+        filter_mode: "no_filter"
+      - id: "H6"
+        dataset_id: "D3"
+        source: "ndic"
+        data_type: "kpi"
+        interval_hours: 168
+        filter_mode: "single_instance"
+        metadata:
+          kpi_id: "K4"
+          instance_uid: "NDIC_TRAFFIC_SRC-00002"
+      - id: "H7"
+        dataset_id: "D3"
+        source: "ndic"
+        data_type: "aggregate_kpi"
+        interval_hours: 168
+        filter_mode: "multi_instance"
+        metadata:
+          kpi_id: "K4B"
+          aggregate_seconds: 300
+      - id: "H8"
+        dataset_id: "D3"
+        source: "waze"
+        data_type: "kpi"
+        interval_hours: 168
+        filter_mode: "single_instance"
+        metadata:
+          kpi_id: "K2"
+      - id: "H9"
+        dataset_id: "D3"
+        source: "ndic"
+        data_type: "kpi"
+        interval_hours: 168
+        filter_mode: "multi_instance"
+        metadata:
+          kpi_id: "K4B"
+      - id: "H10"
+        dataset_id: "D3"
+        source: "mhd"
+        data_type: "raw"
+        interval_hours: 720
+        filter_mode: "no_filter"
+        metadata:
+          sort_desc: true
+          note: "large week-long raw export with explicit descending sort"
+
+  - id: "E4"
+    type: "storage"
+    enabled: true
+    repetitions: 1
+    description: "Measure storage growth and point counts."
+    scenarios:
+      - id: "S1"
+        dataset_id: "D1"
+      - id: "S2"
+        dataset_id: "D2"
+      - id: "S3"
+        dataset_id: "D3"
+      - id: "S4"
+        dataset_id: "D3"
+        metadata:
+          apply_extended_kpi_set: true
