@@ -9,7 +9,6 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
-	"github.com/go-chi/chi/v5"
 )
 
 func ReadTimeSeries(w http.ResponseWriter, r *http.Request) {
@@ -80,14 +79,12 @@ func StartTimeSeriesExport(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	url, err := domainLogicLayer.StartTimeSeriesExport(principal.UserID, input)
+	exportJob, err := domainLogicLayer.StartTimeSeriesExport(principal.UserID, input)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]string{
-		"url": "/rest/time-series/export/" + url,
-	})
+	json.NewEncoder(w).Encode(exportJob)
 }
 
 func StartTimeSeriesExportAggregateKpi(w http.ResponseWriter, r *http.Request) {
@@ -101,21 +98,61 @@ func StartTimeSeriesExportAggregateKpi(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	url, err := domainLogicLayer.StartTimeSeriesExportAggregateKPI(principal.UserID, input)
+	exportJob, err := domainLogicLayer.StartTimeSeriesExportAggregateKPI(principal.UserID, input)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]string{
-		"url": "/rest/time-series/export/" + url,
-	})
+	json.NewEncoder(w).Encode(exportJob)
+}
+
+func CancelTimeSeriesExport(w http.ResponseWriter, r *http.Request) {
+	principal := authorizeOperation(w, r, auth.ResourceTimeSeries, auth.OperationRead)
+	if principal == nil {
+		return
+	}
+	id, ok := parseID(w, r)
+	if !ok {
+		return
+	}
+	exportJob, err := domainLogicLayer.CancelTimeSeriesExport(principal.UserID, id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	json.NewEncoder(w).Encode(exportJob)
+}
+
+func GetTimeSeriesExport(w http.ResponseWriter, r *http.Request) {
+	principal := authorizeOperation(w, r, auth.ResourceTimeSeries, auth.OperationRead)
+	if principal == nil {
+		return
+	}
+	id, ok := parseID(w, r)
+	if !ok {
+		return
+	}
+	exportJob, err := domainLogicLayer.GetTimeSeriesExport(principal.UserID, id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	json.NewEncoder(w).Encode(exportJob)
 }
 
 func TimeSeriesExport(w http.ResponseWriter, r *http.Request) {
-	if principal := authorizeOperation(w, r, auth.ResourceTimeSeries, auth.OperationRead); principal == nil {
+	principal := authorizeOperation(w, r, auth.ResourceTimeSeries, auth.OperationRead)
+	if principal == nil {
 		return
 	}
-	id := chi.URLParam(r, "id")
+	id, ok := parseID(w, r)
+	if !ok {
+		return
+	}
+	if _, err := domainLogicLayer.GetTimeSeriesExport(principal.UserID, id); err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
 	job, ok := domainLogicLayer.GetExportJob(id)
 	if !ok {
 		http.Error(w, "not found", 404)

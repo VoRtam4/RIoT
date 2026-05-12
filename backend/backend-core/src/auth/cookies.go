@@ -19,13 +19,13 @@ const (
 
 var (
 	secureCookies = sharedUtils.GetFlagEnvironmentVariableValue("SECURE_COOKIES").GetPayloadOrDefault(false) // TODO: Ensure this variable evaluates to 'true' in production (requires HTTPS)
-	env           = sharedUtils.GetEnvironmentVariableValue("APP_ENV").GetPayloadOrDefault("dev")
+	devEnv        = sharedUtils.GetFlagEnvironmentVariableValue("DEV_ENV").GetPayloadOrDefault(true)
 )
 
 func setupHttpOnlyCookie(w http.ResponseWriter, identifier string, value string, path string, expiresIn time.Duration) {
 	sameSite := http.SameSiteNoneMode
 	secure := true
-	if env == "dev" {
+	if devEnv {
 		sameSite = http.SameSiteLaxMode
 		secure = false
 	}
@@ -52,7 +52,7 @@ func getCookieValue(r *http.Request, identifier string) sharedUtils.Optional[str
 func clearHttpOnlyCookie(w http.ResponseWriter, identifier string, path string) {
 	sameSite := http.SameSiteNoneMode
 	secure := true
-	if env == "dev" {
+	if devEnv {
 		sameSite = http.SameSiteLaxMode
 		secure = false
 	}

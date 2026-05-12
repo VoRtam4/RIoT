@@ -19,6 +19,8 @@ var (
 	sdTypeDefinitionsMutex                   sync.RWMutex
 	activeReprocessJobs                      sync.Map
 	jobSyncMap                               sync.Map
+	initialConfigReady                       = make(chan struct{})
+	initialConfigReadyOnce                   sync.Once
 )
 
 func InitializeProcessing() {
@@ -34,6 +36,10 @@ func DenotationMapUpdates(rabbitMQClient rabbitmq.Client) {
 		kpiDefinitionsBySDTypeDenotationMap = messagePayload.KpiConfiguration
 		kpiDefinitionsBySDTypeDenotationMapMutex.Unlock()
 		log.Printf("[MPU] KPI configuration map updated successfully | unit=%s", unitUUID)
+		initialConfigReadyOnce.Do(func() {
+			close(initialConfigReady)
+			log.Printf("[MPU][BOOTSTRAP] Initial KPI configuration received | unit=%s", unitUUID)
+		})
 		signalConfigReady(messagePayload.JobID)
 		return nil
 	})

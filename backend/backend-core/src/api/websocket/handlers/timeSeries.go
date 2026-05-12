@@ -60,14 +60,12 @@ func StartTimeSeriesExportAggregateKpi(c *connection.Client, msg sharedModel.Web
 		sendError(c, msg.ID, "invalid payload")
 		return
 	}
-	url, err := domainLogicLayer.StartTimeSeriesExportAggregateKPI(principal.UserID, input)
+	exportJob, err := domainLogicLayer.StartTimeSeriesExportAggregateKPI(principal.UserID, input)
 	if err != nil {
 		sendError(c, msg.ID, err.Error())
 		return
 	}
-	sendSuccess(c, msg.ID, map[string]string{
-		"url": url,
-	})
+	sendSuccess(c, msg.ID, exportJob)
 }
 
 func StartTimeSeriesExport(c *connection.Client, msg sharedModel.WebSocketMessage) {
@@ -80,14 +78,58 @@ func StartTimeSeriesExport(c *connection.Client, msg sharedModel.WebSocketMessag
 		sendError(c, msg.ID, "invalid payload")
 		return
 	}
-	url, err := domainLogicLayer.StartTimeSeriesExport(principal.UserID, input)
+	exportJob, err := domainLogicLayer.StartTimeSeriesExport(principal.UserID, input)
 	if err != nil {
 		sendError(c, msg.ID, err.Error())
 		return
 	}
-	sendSuccess(c, msg.ID, map[string]string{
-		"url": url,
-	})
+	sendSuccess(c, msg.ID, exportJob)
+}
+
+func CancelTimeSeriesExport(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	principal := AuthorizeOperation(c, msg, auth.ResourceTimeSeries, auth.OperationRead)
+	if principal == nil {
+		return
+	}
+	payload, ok := msg.Payload.(map[string]any)
+	if !ok {
+		sendError(c, msg.ID, "invalid payload")
+		return
+	}
+	id, ok := parseID(payload)
+	if !ok {
+		sendError(c, msg.ID, "invalid id")
+		return
+	}
+	exportJob, err := domainLogicLayer.CancelTimeSeriesExport(principal.UserID, id)
+	if err != nil {
+		sendError(c, msg.ID, err.Error())
+		return
+	}
+	sendSuccess(c, msg.ID, exportJob)
+}
+
+func GetTimeSeriesExport(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	principal := AuthorizeOperation(c, msg, auth.ResourceTimeSeries, auth.OperationRead)
+	if principal == nil {
+		return
+	}
+	payload, ok := msg.Payload.(map[string]any)
+	if !ok {
+		sendError(c, msg.ID, "invalid payload")
+		return
+	}
+	id, ok := parseID(payload)
+	if !ok {
+		sendError(c, msg.ID, "invalid id")
+		return
+	}
+	exportJob, err := domainLogicLayer.GetTimeSeriesExport(principal.UserID, id)
+	if err != nil {
+		sendError(c, msg.ID, err.Error())
+		return
+	}
+	sendSuccess(c, msg.ID, exportJob)
 }
 
 func GetTimeSeriesDistinctTagValues(c *connection.Client, msg sharedModel.WebSocketMessage) {

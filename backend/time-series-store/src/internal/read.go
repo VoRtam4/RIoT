@@ -11,9 +11,9 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 )
 
-func (c Influx2Client) StreamRead(plan sharedModel.QueryPlan, onBatch func([]sharedModel.TimeSeriesDataPoint, bool, bool) error) error {
+func (c Influx2Client) StreamRead(ctx context.Context, plan sharedModel.QueryPlan, onBatch func([]sharedModel.TimeSeriesDataPoint, bool, bool) error) error {
 	if plan.UseAggregation {
-		return c.streamReadAggregated(plan, onBatch)
+		return c.streamReadAggregated(ctx, plan, onBatch)
 	}
 	state := &streamState{
 		totalSent:    0,
@@ -39,7 +39,7 @@ func (c Influx2Client) StreamRead(plan sharedModel.QueryPlan, onBatch func([]sha
 		return nil
 	}
 	if !plan.UseSort {
-		hitLimit, err := c.streamReadRangeChunks(plan, state, onBatch)
+		hitLimit, err := c.streamReadRangeChunks(ctx, plan, state, onBatch)
 		if err != nil {
 			return err
 		}
@@ -51,7 +51,7 @@ func (c Influx2Client) StreamRead(plan sharedModel.QueryPlan, onBatch func([]sha
 	if !plan.SortDesc {
 		if plan.NeedInitial {
 			snapshotFlux := c.buildSnapshotFlux(plan)
-			hitLimit, err := c.streamRowsFlux(snapshotFlux, plan, state, onBatch, true)
+			hitLimit, err := c.streamRowsFlux(ctx, snapshotFlux, plan, state, onBatch, true)
 			if err != nil {
 				return err
 			}
@@ -59,7 +59,7 @@ func (c Influx2Client) StreamRead(plan sharedModel.QueryPlan, onBatch func([]sha
 				return nil
 			}
 		}
-		hitLimit, err := c.streamReadRangeChunks(plan, state, onBatch)
+		hitLimit, err := c.streamReadRangeChunks(ctx, plan, state, onBatch)
 		if err != nil {
 			return err
 		}
@@ -68,7 +68,7 @@ func (c Influx2Client) StreamRead(plan sharedModel.QueryPlan, onBatch func([]sha
 		}
 		return finalFlush()
 	}
-	hitLimit, err := c.streamReadRangeChunks(plan, state, onBatch)
+	hitLimit, err := c.streamReadRangeChunks(ctx, plan, state, onBatch)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func (c Influx2Client) StreamRead(plan sharedModel.QueryPlan, onBatch func([]sha
 	}
 	if !plan.From.IsZero() {
 		snapshotFlux := c.buildSnapshotFlux(plan)
-		hitLimit, err := c.streamRowsFlux(snapshotFlux, plan, state, onBatch, true)
+		hitLimit, err := c.streamRowsFlux(ctx, snapshotFlux, plan, state, onBatch, true)
 		if err != nil {
 			return err
 		}
@@ -88,12 +88,12 @@ func (c Influx2Client) StreamRead(plan sharedModel.QueryPlan, onBatch func([]sha
 	return finalFlush()
 }
 
-func (c Influx2Client) streamReadRangeChunks(plan sharedModel.QueryPlan, state *streamState, onBatch func([]sharedModel.TimeSeriesDataPoint, bool, bool) error) (bool, error) {
+func (c Influx2Client) streamReadRangeChunks(ctx context.Context, plan sharedModel.QueryPlan, state *streamState, onBatch func([]sharedModel.TimeSeriesDataPoint, bool, bool) error) (bool, error) {
 	if !plan.To.After(plan.From) {
 		return false, nil
 	}
 
-	effectiveFrom, err := c.resolveEffectivePlanFrom(plan)
+	effectiveFrom, err := c.resolveEffectivePlanFrom(ctx, plan)
 	if err != nil {
 		return false, err
 	}
@@ -101,7 +101,7 @@ func (c Influx2Client) streamReadRangeChunks(plan sharedModel.QueryPlan, state *
 	windows := buildTimeWindows(effectiveFrom, plan.To, plan.UseSort && plan.SortDesc)
 	for _, window := range windows {
 		readFlux := c.buildReadFluxForRange(plan, window.From, window.To)
-		hitLimit, err := c.streamRowsFlux(readFlux, plan, state, onBatch, false)
+		hitLimit, err := c.streamRowsFlux(ctx, readFlux, plan, state, onBatch, false)
 		if err != nil || hitLimit {
 			return hitLimit, err
 		}
@@ -121,7 +121,7 @@ func (c Influx2Client) DistinctTagValues(req sharedModel.TimeSeriesDistinctTagVa
 	}
 	plan := BuildQueryPlan(readReq)
 	distinctValues := make(map[string]struct{})
-	effectiveFrom, err := c.resolveEffectivePlanFrom(plan)
+	effectiveFrom, err := c.resolveEffectivePlanFrom(context.Background(), plan)
 	if err != nil {
 		return nil, err
 	}
@@ -169,13 +169,13 @@ func (c Influx2Client) DistinctTagValues(req sharedModel.TimeSeriesDistinctTagVa
 	return values, nil
 }
 
-func (c Influx2Client) resolveEffectivePlanFrom(plan sharedModel.QueryPlan) (time.Time, error) {
+func (c Influx2Client) resolveEffectivePlanFrom(ctx context.Context, plan sharedModel.QueryPlan) (time.Time, error) {
 	if !plan.From.IsZero() || !plan.To.After(plan.From) {
 		return plan.From, nil
 	}
 
 	fluxQuery := c.buildFirstPointFlux(plan, plan.To)
-	result, err := c.queryApi.Query(context.Background(), fluxQuery)
+	result, err := c.queryApi.Query(ctx, fluxQuery)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -202,8 +202,8 @@ func (c Influx2Client) resolveEffectivePlanFrom(plan sharedModel.QueryPlan) (tim
 	return earliest, nil
 }
 
-func (c Influx2Client) streamRowsFlux(fluxQuery string, plan sharedModel.QueryPlan, state *streamState, onBatch func([]sharedModel.TimeSeriesDataPoint, bool, bool) error, isSnapshot bool) (bool, error) {
-	result, err := c.queryApi.Query(context.Background(), fluxQuery)
+func (c Influx2Client) streamRowsFlux(ctx context.Context, fluxQuery string, plan sharedModel.QueryPlan, state *streamState, onBatch func([]sharedModel.TimeSeriesDataPoint, bool, bool) error, isSnapshot bool) (bool, error) {
+	result, err := c.queryApi.Query(ctx, fluxQuery)
 	if err != nil {
 		return false, err
 	}

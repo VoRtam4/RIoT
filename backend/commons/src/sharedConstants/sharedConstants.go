@@ -3,6 +3,8 @@ package sharedConstants
 const (
 	BuiltInFanoutExchangeName                             = "amq.fanout"
 	MessageProcessingUnitConnectionNotificationsQueueName = "message-processing-unit-connection-notifications"
+	RawDataPointCacheBootstrapQueueName                   = "raw-data-point-cache-bootstrap"
+	KPIFulfillmentCacheBootstrapQueueName                 = "kpi-fulfillment-cache-bootstrap"
 	KPIFulfillmentCheckRequestsQueueName                  = "kpi-fulfillment-check-requests"
 	KPIFulfillmentCheckResultsQueueName                   = "kpi-fulfillment-check-results"
 	RawDataPointQueueName                                 = "raw-data-point"
@@ -13,6 +15,7 @@ const (
 	TimeSeriesRawDataQueueName                            = "time-series-raw-data"
 	TimeSeriesKPIResultQueueName                          = "time-series-kpi-results"
 	TimeSeriesReadRequestQueueName                        = "time-series-read-request"
+	TimeSeriesReadCancelRequestQueueName                  = "time-series-read-cancel-request"
 	TimeSeriesReadResponseQueueName                       = "time-series-read-response"
 	TimeSeriesDistinctTagValuesRequestQueueName           = "time-series-distinct-tag-values-request"
 	TimeSeriesDistinctTagValuesResponseQueueName          = "time-series-distinct-tag-values-response"

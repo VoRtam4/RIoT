@@ -1,3 +1,11 @@
+/**
+ * @file client.go
+ * @brief Sdílený RabbitMQ klient používaný backendovými moduly platformy RIoT.
+ * @author Vojtěch Hubáček, Michal Bureš
+ * @defgroup riot_commons Commons
+ * @ingroup riot
+ * @see ../../README.md
+ */
 package rabbitmq
 
 import (

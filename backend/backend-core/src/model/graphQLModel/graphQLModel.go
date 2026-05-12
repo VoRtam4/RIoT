@@ -635,6 +635,10 @@ type TimeSeriesExport struct {
 	Error       *string      `json:"error,omitempty"`
 }
 
+type TimeSeriesExportFilter struct {
+	Ids []uint32 `json:"ids,omitempty"`
+}
+
 type TimeSeriesParameter struct {
 	Denotation string        `json:"denotation"`
 	Label      string        `json:"label"`
@@ -694,6 +698,7 @@ const (
 	ExportStatusProcessing ExportStatus = "processing"
 	ExportStatusDone       ExportStatus = "done"
 	ExportStatusFailed     ExportStatus = "failed"
+	ExportStatusCancelled  ExportStatus = "cancelled"
 	ExportStatusExpired    ExportStatus = "expired"
 )
 
@@ -702,12 +707,13 @@ var AllExportStatus = []ExportStatus{
 	ExportStatusProcessing,
 	ExportStatusDone,
 	ExportStatusFailed,
+	ExportStatusCancelled,
 	ExportStatusExpired,
 }
 
 func (e ExportStatus) IsValid() bool {
 	switch e {
-	case ExportStatusPending, ExportStatusProcessing, ExportStatusDone, ExportStatusFailed, ExportStatusExpired:
+	case ExportStatusPending, ExportStatusProcessing, ExportStatusDone, ExportStatusFailed, ExportStatusCancelled, ExportStatusExpired:
 		return true
 	}
 	return false

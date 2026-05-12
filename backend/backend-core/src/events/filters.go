@@ -245,3 +245,17 @@ func BuildKPIFulfillmentCheckedFilter(userID uint32, filter *graphQLModel.KPIFul
 		return false
 	}, nil
 }
+
+func BuildTimeSeriesExportFilter(filter *graphQLModel.TimeSeriesExportFilter) (func(graphQLModel.TimeSeriesExport) bool, error) {
+	if filter == nil || len(filter.Ids) == 0 {
+		return nil, fmt.Errorf("timeSeries export subscription requires at least one id")
+	}
+	allowedIDs := make(map[uint32]struct{}, len(filter.Ids))
+	for _, id := range filter.Ids {
+		allowedIDs[id] = struct{}{}
+	}
+	return func(export graphQLModel.TimeSeriesExport) bool {
+		_, ok := allowedIDs[export.ID]
+		return ok
+	}, nil
+}

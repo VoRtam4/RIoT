@@ -1,3 +1,11 @@
+/**
+ * @file main.go
+ * @brief Vstupní bod modulu Backend Core platformy RIoT.
+ * @author Vojtěch Hubáček, Michal Bureš
+ * @defgroup riot_backend_core Backend Core
+ * @ingroup riot
+ * @see ../README.md
+ */
 package main
 
 import (

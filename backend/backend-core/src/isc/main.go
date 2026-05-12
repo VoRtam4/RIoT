@@ -25,6 +25,8 @@ func ProcessIncomingMessageProcessingUnitConnectionNotifications() {
 	defer rabbitMQClient.Dispose()
 	consumeMessageProcessingUnitConnectionNotificationJSONMessages(func(_ sharedModel.MessageProcessingUnitConnectionNotification) error {
 		EnqueueMessageRepresentingCurrentKPIDefinitionConfiguration(rabbitMQClient, "")
+		EnqueueMessageRepresentingCurrentRawDataCache(rabbitMQClient)
+		EnqueueMessageRepresentingCurrentKPICache(rabbitMQClient)
 		return nil
 	}, rabbitMQClient)
 }
@@ -71,7 +73,6 @@ func ProcessIncomingRawDataPoints() {
 			grouped[msg.SDInstanceUID] = append(grouped[msg.SDInstanceUID], msg)
 		}
 		for uid, messages := range grouped {
-			log.Printf("Raw data point: %s", uid)
 			instanceResult := dbClient.GetRelationalDatabaseClientInstance().UpsertSDInstance(uid, messages[0].SDTypeUID, "")
 			if instanceResult.IsFailure() {
 				return instanceResult.GetError()
@@ -122,7 +123,6 @@ func ProcessIncomingKPIFulfillmentCheckResults() {
 			grouped[msg.SDInstanceUID] = append(grouped[msg.SDInstanceUID], msg)
 		}
 		for uid, messages := range grouped {
-			log.Printf("KPI fulfillment: %s", uid)
 			instanceResult := dbClient.GetRelationalDatabaseClientInstance().UpsertSDInstance(uid, messages[0].SDTypeUID, "")
 			if instanceResult.IsFailure() {
 				return instanceResult.GetError()
@@ -294,6 +294,141 @@ func EnqueueMessageRepresentingCurrentKPIDefinitionConfiguration(rabbitMQClient 
 		}
 		return rabbitMQClient.PublishJSONMessage(sharedUtils.NewOptionalOf(sharedConstants.BuiltInFanoutExchangeName), sharedUtils.NewEmptyOptional[string](), jsonSerializationResult.GetPayload())
 	}(), "[ISC] Failed to enqueue RabbitMQ messages representing current KPI definition configuration")
+}
+
+func EnqueueMessageRepresentingCurrentRawDataCache(rabbitMQClient rabbitmq.Client) {
+	const batchSize = 500
+	sharedUtils.TerminateOnError(func() error {
+		rawPointsLoadResult := dbClient.GetRelationalDatabaseClientInstance().LoadAllRawDataPoints()
+		if rawPointsLoadResult.IsFailure() {
+			return rawPointsLoadResult.GetError()
+		}
+		sdInstancesLoadResult := dbClient.GetRelationalDatabaseClientInstance().LoadSDInstances()
+		if sdInstancesLoadResult.IsFailure() {
+			return sdInstancesLoadResult.GetError()
+		}
+
+		instanceByID := make(map[uint32]dllModel.SDInstance, len(sdInstancesLoadResult.GetPayload()))
+		for _, instance := range sdInstancesLoadResult.GetPayload() {
+			id := instance.ID.GetPayloadOrDefault(0)
+			if id == 0 {
+				continue
+			}
+			instanceByID[id] = instance
+		}
+
+		messages := make([]sharedModel.RawDataPointISCMessage, 0, len(rawPointsLoadResult.GetPayload()))
+		for _, point := range rawPointsLoadResult.GetPayload() {
+			instance, exists := instanceByID[point.SDInstanceID]
+			if !exists {
+				continue
+			}
+			messages = append(messages, sharedModel.RawDataPointISCMessage{
+				SDTypeUID:     instance.SDType.UID,
+				SDInstanceUID: instance.UID,
+				EventTime:     point.EventTime,
+				Payload:       point.Payload,
+			})
+		}
+
+		if len(messages) == 0 {
+			payloadResult := sharedUtils.SerializeToJSON(sharedModel.RawDataPointCacheBootstrapISCMessage{
+				Tuple: []sharedModel.RawDataPointISCMessage{},
+				Done:  true,
+			})
+			if payloadResult.IsFailure() {
+				return payloadResult.GetError()
+			}
+			return rabbitMQClient.PublishJSONMessage(sharedUtils.NewEmptyOptional[string](), sharedUtils.NewOptionalOf(sharedConstants.RawDataPointCacheBootstrapQueueName), payloadResult.GetPayload())
+		}
+
+		for start := 0; start < len(messages); start += batchSize {
+			end := start + batchSize
+			if end > len(messages) {
+				end = len(messages)
+			}
+			payloadResult := sharedUtils.SerializeToJSON(sharedModel.RawDataPointCacheBootstrapISCMessage{
+				Tuple: messages[start:end],
+				Done:  end == len(messages),
+			})
+			if payloadResult.IsFailure() {
+				return payloadResult.GetError()
+			}
+			if err := rabbitMQClient.PublishJSONMessage(sharedUtils.NewEmptyOptional[string](), sharedUtils.NewOptionalOf(sharedConstants.RawDataPointCacheBootstrapQueueName), payloadResult.GetPayload()); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}(), "[ISC] Failed to enqueue RAW cache bootstrap")
+}
+
+func EnqueueMessageRepresentingCurrentKPICache(rabbitMQClient rabbitmq.Client) {
+	const batchSize = 500
+	sharedUtils.TerminateOnError(func() error {
+		kpiResultsLoadResult := dbClient.GetRelationalDatabaseClientInstance().LoadAllKPIFulfillmentCheckResults()
+		if kpiResultsLoadResult.IsFailure() {
+			return kpiResultsLoadResult.GetError()
+		}
+		sdInstancesLoadResult := dbClient.GetRelationalDatabaseClientInstance().LoadSDInstances()
+		if sdInstancesLoadResult.IsFailure() {
+			return sdInstancesLoadResult.GetError()
+		}
+
+		instanceByID := make(map[uint32]dllModel.SDInstance, len(sdInstancesLoadResult.GetPayload()))
+		for _, instance := range sdInstancesLoadResult.GetPayload() {
+			id := instance.ID.GetPayloadOrDefault(0)
+			if id == 0 {
+				continue
+			}
+			instanceByID[id] = instance
+		}
+
+		messages := make([]sharedModel.KPIFulfillmentCheckResultISCMessage, 0, len(kpiResultsLoadResult.GetPayload()))
+		for _, result := range kpiResultsLoadResult.GetPayload() {
+			instance, exists := instanceByID[result.SDInstanceID]
+			if !exists {
+				continue
+			}
+			messages = append(messages, sharedModel.KPIFulfillmentCheckResultISCMessage{
+				SDTypeUID:       instance.SDType.UID,
+				SDInstanceUID:   instance.UID,
+				KPIDefinitionID: result.KPIDefinitionID,
+				EventTime:       result.EventTime,
+				Fulfilled:       result.Fulfilled,
+			})
+		}
+
+		if len(messages) == 0 {
+			payloadResult := sharedUtils.SerializeToJSON(sharedModel.KPIFulfillmentCacheBootstrapISCMessage{
+				Tuple: []sharedModel.KPIFulfillmentCheckResultISCMessage{},
+				Done:  true,
+			})
+			if payloadResult.IsFailure() {
+				return payloadResult.GetError()
+			}
+			return rabbitMQClient.PublishJSONMessage(sharedUtils.NewEmptyOptional[string](), sharedUtils.NewOptionalOf(sharedConstants.KPIFulfillmentCacheBootstrapQueueName), payloadResult.GetPayload())
+		}
+
+		for start := 0; start < len(messages); start += batchSize {
+			end := start + batchSize
+			if end > len(messages) {
+				end = len(messages)
+			}
+			payloadResult := sharedUtils.SerializeToJSON(sharedModel.KPIFulfillmentCacheBootstrapISCMessage{
+				Tuple: messages[start:end],
+				Done:  end == len(messages),
+			})
+			if payloadResult.IsFailure() {
+				return payloadResult.GetError()
+			}
+			if err := rabbitMQClient.PublishJSONMessage(sharedUtils.NewEmptyOptional[string](), sharedUtils.NewOptionalOf(sharedConstants.KPIFulfillmentCacheBootstrapQueueName), payloadResult.GetPayload()); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}(), "[ISC] Failed to enqueue KPI cache bootstrap")
 }
 
 func EnqueueMessagesRepresentingCurrentSystemConfiguration(rabbitMQClient rabbitmq.Client) {

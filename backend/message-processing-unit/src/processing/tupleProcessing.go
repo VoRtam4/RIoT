@@ -2,6 +2,8 @@ package processing
 
 import (
 	"sort"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/rabbitmq"
@@ -12,6 +14,28 @@ type normalizedKPICheckRequest struct {
 	Message   sharedModel.KPIFulfillmentCheckRequestISCMessage
 	Params    map[string]interface{}
 	EventTime time.Time
+}
+
+var (
+	inputConcurrency     atomic.Int32
+	instanceProcessLocks sync.Map
+)
+
+func SetInputConcurrency(workerCount int) {
+	if workerCount < 1 {
+		workerCount = 1
+	}
+	inputConcurrency.Store(int32(workerCount))
+}
+
+func lockInstanceForInputProcessing(uid string) func() {
+	if inputConcurrency.Load() <= 1 || uid == "" {
+		return func() {}
+	}
+	rawLock, _ := instanceProcessLocks.LoadOrStore(uid, &sync.Mutex{})
+	lock := rawLock.(*sync.Mutex)
+	lock.Lock()
+	return lock.Unlock
 }
 
 func ProcessKPIFulfillmentCheckRequestTuple(rabbitMQClient rabbitmq.Client, tuple sharedModel.KPIFulfillmentCheckRequestTupleISCMessage) error {
@@ -51,7 +75,7 @@ func ProcessKPIFulfillmentCheckRequestTuple(rabbitMQClient rabbitmq.Client, tupl
 	kpiRecords := make([]sharedModel.TimeSeriesKPIResultRecord, 0, len(requests))
 
 	for _, request := range requests {
-		rawOutputs, shouldProcessKPI := ProcessRaw(request.Message, request.Params, request.EventTime)
+		rawOutputs, kpiOutputs, shouldProcessKPI := processRequestWithInstanceLock(request)
 		if rawOutputs.SDTypeChanged {
 			sdTypeUpdates[request.Message.SDTypeUID] = struct{}{}
 		}
@@ -61,7 +85,6 @@ func ProcessKPIFulfillmentCheckRequestTuple(rabbitMQClient rabbitmq.Client, tupl
 			continue
 		}
 
-		kpiOutputs := ProcessKPI(request.Message, request.Params, request.EventTime)
 		kpiResults = append(kpiResults, kpiOutputs.Results...)
 		kpiRecords = append(kpiRecords, kpiOutputs.TimeSeriesKPIRecord...)
 	}
@@ -78,4 +101,16 @@ func ProcessKPIFulfillmentCheckRequestTuple(rabbitMQClient rabbitmq.Client, tupl
 	storeKPI(rabbitMQClient, kpiRecords)
 	publishKPI(rabbitMQClient, kpiResults, false)
 	return nil
+}
+
+func processRequestWithInstanceLock(request normalizedKPICheckRequest) (RawProcessingOutputs, KPIProcessingOutputs, bool) {
+	unlock := lockInstanceForInputProcessing(request.Message.SDInstanceUID)
+	defer unlock()
+
+	rawOutputs, shouldProcessKPI := ProcessRaw(request.Message, request.Params, request.EventTime)
+	if !shouldProcessKPI {
+		return rawOutputs, KPIProcessingOutputs{}, false
+	}
+
+	return rawOutputs, ProcessKPI(request.Message, request.Params, request.EventTime), true
 }

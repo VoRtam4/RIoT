@@ -67,8 +67,9 @@ type MutationResolver interface {
 	CreateAPIKey(ctx context.Context, input graphQLModel.APIKeyInput) (string, error)
 	UpdateAPIKey(ctx context.Context, id uint32, input graphQLModel.APIKeyInput) (bool, error)
 	DeleteAPIKey(ctx context.Context, id uint32) (bool, error)
-	StartTimeSeriesExport(ctx context.Context, input graphQLModel.TimeSeriesReadInput) (string, error)
-	StartTimeSeriesExportAggregateKpi(ctx context.Context, input graphQLModel.TimeSeriesReadAggregateKPIInput) (string, error)
+	StartTimeSeriesExport(ctx context.Context, input graphQLModel.TimeSeriesReadInput) (graphQLModel.TimeSeriesExport, error)
+	StartTimeSeriesExportAggregateKpi(ctx context.Context, input graphQLModel.TimeSeriesReadAggregateKPIInput) (graphQLModel.TimeSeriesExport, error)
+	CancelTimeSeriesExport(ctx context.Context, id uint32) (graphQLModel.TimeSeriesExport, error)
 }
 type QueryResolver interface {
 	SdType(ctx context.Context, id uint32) (graphQLModel.SDType, error)
@@ -99,11 +100,13 @@ type QueryResolver interface {
 	TimeSeriesRead(ctx context.Context, request graphQLModel.TimeSeriesReadInput) (graphQLModel.TimeSeriesReadResponse, error)
 	TimeSeriesReadAggregateKpi(ctx context.Context, request graphQLModel.TimeSeriesReadAggregateKPIInput) (graphQLModel.TimeSeriesReadResponse, error)
 	TimeSeriesDistinctTagValues(ctx context.Context, request graphQLModel.TimeSeriesDistinctTagValuesInput) (graphQLModel.TimeSeriesDistinctTagValuesResponse, error)
+	TimeSeriesExport(ctx context.Context, id uint32) (graphQLModel.TimeSeriesExport, error)
 }
 type SubscriptionResolver interface {
 	OnSDInstanceRegistered(ctx context.Context, filter *graphQLModel.SDInstanceRegisteredFilter) (<-chan graphQLModel.SDInstance, error)
 	OnRawDataPointArrived(ctx context.Context, filter *graphQLModel.RawDataPointArrivedFilter) (<-chan []graphQLModel.RawDataPoint, error)
 	OnKPIFulfillmentChecked(ctx context.Context, filter *graphQLModel.KPIFulfillmentCheckedFilter) (<-chan []graphQLModel.KPIFulfillmentCheckResult, error)
+	OnTimeSeriesExportUpdated(ctx context.Context, filter graphQLModel.TimeSeriesExportFilter) (<-chan graphQLModel.TimeSeriesExport, error)
 }
 
 type executableSchema struct {
@@ -152,6 +155,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputStatisticsInput,
 		ec.unmarshalInputTimeSeriesCursorInput,
 		ec.unmarshalInputTimeSeriesDistinctTagValuesInput,
+		ec.unmarshalInputTimeSeriesExportFilter,
 		ec.unmarshalInputTimeSeriesReadAggregateKPIInput,
 		ec.unmarshalInputTimeSeriesReadInput,
 		ec.unmarshalInputUserConfigInput,
@@ -720,6 +724,10 @@ input KPIFulfillmentCheckedFilter {
   sdInstanceIDs: [ID!]
 }
 
+input TimeSeriesExportFilter {
+  ids: [ID!]
+}
+
 # ----- Queries, mutations and subscriptions -----
 
 type Query {
@@ -751,6 +759,7 @@ type Query {
   timeSeriesRead(request: TimeSeriesReadInput!): TimeSeriesReadResponse!
   timeSeriesReadAggregateKPI(request: TimeSeriesReadAggregateKPIInput!): TimeSeriesReadResponse!
   timeSeriesDistinctTagValues(request: TimeSeriesDistinctTagValuesInput!): TimeSeriesDistinctTagValuesResponse!
+  timeSeriesExport(id: ID!): TimeSeriesExport!
 }
 
 type Mutation {
@@ -770,14 +779,16 @@ type Mutation {
   createAPIKey(input: APIKeyInput!): String!
   updateAPIKey(id: ID!, input: APIKeyInput!): Boolean!
   deleteAPIKey(id: ID!): Boolean!
-  startTimeSeriesExport(input: TimeSeriesReadInput!): String!
-  startTimeSeriesExportAggregateKPI(input: TimeSeriesReadAggregateKPIInput!): String!
+  startTimeSeriesExport(input: TimeSeriesReadInput!): TimeSeriesExport!
+  startTimeSeriesExportAggregateKPI(input: TimeSeriesReadAggregateKPIInput!): TimeSeriesExport!
+  cancelTimeSeriesExport(id: ID!): TimeSeriesExport!
 }
 
 type Subscription {
   onSDInstanceRegistered(filter: SDInstanceRegisteredFilter): SDInstance!
   onRawDataPointArrived(filter: RawDataPointArrivedFilter): [RawDataPoint!]!
   onKPIFulfillmentChecked(filter: KPIFulfillmentCheckedFilter): [KPIFulfillmentCheckResult!]!
+  onTimeSeriesExportUpdated(filter: TimeSeriesExportFilter!): TimeSeriesExport!
 }
 
 # ----- API Keys -----
@@ -946,6 +957,7 @@ enum ExportStatus {
   processing
   done
   failed
+  cancelled
   expired
 }
 
@@ -990,6 +1002,34 @@ func (ec *executionContext) field_Mutation_assignRoleToUser_argsInput(
 	}
 
 	var zeroVal graphQLModel.AssignRoleInput
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_cancelTimeSeriesExport_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_cancelTimeSeriesExport_argsID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_cancelTimeSeriesExport_argsID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (uint32, error) {
+	if _, ok := rawArgs["id"]; !ok {
+		var zeroVal uint32
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+	if tmp, ok := rawArgs["id"]; ok {
+		return ec.unmarshalNID2uint32(ctx, tmp)
+	}
+
+	var zeroVal uint32
 	return zeroVal, nil
 }
 
@@ -2055,6 +2095,34 @@ func (ec *executionContext) field_Query_timeSeriesDistinctTagValues_argsRequest(
 	return zeroVal, nil
 }
 
+func (ec *executionContext) field_Query_timeSeriesExport_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Query_timeSeriesExport_argsID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Query_timeSeriesExport_argsID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (uint32, error) {
+	if _, ok := rawArgs["id"]; !ok {
+		var zeroVal uint32
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+	if tmp, ok := rawArgs["id"]; ok {
+		return ec.unmarshalNID2uint32(ctx, tmp)
+	}
+
+	var zeroVal uint32
+	return zeroVal, nil
+}
+
 func (ec *executionContext) field_Query_timeSeriesReadAggregateKPI_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2220,6 +2288,34 @@ func (ec *executionContext) field_Subscription_onSDInstanceRegistered_argsFilter
 	}
 
 	var zeroVal *graphQLModel.SDInstanceRegisteredFilter
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Subscription_onTimeSeriesExportUpdated_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Subscription_onTimeSeriesExportUpdated_argsFilter(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["filter"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Subscription_onTimeSeriesExportUpdated_argsFilter(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (graphQLModel.TimeSeriesExportFilter, error) {
+	if _, ok := rawArgs["filter"]; !ok {
+		var zeroVal graphQLModel.TimeSeriesExportFilter
+		return zeroVal, nil
+	}
+
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("filter"))
+	if tmp, ok := rawArgs["filter"]; ok {
+		return ec.unmarshalNTimeSeriesExportFilter2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesExportFilter(ctx, tmp)
+	}
+
+	var zeroVal graphQLModel.TimeSeriesExportFilter
 	return zeroVal, nil
 }
 
@@ -5368,9 +5464,9 @@ func (ec *executionContext) _Mutation_startTimeSeriesExport(ctx context.Context,
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(graphQLModel.TimeSeriesExport)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNTimeSeriesExport2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesExport(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_startTimeSeriesExport(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -5380,7 +5476,21 @@ func (ec *executionContext) fieldContext_Mutation_startTimeSeriesExport(ctx cont
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_TimeSeriesExport_id(ctx, field)
+			case "status":
+				return ec.fieldContext_TimeSeriesExport_status(ctx, field)
+			case "downloadUrl":
+				return ec.fieldContext_TimeSeriesExport_downloadUrl(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_TimeSeriesExport_createdAt(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_TimeSeriesExport_expiresAt(ctx, field)
+			case "error":
+				return ec.fieldContext_TimeSeriesExport_error(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TimeSeriesExport", field.Name)
 		},
 	}
 	defer func() {
@@ -5423,9 +5533,9 @@ func (ec *executionContext) _Mutation_startTimeSeriesExportAggregateKPI(ctx cont
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(graphQLModel.TimeSeriesExport)
 	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
+	return ec.marshalNTimeSeriesExport2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesExport(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_startTimeSeriesExportAggregateKPI(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -5435,7 +5545,21 @@ func (ec *executionContext) fieldContext_Mutation_startTimeSeriesExportAggregate
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_TimeSeriesExport_id(ctx, field)
+			case "status":
+				return ec.fieldContext_TimeSeriesExport_status(ctx, field)
+			case "downloadUrl":
+				return ec.fieldContext_TimeSeriesExport_downloadUrl(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_TimeSeriesExport_createdAt(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_TimeSeriesExport_expiresAt(ctx, field)
+			case "error":
+				return ec.fieldContext_TimeSeriesExport_error(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TimeSeriesExport", field.Name)
 		},
 	}
 	defer func() {
@@ -5446,6 +5570,75 @@ func (ec *executionContext) fieldContext_Mutation_startTimeSeriesExportAggregate
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_startTimeSeriesExportAggregateKPI_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_cancelTimeSeriesExport(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_cancelTimeSeriesExport(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().CancelTimeSeriesExport(rctx, fc.Args["id"].(uint32))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(graphQLModel.TimeSeriesExport)
+	fc.Result = res
+	return ec.marshalNTimeSeriesExport2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesExport(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_cancelTimeSeriesExport(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_TimeSeriesExport_id(ctx, field)
+			case "status":
+				return ec.fieldContext_TimeSeriesExport_status(ctx, field)
+			case "downloadUrl":
+				return ec.fieldContext_TimeSeriesExport_downloadUrl(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_TimeSeriesExport_createdAt(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_TimeSeriesExport_expiresAt(ctx, field)
+			case "error":
+				return ec.fieldContext_TimeSeriesExport_error(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TimeSeriesExport", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_cancelTimeSeriesExport_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -9496,6 +9689,75 @@ func (ec *executionContext) fieldContext_Query_timeSeriesDistinctTagValues(ctx c
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_timeSeriesExport(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_timeSeriesExport(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().TimeSeriesExport(rctx, fc.Args["id"].(uint32))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(graphQLModel.TimeSeriesExport)
+	fc.Result = res
+	return ec.marshalNTimeSeriesExport2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesExport(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_timeSeriesExport(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_TimeSeriesExport_id(ctx, field)
+			case "status":
+				return ec.fieldContext_TimeSeriesExport_status(ctx, field)
+			case "downloadUrl":
+				return ec.fieldContext_TimeSeriesExport_downloadUrl(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_TimeSeriesExport_createdAt(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_TimeSeriesExport_expiresAt(ctx, field)
+			case "error":
+				return ec.fieldContext_TimeSeriesExport_error(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TimeSeriesExport", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_timeSeriesExport_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query___type(ctx, field)
 	if err != nil {
@@ -11989,6 +12251,89 @@ func (ec *executionContext) fieldContext_Subscription_onKPIFulfillmentChecked(ct
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Subscription_onKPIFulfillmentChecked_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Subscription_onTimeSeriesExportUpdated(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	fc, err := ec.fieldContext_Subscription_onTimeSeriesExportUpdated(ctx, field)
+	if err != nil {
+		return nil
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = nil
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Subscription().OnTimeSeriesExportUpdated(rctx, fc.Args["filter"].(graphQLModel.TimeSeriesExportFilter))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return nil
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return nil
+	}
+	return func(ctx context.Context) graphql.Marshaler {
+		select {
+		case res, ok := <-resTmp.(<-chan graphQLModel.TimeSeriesExport):
+			if !ok {
+				return nil
+			}
+			return graphql.WriterFunc(func(w io.Writer) {
+				w.Write([]byte{'{'})
+				graphql.MarshalString(field.Alias).MarshalGQL(w)
+				w.Write([]byte{':'})
+				ec.marshalNTimeSeriesExport2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesExport(ctx, field.Selections, res).MarshalGQL(w)
+				w.Write([]byte{'}'})
+			})
+		case <-ctx.Done():
+			return nil
+		}
+	}
+}
+
+func (ec *executionContext) fieldContext_Subscription_onTimeSeriesExportUpdated(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Subscription",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_TimeSeriesExport_id(ctx, field)
+			case "status":
+				return ec.fieldContext_TimeSeriesExport_status(ctx, field)
+			case "downloadUrl":
+				return ec.fieldContext_TimeSeriesExport_downloadUrl(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_TimeSeriesExport_createdAt(ctx, field)
+			case "expiresAt":
+				return ec.fieldContext_TimeSeriesExport_expiresAt(ctx, field)
+			case "error":
+				return ec.fieldContext_TimeSeriesExport_error(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TimeSeriesExport", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Subscription_onTimeSeriesExportUpdated_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -16046,6 +16391,33 @@ func (ec *executionContext) unmarshalInputTimeSeriesDistinctTagValuesInput(ctx c
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputTimeSeriesExportFilter(ctx context.Context, obj any) (graphQLModel.TimeSeriesExportFilter, error) {
+	var it graphQLModel.TimeSeriesExportFilter
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"ids"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "ids":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("ids"))
+			data, err := ec.unmarshalOID2ᚕuint32ᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Ids = data
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputTimeSeriesReadAggregateKPIInput(ctx context.Context, obj any) (graphQLModel.TimeSeriesReadAggregateKPIInput, error) {
 	var it graphQLModel.TimeSeriesReadAggregateKPIInput
 	asMap := map[string]any{}
@@ -17146,6 +17518,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "startTimeSeriesExportAggregateKPI":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_startTimeSeriesExportAggregateKPI(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "cancelTimeSeriesExport":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_cancelTimeSeriesExport(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -18375,6 +18754,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "timeSeriesExport":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_timeSeriesExport(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -18990,6 +19391,8 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 		return ec._Subscription_onRawDataPointArrived(ctx, fields[0])
 	case "onKPIFulfillmentChecked":
 		return ec._Subscription_onKPIFulfillmentChecked(ctx, fields[0])
+	case "onTimeSeriesExportUpdated":
+		return ec._Subscription_onTimeSeriesExportUpdated(ctx, fields[0])
 	default:
 		panic("unknown field " + strconv.Quote(fields[0].Name))
 	}
@@ -20590,6 +20993,15 @@ func (ec *executionContext) unmarshalNTimeSeriesDistinctTagValuesInput2githubᚗ
 
 func (ec *executionContext) marshalNTimeSeriesDistinctTagValuesResponse2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesDistinctTagValuesResponse(ctx context.Context, sel ast.SelectionSet, v graphQLModel.TimeSeriesDistinctTagValuesResponse) graphql.Marshaler {
 	return ec._TimeSeriesDistinctTagValuesResponse(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNTimeSeriesExport2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesExport(ctx context.Context, sel ast.SelectionSet, v graphQLModel.TimeSeriesExport) graphql.Marshaler {
+	return ec._TimeSeriesExport(ctx, sel, &v)
+}
+
+func (ec *executionContext) unmarshalNTimeSeriesExportFilter2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesExportFilter(ctx context.Context, v any) (graphQLModel.TimeSeriesExportFilter, error) {
+	res, err := ec.unmarshalInputTimeSeriesExportFilter(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalNTimeSeriesParameter2githubᚗcomᚋMichalBuresᚑOGᚋbpᚑburesᚑRIoTᚑbackendᚑcoreᚋsrcᚋmodelᚋgraphQLModelᚐTimeSeriesParameter(ctx context.Context, sel ast.SelectionSet, v graphQLModel.TimeSeriesParameter) graphql.Marshaler {

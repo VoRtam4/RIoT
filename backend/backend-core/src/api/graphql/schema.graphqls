@@ -449,6 +449,10 @@ input KPIFulfillmentCheckedFilter {
   sdInstanceIDs: [ID!]
 }
 
+input TimeSeriesExportFilter {
+  ids: [ID!]
+}
+
 # ----- Queries, mutations and subscriptions -----
 
 type Query {
@@ -480,6 +484,7 @@ type Query {
   timeSeriesRead(request: TimeSeriesReadInput!): TimeSeriesReadResponse!
   timeSeriesReadAggregateKPI(request: TimeSeriesReadAggregateKPIInput!): TimeSeriesReadResponse!
   timeSeriesDistinctTagValues(request: TimeSeriesDistinctTagValuesInput!): TimeSeriesDistinctTagValuesResponse!
+  timeSeriesExport(id: ID!): TimeSeriesExport!
 }
 
 type Mutation {
@@ -499,14 +504,16 @@ type Mutation {
   createAPIKey(input: APIKeyInput!): String!
   updateAPIKey(id: ID!, input: APIKeyInput!): Boolean!
   deleteAPIKey(id: ID!): Boolean!
-  startTimeSeriesExport(input: TimeSeriesReadInput!): String!
-  startTimeSeriesExportAggregateKPI(input: TimeSeriesReadAggregateKPIInput!): String!
+  startTimeSeriesExport(input: TimeSeriesReadInput!): TimeSeriesExport!
+  startTimeSeriesExportAggregateKPI(input: TimeSeriesReadAggregateKPIInput!): TimeSeriesExport!
+  cancelTimeSeriesExport(id: ID!): TimeSeriesExport!
 }
 
 type Subscription {
   onSDInstanceRegistered(filter: SDInstanceRegisteredFilter): SDInstance!
   onRawDataPointArrived(filter: RawDataPointArrivedFilter): [RawDataPoint!]!
   onKPIFulfillmentChecked(filter: KPIFulfillmentCheckedFilter): [KPIFulfillmentCheckResult!]!
+  onTimeSeriesExportUpdated(filter: TimeSeriesExportFilter!): TimeSeriesExport!
 }
 
 # ----- API Keys -----
@@ -675,6 +682,7 @@ enum ExportStatus {
   processing
   done
   failed
+  cancelled
   expired
 }
 

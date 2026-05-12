@@ -1,13 +1,23 @@
+/**
+ * @file main.go
+ * @brief Vstupní bod modulu Time Series Store platformy RIoT.
+ * @author Vojtěch Hubáček
+ * @defgroup riot_time_series_store Time Series Store
+ * @ingroup riot
+ * @see ../README.md
+ */
 package main
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/rabbitmq"
@@ -17,6 +27,16 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/xjohnp00/jiap/backend/shared/time-series-store/src/internal"
 )
+
+func getWorkerCount(envName string, logPrefix string) int {
+	raw := sharedUtils.GetEnvironmentVariableValue(envName).GetPayloadOrDefault("1")
+	workerCount, convertErr := strconv.Atoi(raw)
+	if convertErr != nil || workerCount < 1 {
+		log.Printf("%s Invalid %s=%q, using 1", logPrefix, envName, raw)
+		return 1
+	}
+	return workerCount
+}
 
 func main() {
 	hasError, environment := parseParameters()
@@ -47,6 +67,8 @@ func main() {
 		runConsumerLoop("kpi records", func() error { return consumeKPIRecords(influx) })
 	}, func() {
 		runConsumerLoop("read requests", func() error { return consumeReadRequests(influx) })
+	}, func() {
+		runConsumerLoop("read cancel requests", func() error { return consumeReadCancelRequests() })
 	}, func() {
 		runConsumerLoop("distinct tag value requests", func() error { return consumeDistinctTagValueRequests(influx) })
 	}, func() {
@@ -90,11 +112,31 @@ func consumeKPIRecords(influx internal.Influx2Client) error {
 }
 
 func consumeReadRequests(influx internal.Influx2Client) error {
+	workerCount := getWorkerCount("INFLUX_READ_WORKERS", "[TSS][READ]")
+	log.Printf("[TSS][READ] Starting %d read worker(s)", workerCount)
+	var wg sync.WaitGroup
+	for workerID := 1; workerID <= workerCount; workerID++ {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+			for {
+				if err := consumeReadRequestsWorker(influx); err != nil {
+					log.Printf("[TSS][READ][worker=%d] Consumer stopped: %s", workerID, err.Error())
+				}
+				time.Sleep(time.Second)
+			}
+		}(workerID)
+	}
+	wg.Wait()
+	return nil
+}
+
+func consumeReadRequestsWorker(influx internal.Influx2Client) error {
 	rabbitMQClient := rabbitmq.NewClient()
 	defer rabbitMQClient.Dispose()
 	return rabbitmq.ConsumeJSONMessagesWithAccessToDelivery[sharedModel.TimeSeriesReadRequest](rabbitMQClient, sharedConstants.TimeSeriesReadRequestQueueName, "",
 		func(req sharedModel.TimeSeriesReadRequest, delivery amqp.Delivery) error {
-			go handleReadRequest(influx, req, delivery)
+			handleReadRequest(influx, req, delivery)
 			return nil
 		},
 	)
@@ -103,6 +145,10 @@ func consumeReadRequests(influx internal.Influx2Client) error {
 func handleReadRequest(influx internal.Influx2Client, req sharedModel.TimeSeriesReadRequest, delivery amqp.Delivery) {
 	rabbitMQClient := rabbitmq.NewClient()
 	defer rabbitMQClient.Dispose()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	internal.RegisterReadJob(req.JobID, cancel)
+	defer internal.UnregisterReadJob(req.JobID)
 
 	base := map[string]string{
 		"type":      string(req.Type),
@@ -160,8 +206,19 @@ func handleReadRequest(influx internal.Influx2Client, req sharedModel.TimeSeries
 		}
 		return publish(resp)
 	}
-	err := influx.StreamRead(plan, send)
+	err := influx.StreamRead(ctx, plan, send)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			resp := sharedModel.TimeSeriesReadResponse{
+				Base:           base,
+				HasMoreBatches: false,
+				HasMoreData:    false,
+			}
+			if publishErr := publish(resp); publishErr != nil {
+				log.Printf("[TSS] failed to publish cancelled read response: %s", publishErr.Error())
+			}
+			return
+		}
 		resp := sharedModel.TimeSeriesReadResponse{
 			Base:  base,
 			Error: err.Error(),
@@ -170,6 +227,19 @@ func handleReadRequest(influx internal.Influx2Client, req sharedModel.TimeSeries
 			log.Printf("[TSS] failed to publish read error response: %s", publishErr.Error())
 		}
 	}
+}
+
+func consumeReadCancelRequests() error {
+	rabbitMQClient := rabbitmq.NewClient()
+	defer rabbitMQClient.Dispose()
+	return rabbitmq.ConsumeJSONMessages[sharedModel.TimeSeriesReadCancelRequest](
+		rabbitMQClient,
+		sharedConstants.TimeSeriesReadCancelRequestQueueName,
+		func(req sharedModel.TimeSeriesReadCancelRequest) error {
+			internal.CancelReadJob(req.JobID)
+			return nil
+		},
+	)
 }
 
 func consumeDistinctTagValueRequests(influx internal.Influx2Client) error {
@@ -208,6 +278,26 @@ func consumeDistinctTagValueRequests(influx internal.Influx2Client) error {
 }
 
 func consumeReprocessReadRequests(influx internal.Influx2Client) error {
+	workerCount := getWorkerCount("INFLUX_REPROCESS_WORKERS", "[TSS][REPROCESS]")
+	log.Printf("[TSS][REPROCESS] Starting %d reprocess read worker(s)", workerCount)
+	var wg sync.WaitGroup
+	for workerID := 1; workerID <= workerCount; workerID++ {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+			for {
+				if err := consumeReprocessReadRequestsWorker(influx); err != nil {
+					log.Printf("[TSS][REPROCESS][worker=%d] Consumer stopped: %s", workerID, err.Error())
+				}
+				time.Sleep(time.Second)
+			}
+		}(workerID)
+	}
+	wg.Wait()
+	return nil
+}
+
+func consumeReprocessReadRequestsWorker(influx internal.Influx2Client) error {
 	rabbitMQClient := rabbitmq.NewClient()
 	defer rabbitMQClient.Dispose()
 	return rabbitmq.ConsumeJSONMessagesWithAccessToDelivery[sharedModel.TimeSeriesReprocessReadRequest](rabbitMQClient, sharedConstants.TimeSeriesReprocessReadRequestQueueName, "",

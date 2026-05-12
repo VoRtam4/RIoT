@@ -50,9 +50,11 @@ type RelationalDatabaseClient interface {
 	LoadSDInstanceBasedOnUID(uid string) sharedUtils.Result[sharedUtils.Optional[dllModel.SDInstance]]
 	LoadSDInstances() sharedUtils.Result[[]dllModel.SDInstance]
 	PersistRawDataPoints(points []dllModel.RawDataPoint) sharedUtils.Result[[]dllModel.RawDataPoint]
+	LoadAllRawDataPoints() sharedUtils.Result[[]dllModel.RawDataPoint]
 	LoadRawDataPointsBySDType(sdTypeID uint32) sharedUtils.Result[[]dllModel.RawDataPoint]
 	LoadRawDataPoint(sdInstanceID uint32) sharedUtils.Result[sharedUtils.Optional[dllModel.RawDataPoint]]
 	PersistKPIFulfillmentCheckResults(points []dllModel.KPIFulfillmentCheckResult, reprocess bool) sharedUtils.Result[[]dllModel.KPIFulfillmentCheckResult]
+	LoadAllKPIFulfillmentCheckResults() sharedUtils.Result[[]dllModel.KPIFulfillmentCheckResult]
 	LoadKPIFulfillmentCheckResults(userID uint32) sharedUtils.Result[[]dllModel.KPIFulfillmentCheckResult]
 	LoadKPIFulfillmentCheckResultsByKPI(userID uint32, kpiDefinitionID uint32) sharedUtils.Result[[]dllModel.KPIFulfillmentCheckResult]
 	LoadKPIFulfillmentCheckResult(userID uint32, input dllModel.KPIFulfillmentCheckResultRequest) sharedUtils.Result[sharedUtils.Optional[dllModel.KPIFulfillmentCheckResult]]
@@ -872,6 +874,16 @@ func (r *relationalDatabaseClientImpl) LoadRawDataPointsBySDType(sdTypeID uint32
 	return sharedUtils.NewSuccessResult(sharedUtils.Map(result.GetPayload(), db2dll.ToDLLModelRawDataPoint))
 }
 
+func (r *relationalDatabaseClientImpl) LoadAllRawDataPoints() sharedUtils.Result[[]dllModel.RawDataPoint] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	result := dbUtil.LoadEntitiesFromDB[dbModel.RawDataPointEntity](r.db, dbUtil.Preload("SDInstance"))
+	if result.IsFailure() {
+		return sharedUtils.NewFailureResult[[]dllModel.RawDataPoint](result.GetError())
+	}
+	return sharedUtils.NewSuccessResult(sharedUtils.Map(result.GetPayload(), db2dll.ToDLLModelRawDataPoint))
+}
+
 func (r *relationalDatabaseClientImpl) LoadRawDataPoint(sdInstanceID uint32) sharedUtils.Result[sharedUtils.Optional[dllModel.RawDataPoint]] {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -971,6 +983,16 @@ func (r *relationalDatabaseClientImpl) LoadKPIFulfillmentCheckResults(userID uin
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	result := dbUtil.LoadEntitiesFromDB[dbModel.KPIFulfillmentCheckResultEntity](r.db, dbUtil.Preload("SDInstance"), dbUtil.Where("kpi_definition_id IN (?)", r.db.Table("kpi_definitions").Select("id").Where("user_id = ?", userID)))
+	if result.IsFailure() {
+		return sharedUtils.NewFailureResult[[]dllModel.KPIFulfillmentCheckResult](result.GetError())
+	}
+	return sharedUtils.NewSuccessResult(sharedUtils.Map(result.GetPayload(), db2dll.ToDLLModelKPIFulfillmentCheckResult))
+}
+
+func (r *relationalDatabaseClientImpl) LoadAllKPIFulfillmentCheckResults() sharedUtils.Result[[]dllModel.KPIFulfillmentCheckResult] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	result := dbUtil.LoadEntitiesFromDB[dbModel.KPIFulfillmentCheckResultEntity](r.db, dbUtil.Preload("SDInstance"))
 	if result.IsFailure() {
 		return sharedUtils.NewFailureResult[[]dllModel.KPIFulfillmentCheckResult](result.GetError())
 	}

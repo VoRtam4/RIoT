@@ -14,6 +14,8 @@ func getQueueDeclarationErrorMessage(queueName string) string {
 
 func SetupRabbitMQInfrastructureForISC(rabbitMQClient rabbitmq.Client) {
 	namesOfQueuesToDeclare := sharedUtils.SliceOf[string](
+		sharedConstants.RawDataPointCacheBootstrapQueueName,
+		sharedConstants.KPIFulfillmentCacheBootstrapQueueName,
 		sharedConstants.KPIFulfillmentCheckResultsQueueName,
 		sharedConstants.RawDataPointQueueName,
 		sharedConstants.KPIFulfillmentCheckRequestsQueueName,
@@ -25,6 +27,7 @@ func SetupRabbitMQInfrastructureForISC(rabbitMQClient rabbitmq.Client) {
 		sharedConstants.TimeSeriesRawDataQueueName,
 		sharedConstants.TimeSeriesKPIResultQueueName,
 		sharedConstants.TimeSeriesReadRequestQueueName,
+		sharedConstants.TimeSeriesReadCancelRequestQueueName,
 		sharedConstants.TimeSeriesReadResponseQueueName,
 		sharedConstants.TimeSeriesDistinctTagValuesRequestQueueName,
 		sharedConstants.TimeSeriesDistinctTagValuesResponseQueueName,

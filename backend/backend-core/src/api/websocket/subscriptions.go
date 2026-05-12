@@ -7,6 +7,7 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/websocket/connection"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/api/websocket/handlers"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/events"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedModel"
@@ -94,6 +95,36 @@ func subscribeClient(c *connection.Client, msg sharedModel.WebSocketMessage) err
 		}
 
 		sub, err := events.SubscribeKPIFulfillmentChecked(c.Ctx, &filter, principal.UserID)
+		if err != nil {
+			return err
+		}
+
+		c.Subscriptions[msg.ID] = sub.Close
+		startForwarder(c, msg.ID, msg.Topic, sub)
+		return nil
+
+	case string(events.TimeSeriesExportUpdatedEventType):
+
+		principal := handlers.AuthorizeOperation(c, msg, auth.ResourceTimeSeries, auth.OperationSubscribe)
+		if principal == nil {
+			return fmt.Errorf("unauthorized")
+		}
+
+		var filter graphQLModel.TimeSeriesExportFilter
+		if msg.Payload != nil {
+			raw, _ := json.Marshal(msg.Payload)
+			_ = json.Unmarshal(raw, &filter)
+		}
+		if len(filter.Ids) == 0 {
+			return fmt.Errorf("timeSeries export subscription requires at least one id")
+		}
+		for _, id := range filter.Ids {
+			if _, err := domainLogicLayer.GetTimeSeriesExport(principal.UserID, id); err != nil {
+				return err
+			}
+		}
+
+		sub, err := events.SubscribeTimeSeriesExportUpdated(c.Ctx, &filter)
 		if err != nil {
 			return err
 		}

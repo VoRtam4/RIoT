@@ -99,8 +99,8 @@ func (s *aggregateSeriesState) resetWindow() {
 	}
 }
 
-func (c Influx2Client) iterateFluxPoints(fluxQuery string, plan sharedModel.QueryPlan, isSnapshot bool, onPoint func(sharedModel.TimeSeriesDataPoint) (bool, error)) (bool, error) {
-	result, err := c.queryApi.Query(context.Background(), fluxQuery)
+func (c Influx2Client) iterateFluxPoints(ctx context.Context, fluxQuery string, plan sharedModel.QueryPlan, isSnapshot bool, onPoint func(sharedModel.TimeSeriesDataPoint) (bool, error)) (bool, error) {
+	result, err := c.queryApi.Query(ctx, fluxQuery)
 	if err != nil {
 		return false, err
 	}
@@ -230,7 +230,7 @@ func (c Influx2Client) advanceAggregateWindows(plan sharedModel.QueryPlan, state
 	return false, nil
 }
 
-func (c Influx2Client) streamReadAggregated(plan sharedModel.QueryPlan, onBatch func([]sharedModel.TimeSeriesDataPoint, bool, bool) error) error {
+func (c Influx2Client) streamReadAggregated(ctx context.Context, plan sharedModel.QueryPlan, onBatch func([]sharedModel.TimeSeriesDataPoint, bool, bool) error) error {
 	if !plan.IsKPI {
 		return fmt.Errorf("aggregation only supported for KPI")
 	}
@@ -243,7 +243,7 @@ func (c Influx2Client) streamReadAggregated(plan sharedModel.QueryPlan, onBatch 
 	if !plan.To.After(plan.From) {
 		return onBatch(nil, false, false)
 	}
-	effectiveFrom, err := c.resolveEffectivePlanFrom(plan)
+	effectiveFrom, err := c.resolveEffectivePlanFrom(ctx, plan)
 	if err != nil {
 		return err
 	}
@@ -262,7 +262,7 @@ func (c Influx2Client) streamReadAggregated(plan sharedModel.QueryPlan, onBatch 
 	snapshotPlan := plan
 	snapshotPlan.From = effectiveFrom
 	snapshotFlux := c.buildSnapshotFlux(snapshotPlan)
-	_, err = c.iterateFluxPoints(snapshotFlux, plan, true, func(p sharedModel.TimeSeriesDataPoint) (bool, error) {
+	_, err = c.iterateFluxPoints(ctx, snapshotFlux, plan, true, func(p sharedModel.TimeSeriesDataPoint) (bool, error) {
 		key := buildAggregateKey(p.Tags)
 		val, ok := extractFulfilled(p)
 		if !ok {
@@ -271,14 +271,14 @@ func (c Influx2Client) streamReadAggregated(plan sharedModel.QueryPlan, onBatch 
 		if _, exists := state.series[key]; exists {
 			return false, nil
 		}
-			state.series[key] = &aggregateSeriesState{
-				Key:           key,
-				Tags:          cloneTags(p.Tags),
-				LastBool:      val,
-				LastTime:      effectiveFrom.UTC(),
-				HasLastValue:  true,
-				HasFullWindow: true,
-			}
+		state.series[key] = &aggregateSeriesState{
+			Key:           key,
+			Tags:          cloneTags(p.Tags),
+			LastBool:      val,
+			LastTime:      effectiveFrom.UTC(),
+			HasLastValue:  true,
+			HasFullWindow: true,
+		}
 		state.seriesOrder = append(state.seriesOrder, key)
 		return false, nil
 	})
@@ -289,7 +289,7 @@ func (c Influx2Client) streamReadAggregated(plan sharedModel.QueryPlan, onBatch 
 	hitLimit := false
 	for _, window := range buildTimeWindows(effectiveFrom, plan.To, false) {
 		readFlux := c.buildReadFluxForRange(plan, window.From, window.To)
-		chunkHitLimit, err := c.iterateFluxPoints(readFlux, plan, false, func(p sharedModel.TimeSeriesDataPoint) (bool, error) {
+		chunkHitLimit, err := c.iterateFluxPoints(ctx, readFlux, plan, false, func(p sharedModel.TimeSeriesDataPoint) (bool, error) {
 			t := p.Time.UTC()
 			hitLimit, err := c.advanceAggregateWindows(plan, state, t, onBatch)
 			if err != nil || hitLimit {

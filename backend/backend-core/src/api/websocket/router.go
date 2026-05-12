@@ -57,6 +57,8 @@ var requestHandlers = map[string]RequestHandler{
 
 	"time-series":                      handlers.StreamTimeSeries,
 	"time-series-export":               handlers.StartTimeSeriesExport,
+	"time-series-export-status":        handlers.GetTimeSeriesExport,
+	"time-series-export-cancel":        handlers.CancelTimeSeriesExport,
 	"time-series-aggregate-kpi":        handlers.StreamTimeSeriesAggregateKpi,
 	"time-series-export-aggregate-kpi": handlers.StartTimeSeriesExportAggregateKpi,
 	"time-series-distinct-tag-values":  handlers.GetTimeSeriesDistinctTagValues,

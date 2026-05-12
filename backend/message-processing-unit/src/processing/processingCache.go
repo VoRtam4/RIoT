@@ -13,6 +13,8 @@ var (
 	lastKPI sync.Map
 )
 
+const CacheTTL = 169 * time.Hour
+
 func StartCacheCleanup(interval time.Duration, ttl time.Duration) {
 	go func() {
 		for {

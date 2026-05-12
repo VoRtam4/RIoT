@@ -136,3 +136,45 @@ func SubscribeKPIFulfillmentChecked(ctx context.Context, filter *graphQLModel.KP
 		},
 	}, nil
 }
+
+func SubscribeTimeSeriesExportUpdated(ctx context.Context, filter *graphQLModel.TimeSeriesExportFilter) (*StreamSubscription[graphQLModel.TimeSeriesExport], error) {
+	filterFn, err := BuildTimeSeriesExportFilter(filter)
+	if err != nil {
+		return nil, err
+	}
+	busFilter := func(e Event) bool {
+		payload, ok := e.Payload.(graphQLModel.TimeSeriesExport)
+		return ok && filterFn(payload)
+	}
+	output := make(chan graphQLModel.TimeSeriesExport, 16)
+	sub := GetEventBus().Subscribe([]EventType{TimeSeriesExportUpdatedEventType}, busFilter, 16)
+	go func() {
+		defer close(output)
+		defer GetEventBus().Unsubscribe(sub.ID)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case event, ok := <-sub.Channel:
+				if !ok {
+					return
+				}
+				payload, ok := event.Payload.(graphQLModel.TimeSeriesExport)
+				if !ok {
+					continue
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case output <- payload:
+				}
+			}
+		}
+	}()
+	return &StreamSubscription[graphQLModel.TimeSeriesExport]{
+		Channel: output,
+		Close: func() {
+			GetEventBus().Unsubscribe(sub.ID)
+		},
+	}, nil
+}

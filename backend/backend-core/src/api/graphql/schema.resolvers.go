@@ -192,20 +192,28 @@ func (r *mutationResolver) DeleteAPIKey(ctx context.Context, id uint32) (bool, e
 	return true, nil
 }
 
-func (r *mutationResolver) StartTimeSeriesExport(ctx context.Context, input graphQLModel.TimeSeriesReadInput) (string, error) {
+func (r *mutationResolver) StartTimeSeriesExport(ctx context.Context, input graphQLModel.TimeSeriesReadInput) (graphQLModel.TimeSeriesExport, error) {
 	principal, err := authorizeOperation(ctx, auth.ResourceTimeSeries, auth.OperationRead)
 	if err != nil {
-		return "", err
+		return graphQLModel.TimeSeriesExport{}, err
 	}
 	return domainLogicLayer.StartTimeSeriesExport(principal.UserID, input)
 }
 
-func (r *mutationResolver) StartTimeSeriesExportAggregateKpi(ctx context.Context, input graphQLModel.TimeSeriesReadAggregateKPIInput) (string, error) {
+func (r *mutationResolver) StartTimeSeriesExportAggregateKpi(ctx context.Context, input graphQLModel.TimeSeriesReadAggregateKPIInput) (graphQLModel.TimeSeriesExport, error) {
 	principal, err := authorizeOperation(ctx, auth.ResourceTimeSeries, auth.OperationRead)
 	if err != nil {
-		return "", err
+		return graphQLModel.TimeSeriesExport{}, err
 	}
 	return domainLogicLayer.StartTimeSeriesExportAggregateKPI(principal.UserID, input)
+}
+
+func (r *mutationResolver) CancelTimeSeriesExport(ctx context.Context, id uint32) (graphQLModel.TimeSeriesExport, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceTimeSeries, auth.OperationRead)
+	if err != nil {
+		return graphQLModel.TimeSeriesExport{}, err
+	}
+	return domainLogicLayer.CancelTimeSeriesExport(principal.UserID, id)
 }
 
 func (r *queryResolver) SdType(ctx context.Context, id uint32) (graphQLModel.SDType, error) {
@@ -547,6 +555,14 @@ func (r *queryResolver) TimeSeriesDistinctTagValues(ctx context.Context, request
 	return result.GetPayload(), nil
 }
 
+func (r *queryResolver) TimeSeriesExport(ctx context.Context, id uint32) (graphQLModel.TimeSeriesExport, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceTimeSeries, auth.OperationRead)
+	if err != nil {
+		return graphQLModel.TimeSeriesExport{}, err
+	}
+	return domainLogicLayer.GetTimeSeriesExport(principal.UserID, id)
+}
+
 func (r *subscriptionResolver) OnSDInstanceRegistered(ctx context.Context, filter *graphQLModel.SDInstanceRegisteredFilter) (<-chan graphQLModel.SDInstance, error) {
 	principal, err := authorizeOperation(ctx, auth.ResourceSDInstances, auth.OperationSubscribe)
 	if err != nil {
@@ -578,6 +594,24 @@ func (r *subscriptionResolver) OnKPIFulfillmentChecked(ctx context.Context, filt
 		return nil, err
 	}
 	sub, err := events.SubscribeKPIFulfillmentChecked(ctx, filter, principal.UserID)
+	if err != nil {
+		log.Println("SUB ERROR:", err)
+		return nil, err
+	}
+	return sub.Channel, nil
+}
+
+func (r *subscriptionResolver) OnTimeSeriesExportUpdated(ctx context.Context, filter graphQLModel.TimeSeriesExportFilter) (<-chan graphQLModel.TimeSeriesExport, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceTimeSeries, auth.OperationSubscribe)
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range filter.Ids {
+		if _, err := domainLogicLayer.GetTimeSeriesExport(principal.UserID, id); err != nil {
+			return nil, err
+		}
+	}
+	sub, err := events.SubscribeTimeSeriesExportUpdated(ctx, &filter)
 	if err != nil {
 		log.Println("SUB ERROR:", err)
 		return nil, err

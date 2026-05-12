@@ -60,6 +60,8 @@ func SetupRouter(r chi.Router) {
 		r.Post("/time-series", handlers.ReadTimeSeries)
 		r.Post("/time-series/distinct-tag-values", handlers.DistinctTimeSeriesTagValues)
 		r.Post("/time-series/export", handlers.StartTimeSeriesExport)
+		r.Get("/time-series/export/{id}/status", handlers.GetTimeSeriesExport)
+		r.Delete("/time-series/export/{id}", handlers.CancelTimeSeriesExport)
 		r.Post("/time-series/aggregate-kpi", handlers.ReadTimeSeriesAggregateKpi)
 		r.Post("/time-series/export/aggregate-kpi", handlers.StartTimeSeriesExportAggregateKpi)
 		r.Get("/time-series/export/{id}", handlers.TimeSeriesExport)
