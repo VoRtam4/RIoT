@@ -9,22 +9,32 @@ class RESTClient:
     def __init__(self, http_client, rest_url: str):
         self.http = http_client
         self.rest_url = rest_url.rstrip("/")
+        self.export_timeout_seconds = max(self.http.timeout_seconds * 20, 1800)
+        self.export_poll_interval_seconds = 0.05
 
-    def start_time_series_export(self, payload: dict) -> str:
+    def start_time_series_export(self, payload: dict) -> dict:
         response = self.http.post(self._to_path("/time-series/export"), json=payload)
         if response.status_code >= 400:
             raise RuntimeError(response.body)
-        if not isinstance(response.body, dict) or "url" not in response.body:
+        if not isinstance(response.body, dict) or "id" not in response.body or "status" not in response.body:
             raise RuntimeError("Unexpected export response shape")
-        return response.body["url"]
+        return response.body
 
-    def start_aggregate_kpi_export(self, payload: dict) -> str:
+    def start_aggregate_kpi_export(self, payload: dict) -> dict:
         response = self.http.post(self._to_path("/time-series/export/aggregate-kpi"), json=payload)
         if response.status_code >= 400:
             raise RuntimeError(response.body)
-        if not isinstance(response.body, dict) or "url" not in response.body:
+        if not isinstance(response.body, dict) or "id" not in response.body or "status" not in response.body:
             raise RuntimeError("Unexpected aggregate export response shape")
-        return response.body["url"]
+        return response.body
+
+    def get_time_series_export(self, export_id: int) -> dict:
+        response = self.http.get(self._to_path(f"/time-series/export/{export_id}/status"))
+        if response.status_code >= 400:
+            raise RuntimeError(response.body)
+        if not isinstance(response.body, dict) or "status" not in response.body:
+            raise RuntimeError("Unexpected export status response shape")
+        return response.body
 
     def distinct_tag_values(self, payload: dict) -> list[str]:
         response = self.http.post(self._to_path("/time-series/distinct-tag-values"), json=payload)
@@ -59,9 +69,11 @@ class RESTClient:
     def timed_export_download(self, payload: dict, target_path: Path, aggregate: bool = False) -> dict:
         started = time.perf_counter()
         if aggregate:
-            download_url = self.start_aggregate_kpi_export(payload)
+            export_job = self.start_aggregate_kpi_export(payload)
         else:
-            download_url = self.start_time_series_export(payload)
+            export_job = self.start_time_series_export(payload)
+        export_id = int(export_job["id"])
+        download_url = self._wait_for_export_download_url(export_id)
         export_ready = time.perf_counter()
         self.download_file(download_url, target_path)
         finished = time.perf_counter()
@@ -71,6 +83,28 @@ class RESTClient:
             "download_time_s": finished - export_ready,
             "total_time_s": finished - started,
         }
+
+    def _wait_for_export_download_url(self, export_id: int) -> str:
+        deadline = time.perf_counter() + self.export_timeout_seconds
+        last_job = None
+        while True:
+            export_job = self.get_time_series_export(export_id)
+            last_job = export_job
+            status = str(export_job.get("status", "")).lower()
+            download_url = export_job.get("downloadUrl")
+            if status == "done":
+                if not download_url:
+                    raise RuntimeError(f"Export {export_id} finished without downloadUrl")
+                return str(download_url)
+            if status in {"failed", "cancelled", "expired"}:
+                error = export_job.get("error")
+                raise RuntimeError(f"Export {export_id} ended with status={status}: {error}")
+            if time.perf_counter() > deadline:
+                raise TimeoutError(
+                    f"Export {export_id} did not finish within {self.export_timeout_seconds} seconds. "
+                    f"Last job={last_job!r}"
+                )
+            time.sleep(self.export_poll_interval_seconds)
 
     def _to_path(self, suffix: str) -> str:
         if self.rest_url.startswith(self.http.base_url):

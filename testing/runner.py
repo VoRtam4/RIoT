@@ -1,3 +1,12 @@
+"""
+@file runner.py
+@brief Vstupní CLI pro benchmarkové a experimentální testování platformy RIoT.
+@author Vojtěch Hubáček
+@defgroup riot_testing Testing
+@ingroup riot
+@see README.md
+"""
+
 import argparse
 import shutil
 import subprocess
@@ -24,7 +33,7 @@ from testing.setup.setup_env import EnvironmentSetupService
 from testing.setup.setup_entities import EntitySetupService
 from testing.setup.setup_kpis import KPISetupService
 
-E2_REPROCESS_QUEUE_NAMES = [
+REPROCESS_QUEUE_NAMES = [
     "kpi-reprocess-requests",
     "time-series-reprocess-read-request",
     "time-series-reprocess-read-response",
@@ -59,6 +68,15 @@ def parse_args() -> argparse.Namespace:
     prime.add_argument("--all", action="store_true")
     prime.add_argument("--rebuild", action="store_true")
     prime.add_argument("--resume", action="store_true")
+    prime.add_argument("--full-reset", action="store_true", help="Reset Docker volumes/runtime state before priming the dataset.")
+    prime.add_argument("--api-key", help="Full-rights API key used after a full reset.")
+    prime.add_argument("--validate-timeout-seconds", type=float, default=900.0)
+    prime.add_argument("--validate-poll-seconds", type=float, default=5.0)
+    prime.add_argument("--skip-down-v", action="store_true")
+    prime.add_argument("--skip-clean-docker-dir", action="store_true")
+    prime.add_argument("--skip-prune", action="store_true")
+    prime.add_argument("--skip-build", action="store_true")
+    prime.add_argument("--keep-outputs", action="store_true")
 
     inject = subparsers.add_parser("inject-window")
     inject.add_argument("--source", required=True)
@@ -91,7 +109,7 @@ def parse_args() -> argparse.Namespace:
     suite.add_argument(
         "--experiments",
         nargs="+",
-        default=["E3", "E2", "E4", "E1"],
+        default=["E1", "E2", "E3", "E4"],
         help="Ordered list of experiments to execute in the suite.",
     )
     suite.add_argument("--skip-down-v", action="store_true")
@@ -182,10 +200,26 @@ def command_prepare_dataset(ctx, config, args: argparse.Namespace) -> int:
     return 0
 
 
-def command_prime(ctx, config, args: argparse.Namespace) -> int:
+def command_prime(repo_root: Path, ctx, config, args: argparse.Namespace) -> int:
     env_service = EnvironmentSetupService()
     entity_service = EntitySetupService()
     kpi_service = KPISetupService()
+
+    if getattr(args, "full_reset", False):
+        _run_suite_cleanup(repo_root, args)
+        _run_compose_up(repo_root, build=not getattr(args, "skip_build", False))
+        api_key = args.api_key.strip() if getattr(args, "api_key", None) else _prompt_for_api_key()
+        _persist_api_key(repo_root, api_key)
+        config = _with_api_key(config, api_key)
+        ctx = build_runtime_context(repo_root, config)
+        _wait_until_valid(
+            ctx,
+            timeout_seconds=getattr(args, "validate_timeout_seconds", 900.0),
+            poll_seconds=getattr(args, "validate_poll_seconds", 5.0),
+        )
+        _run_setup_phase(ctx, config, "types")
+        _run_setup_phase(ctx, config, "refresh")
+        _run_setup_phase(ctx, config, "kpis")
 
     checks = env_service.validate(ctx)
     print("Environment checks:")
@@ -212,6 +246,11 @@ def command_prime(ctx, config, args: argparse.Namespace) -> int:
         if source_name in state.get("sources", {}):
             entity_service.refresh_instances_for_source(ctx, state, source_name)
     state = kpi_service.ensure_kpis(ctx, config, state)
+    if target_dataset_id:
+        requested = kpi_service.enqueue_reprocess_for_kpis(ctx, config, state)
+        if requested:
+            print(f"Triggered KPI reprocess after dataset prime: {requested} definitions.")
+            _wait_for_reprocess_clean(ctx)
     ctx.state_manager.save_runtime_state(state)
     print("Prime completed.")
     return 0
@@ -341,16 +380,16 @@ def command_report(ctx, args: argparse.Namespace) -> int:
 def command_suite(repo_root: Path, config, args: argparse.Namespace) -> int:
     if args.dry_run:
         print("Planned suite flow:")
-        print("- safe order: E3 over D3, E2 grouped by D1 -> D2 -> D3, E4, then E1")
+        print("- text order: E1 storage, E2 ingest, E3 reprocess grouped by D1 -> D2 -> D3, then E4 history export")
         print("- initial cleanup: docker compose down -v, remove RIoT/docker, remove testing/.state, remove testing/outputs, docker system prune -a --volumes -f")
         print("- docker compose up -d --build")
         print("- prompt for full-rights API key")
         print("- wait until validate is fully green")
         print("- setup phases: types, refresh, kpis")
-        print("- prime D3 only if needed for E3/E4")
-        if "E2" in args.experiments:
-            print("- E2 runs grouped by dataset with full runtime reset between groups:")
-            for dataset_id, scenario_ids in _group_e2_scenarios_by_dataset(config).items():
+        print("- prime datasets as needed for storage, reprocess and history export")
+        if "E3" in args.experiments:
+            print("- E3 runs grouped by dataset with full runtime reset between groups:")
+            for dataset_id, scenario_ids in _group_reprocess_scenarios_by_dataset(config).items():
                 print(f"  - {dataset_id}: {', '.join(scenario_ids)}")
         if args.resume:
             print("- resume mode: keep prior raw results and skip already finished scenarios")
@@ -374,9 +413,9 @@ def command_suite(repo_root: Path, config, args: argparse.Namespace) -> int:
     reporter = Reporter()
     completed = _completed_scenarios(store, config)
     current_live_dataset_id: str | None = None
-    requested = [experiment_id for experiment_id in ["E3", "E2", "E4", "E1"] if experiment_id in args.experiments]
+    requested = [experiment_id for experiment_id in ["E1", "E2", "E3", "E4"] if experiment_id in args.experiments]
 
-    if "E3" in requested and not _experiment_complete("E3", completed, config):
+    if "E1" in requested and not _experiment_complete("E1", completed, config):
         ctx, config, current_live_dataset_id = _ensure_dataset_ready(
             repo_root=repo_root,
             ctx=ctx,
@@ -390,19 +429,31 @@ def command_suite(repo_root: Path, config, args: argparse.Namespace) -> int:
             reset_runtime=False,
             resume=args.resume,
         )
-        for scenario in config.experiments["E3"].scenarios:
+        for scenario in config.experiments["E1"].scenarios:
             if _scenario_complete(scenario, completed):
                 continue
             _run_suite_scenario(ctx, scenario, store, reporter)
             completed[(scenario.experiment_id, scenario.id)] = scenario.repetitions
 
-    if "E2" in requested:
-        grouped_scenarios = _group_e2_scenarios_by_dataset(config)
+    if "E2" in requested and not _experiment_complete("E2", completed, config):
+        _restart_benchmark_services(repo_root)
+        _wait_until_valid(ctx, timeout_seconds=args.validate_timeout_seconds, poll_seconds=args.validate_poll_seconds)
+        _run_setup_phase(ctx, config, "refresh")
+        _run_setup_phase(ctx, config, "kpis")
+        current_live_dataset_id = None
+        for scenario in config.experiments["E2"].scenarios:
+            if _scenario_complete(scenario, completed):
+                continue
+            _run_suite_scenario(ctx, scenario, store, reporter)
+            completed[(scenario.experiment_id, scenario.id)] = scenario.repetitions
+
+    if "E3" in requested:
+        grouped_scenarios = _group_reprocess_scenarios_by_dataset(config)
         for dataset_id, scenario_ids in grouped_scenarios.items():
             pending = [
-                next(item for item in config.experiments["E2"].scenarios if item.id == scenario_id)
+                next(item for item in config.experiments["E3"].scenarios if item.id == scenario_id)
                 for scenario_id in scenario_ids
-                if not _scenario_complete(next(item for item in config.experiments["E2"].scenarios if item.id == scenario_id), completed)
+                if not _scenario_complete(next(item for item in config.experiments["E3"].scenarios if item.id == scenario_id), completed)
             ]
             if not pending:
                 continue
@@ -439,18 +490,6 @@ def command_suite(repo_root: Path, config, args: argparse.Namespace) -> int:
                 resume=args.resume,
             )
         for scenario in config.experiments["E4"].scenarios:
-            if _scenario_complete(scenario, completed):
-                continue
-            _run_suite_scenario(ctx, scenario, store, reporter)
-            completed[(scenario.experiment_id, scenario.id)] = scenario.repetitions
-
-    if "E1" in requested and not _experiment_complete("E1", completed, config):
-        _restart_benchmark_services(repo_root)
-        _wait_until_valid(ctx, timeout_seconds=args.validate_timeout_seconds, poll_seconds=args.validate_poll_seconds)
-        _run_setup_phase(ctx, config, "refresh")
-        _run_setup_phase(ctx, config, "kpis")
-        current_live_dataset_id = None
-        for scenario in config.experiments["E1"].scenarios:
             if _scenario_complete(scenario, completed):
                 continue
             _run_suite_scenario(ctx, scenario, store, reporter)
@@ -514,10 +553,32 @@ def _wait_until_valid(ctx, timeout_seconds: float, poll_seconds: float) -> None:
                 print(f"- {name}: {'ok' if ok else 'failed'}")
             last_checks = checks
         if all(checks.values()):
-            return
+            break
         if time.perf_counter() - started > timeout_seconds:
             raise TimeoutError(f"Environment did not become valid within {timeout_seconds} seconds. Last checks={checks!r}")
         time.sleep(poll_seconds)
+
+    _wait_for_isc_consumers_ready(ctx, timeout_seconds=timeout_seconds, poll_seconds=poll_seconds)
+
+
+def _wait_for_isc_consumers_ready(ctx, timeout_seconds: float, poll_seconds: float) -> None:
+    if not ctx.rabbitmq_management_client.is_configured():
+        return
+
+    required_consumers = {
+        "sd-type-registration-requests": 1,
+        "sd-instance-registration-requests": 1,
+        "set-of-sd-types-updates": 1,
+        "message-processing-unit-connection-notifications": 1,
+    }
+    print("Waiting for ISC consumers:")
+    ctx.rabbitmq_management_client.wait_for_queue_consumers(
+        required_consumers,
+        poll_interval_seconds=poll_seconds,
+        timeout_seconds=timeout_seconds,
+    )
+    for queue_name, minimum_consumers in required_consumers.items():
+        print(f"- {queue_name}: >= {minimum_consumers} consumer ready")
 
 
 def _run_suite_cleanup(repo_root: Path, args: argparse.Namespace) -> None:
@@ -587,7 +648,7 @@ def _ensure_dataset_ready(
             rebuild=True,
             resume=resume,
         )
-        command_prime(ctx, config, prime_args)
+        command_prime(repo_root, ctx, config, prime_args)
         _run_setup_phase(ctx, config, "refresh")
         _run_setup_phase(ctx, config, "kpis")
         _wait_for_reprocess_clean(ctx)
@@ -615,7 +676,7 @@ def _wait_for_reprocess_clean(ctx, timeout_seconds: float = 1800.0) -> None:
     if not ctx.rabbitmq_management_client.is_configured():
         return
     ctx.rabbitmq_management_client.wait_for_queues_idle(
-        E2_REPROCESS_QUEUE_NAMES,
+        REPROCESS_QUEUE_NAMES,
         poll_interval_seconds=ctx.env.poll_interval_seconds,
         consecutive_idle_polls=3,
         timeout_seconds=timeout_seconds,
@@ -629,8 +690,8 @@ def _reset_runtime_stack(repo_root: Path) -> None:
     runtime_state_path.unlink(missing_ok=True)
 
 
-def _group_e2_scenarios_by_dataset(config) -> dict[str, list[str]]:
-    experiment = config.experiments["E2"]
+def _group_reprocess_scenarios_by_dataset(config) -> dict[str, list[str]]:
+    experiment = config.experiments["E3"]
     grouped: dict[str, list[str]] = {}
     ordered = sorted(
         experiment.scenarios,
@@ -689,7 +750,7 @@ def main() -> int:
     if args.command == "prepare-dataset":
         return command_prepare_dataset(ctx, config, args)
     if args.command == "prime":
-        return command_prime(ctx, config, args)
+        return command_prime(repo_root, ctx, config, args)
     if args.command == "inject-window":
         return command_inject_window(ctx, config, args)
     if args.command == "run":

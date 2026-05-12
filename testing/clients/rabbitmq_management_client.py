@@ -83,10 +83,48 @@ class RabbitMQManagementClient:
                 "messages": int(details.get("messages", 0)),
                 "messages_ready": int(details.get("messages_ready", 0)),
                 "messages_unacknowledged": int(details.get("messages_unacknowledged", 0)),
+                "consumers": int(details.get("consumers", 0)),
                 "publish_rate": float(details.get("message_stats", {}).get("publish_details", {}).get("rate", 0.0) or 0.0),
                 "deliver_rate": float(details.get("message_stats", {}).get("deliver_get_details", {}).get("rate", 0.0) or 0.0),
             }
         return snapshot
+
+    def wait_for_queue_consumers(
+        self,
+        required_consumers: dict[str, int],
+        poll_interval_seconds: float = 2.0,
+        timeout_seconds: float = 180.0,
+        on_poll=None,
+    ) -> dict[str, dict]:
+        import time
+
+        started = time.perf_counter()
+        last_snapshot: dict[str, dict] = {}
+        queue_names = list(required_consumers.keys())
+        while True:
+            snapshot = self.snapshot_queues(queue_names)
+            last_snapshot = snapshot
+            all_ready = True
+            for queue_name, minimum_consumers in required_consumers.items():
+                consumers = int(snapshot[queue_name]["consumers"])
+                if consumers < minimum_consumers:
+                    all_ready = False
+                    break
+
+            elapsed_seconds = time.perf_counter() - started
+            if on_poll is not None:
+                on_poll(snapshot, elapsed_seconds, all_ready)
+
+            if all_ready:
+                return snapshot
+
+            if elapsed_seconds > timeout_seconds:
+                raise TimeoutError(
+                    f"Queues did not reach required consumer counts within {timeout_seconds} seconds. "
+                    f"Required={required_consumers!r}, last_snapshot={last_snapshot!r}"
+                )
+
+            time.sleep(poll_interval_seconds)
 
     def wait_for_queues_idle(
         self,
@@ -94,6 +132,7 @@ class RabbitMQManagementClient:
         poll_interval_seconds: float = 2.0,
         consecutive_idle_polls: int = 3,
         timeout_seconds: float = 1800.0,
+        require_rates_idle: bool = True,
         on_poll=None,
     ) -> dict[str, dict]:
         import time
@@ -112,7 +151,8 @@ class RabbitMQManagementClient:
                 publish_rate = float(queue_snapshot["publish_rate"])
                 deliver_rate = float(queue_snapshot["deliver_rate"])
                 max_messages_seen[queue_name] = max(max_messages_seen[queue_name], messages)
-                if messages > 0 or publish_rate > 0.01 or deliver_rate > 0.01:
+                rates_active = require_rates_idle and (publish_rate > 0.01 or deliver_rate > 0.01)
+                if messages > 0 or rates_active:
                     all_idle = False
             last_snapshot = snapshot
             elapsed_seconds = time.perf_counter() - started

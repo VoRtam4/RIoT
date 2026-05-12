@@ -47,7 +47,6 @@ class WazeGenerator(BaseGenerator):
             "level": 0.0,
             "speedKPH": 0.0,
             "jamCount": 0.0,
-            "pubMillisLatest": 0.0,
             "rawJams": "[]",
         }
 
@@ -60,7 +59,6 @@ class WazeGenerator(BaseGenerator):
             "speed": 0.0,
             "speedKPH": 0.0,
             "jamCount": 0.0,
-            "pubMillisLatest": 0.0,
             "rawJams": "[]",
         }
 
@@ -82,7 +80,7 @@ class WazeGenerator(BaseGenerator):
         delay = max(5.0, level * 45.0 + self.random.uniform(-10.0, 15.0))
         length = max(80.0, instance.fields.get("length", 150.0) + self.random.uniform(-20.0, 20.0))
         jam_count = max(1.0, round(level + self.random.uniform(0.0, 2.0)))
-        pub_millis = float(int(self.timeline.now().timestamp() * 1000))
+        pub_millis = int(self.timeline.now().timestamp() * 1000)
         instance.fields.update(
             {
                 "delay": round(delay, 2),
@@ -91,7 +89,6 @@ class WazeGenerator(BaseGenerator):
                 "level": float(level),
                 "speedKPH": round(speed_kph, 2),
                 "jamCount": jam_count,
-                "pubMillisLatest": pub_millis,
-                "rawJams": '[{"uuid":"synthetic","pubMillis":%d}]' % int(pub_millis),
+                "rawJams": '[{"uuid":"synthetic","pubMillis":%d}]' % pub_millis,
             }
         )

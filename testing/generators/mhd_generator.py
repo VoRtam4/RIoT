@@ -36,9 +36,6 @@ class MHDGenerator(BaseGenerator):
             "departure_time": f"{(index % 24):02d}:{(index % 60):02d}:00",
             "from_stop_id": f"STOP-{index % 500:04d}",
             "to_stop_id": f"STOP-{(index + 3) % 500:04d}",
-            "segment_index": str(index % 25),
-            "segment_from_stop_id": f"STOP-{index % 500:04d}",
-            "segment_to_stop_id": f"STOP-{(index + 1) % 500:04d}",
             "finalstopid": f"STOP-{(index + 5) % 500:04d}",
             "vtype": ["tram", "bus", "trolleybus"][index % 3],
             "serviceDays": "[1,2,3,4,5]",
@@ -53,12 +50,23 @@ class MHDGenerator(BaseGenerator):
             "ltype": ["tram", "bus", "night"][index % 3],
             "lf": "true",
             "laststopid": f"STOP-{index % 500:04d}",
-            "lastupdate": 0.0,
+            "lastpostid": f"POST-{index % 500:04d}",
             "lat": 49.2 + (index % 100) * 0.001,
             "lng": 16.6 + (index % 100) * 0.001,
             "bearing": 0.0,
             "delay": 0.0,
-            "segment_progress": 0.0,
+            "finalstopname": f"Stop {(index + 5) % 500:04d}",
+            "serviceid": f"SERVICE-{index:05d}",
+            "departuredt": "",
+            "ocfinalstopid": f"STOP-{(index + 5) % 500:04d}",
+            "ocfinalstopname": f"Stop {(index + 5) % 500:04d}",
+            "oclineid": f"L{index % 120:03d}",
+            "oclinename": f"Line {index % 120:03d}",
+            "ocrouteid": f"LR{index % 700:03d}",
+            "state": "inactive",
+            "segment_from_stop_id": f"STOP-{index % 500:04d}",
+            "segment_to_stop_id": f"STOP-{(index + 1) % 500:04d}",
+            "tmflagtext": "",
             "isinactive": True,
         }
 
@@ -71,12 +79,23 @@ class MHDGenerator(BaseGenerator):
             "ltype": instance.fields.get("ltype", ""),
             "lf": instance.fields.get("lf", "true"),
             "laststopid": instance.fields.get("laststopid", ""),
-            "lastupdate": instance.fields.get("lastupdate", 0.0),
+            "lastpostid": instance.fields.get("lastpostid", ""),
             "lat": instance.fields.get("lat", 0.0),
             "lng": instance.fields.get("lng", 0.0),
             "bearing": instance.fields.get("bearing", 0.0),
             "delay": instance.fields.get("delay", 0.0),
-            "segment_progress": instance.fields.get("segment_progress", 0.0),
+            "finalstopname": instance.fields.get("finalstopname", ""),
+            "serviceid": instance.fields.get("serviceid", ""),
+            "departuredt": instance.fields.get("departuredt", ""),
+            "ocfinalstopid": instance.fields.get("ocfinalstopid", ""),
+            "ocfinalstopname": instance.fields.get("ocfinalstopname", ""),
+            "oclineid": instance.fields.get("oclineid", ""),
+            "oclinename": instance.fields.get("oclinename", ""),
+            "ocrouteid": instance.fields.get("ocrouteid", ""),
+            "state": "inactive",
+            "segment_from_stop_id": instance.fields.get("segment_from_stop_id", ""),
+            "segment_to_stop_id": instance.fields.get("segment_to_stop_id", ""),
+            "tmflagtext": instance.fields.get("tmflagtext", ""),
             "isinactive": True,
         }
 
@@ -84,19 +103,22 @@ class MHDGenerator(BaseGenerator):
         previous_delay = float(instance.fields.get("delay", 0.0))
         delay_delta = self.random.uniform(-45.0, 45.0)
         delay = max(-120.0, min(900.0, previous_delay + delay_delta))
-        segment_progress = min(1.0, max(0.0, float(instance.fields.get("segment_progress", 0.0)) + self.random.uniform(0.02, 0.15)))
         bearing = float((float(instance.fields.get("bearing", 0.0)) + self.random.uniform(-20.0, 20.0)) % 360.0)
         lat = float(instance.fields.get("lat", 49.2)) + self.random.uniform(-0.0007, 0.0007)
         lng = float(instance.fields.get("lng", 16.6)) + self.random.uniform(-0.0007, 0.0007)
+        segment_to_stop_id = instance.tags.get("to_stop_id", "")
         instance.fields.update(
             {
                 "delay": round(delay, 2),
-                "lastupdate": float(int(self.timeline.now().timestamp() * 1000)),
+                "departuredt": self.timeline.now().isoformat(),
                 "lat": round(lat, 6),
                 "lng": round(lng, 6),
                 "bearing": round(bearing, 2),
-                "segment_progress": round(segment_progress, 3),
                 "isinactive": False,
-                "laststopid": instance.tags.get("segment_to_stop_id", instance.tags.get("to_stop_id", "")),
+                "laststopid": segment_to_stop_id,
+                "lastpostid": f"POST-{segment_to_stop_id}",
+                "state": "active",
+                "segment_from_stop_id": instance.tags.get("from_stop_id", ""),
+                "segment_to_stop_id": segment_to_stop_id,
             }
         )

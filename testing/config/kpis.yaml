@@ -51,7 +51,7 @@ kpis:
     source: "ndic"
     mode: "SELECTED"
     complexity: "medium"
-    selected_instance_labels: ["NDIC_TRAFFIC_SRC-00001"]
+    selected_instance_labels: ["NDIC_TRAFFIC_SRC-00003"]
     definition:
       nodes:
         - node_id: "root"
@@ -134,9 +134,9 @@ kpis:
           numeric_reference_value: 180
         - node_id: "n2"
           parent_node_id: "root"
-          node_type: "NUMERIC_LT"
-          parameter_denotation: "segment_progress"
-          numeric_reference_value: 0.35
+          node_type: "BOOLEAN_EQ"
+          parameter_denotation: "isinactive"
+          boolean_reference_value: false
 
 extended_kpis:
   - id: "KX1"
@@ -174,6 +174,6 @@ extended_kpis:
     definition:
       nodes:
         - node_id: "root"
-          node_type: "NUMERIC_LT"
-          parameter_denotation: "segment_progress"
-          numeric_reference_value: 0.2
+          node_type: "NUMERIC_GEQ"
+          parameter_denotation: "bearing"
+          numeric_reference_value: 180

@@ -8,7 +8,7 @@ import time
 
 from testing.core.models import ScenarioRunResult, utcnow
 from testing.experiments.base_experiment import BaseExperiment
-from testing.setup.payload_builders import build_history_export_payload, build_kpi_payload_variant
+from testing.setup.payload_builders import build_history_export_payload
 from testing.setup.setup_entities import EntitySetupService
 
 
@@ -21,6 +21,8 @@ REPROCESS_QUEUE_NAMES = [
     "kpi-fulfillment-check-results",
     "time-series-kpi-results",
 ]
+KPI_REPROCESS_QUEUE = "kpi-reprocess-requests"
+MPU_CONNECTION_NOTIFICATION_QUEUE = "message-processing-unit-connection-notifications"
 
 
 class ReprocessExperiment(BaseExperiment):
@@ -30,10 +32,14 @@ class ReprocessExperiment(BaseExperiment):
             raise RuntimeError(f"Dataset {scenario.dataset_id} is not prepared")
         if not ctx.rabbitmq_management_client.is_configured():
             raise RuntimeError("RabbitMQ management client is required for reprocess benchmarking")
+        if not ctx.rabbitmq_amqp_client.is_configured():
+            raise RuntimeError("RabbitMQ AMQP client is required for direct reprocess benchmarking")
         if scenario.kpi_id not in ctx.config.kpis:
             raise RuntimeError(f"Unknown KPI alias {scenario.kpi_id}")
 
     def run_once(self, ctx, scenario, repetition):
+        started = utcnow()
+        full_wall_start = time.perf_counter()
         stale_snapshot = _get_non_idle_reprocess_snapshot(ctx)
         if stale_snapshot:
             raise RuntimeError(
@@ -58,11 +64,6 @@ class ReprocessExperiment(BaseExperiment):
         if spec.mode == "SELECTED" and not selected_instance_ids:
             raise RuntimeError(f"KPI {scenario.kpi_id} requires selected instances but none were resolved")
 
-        runtime_state = ctx.state_manager.load_runtime_state()
-        variants = runtime_state.setdefault("reprocess_variants", {})
-        current_variant = int(variants.get(scenario.kpi_id, 0))
-        next_variant = 1 - current_variant
-
         interval = _resolve_dataset_interval(dataset)
         raw_points = _estimate_or_count_raw_points(
             ctx=ctx,
@@ -74,6 +75,11 @@ class ReprocessExperiment(BaseExperiment):
             scenario=scenario,
             repetition=repetition,
         )
+        if raw_points <= 0:
+            raise RuntimeError(
+                f"Scenario {scenario.id} selected no raw points for dataset {scenario.dataset_id} "
+                f"and KPI {scenario.kpi_id}. Check selected instances and dataset contents."
+            )
         before_count, before_count_mode = _safe_count_kpi_points(
             ctx=ctx,
             dataset=dataset,
@@ -83,72 +89,37 @@ class ReprocessExperiment(BaseExperiment):
             interval=interval,
             suffix=f"{scenario.id}_{repetition}_before",
         )
+        before_export_time = time.perf_counter() - full_wall_start
 
-        warmup_key = f"{ctx.run.run_id}:{scenario.id}"
-        if repetition == 1 and not _is_reprocess_warm(ctx, warmup_key):
-            warmup_payload = build_kpi_payload_variant(
-                spec,
-                sd_type_id=str(source_state["sd_type_id"]),
-                sd_type_uid=source_state["sd_type_uid"],
-                selected_instance_ids=selected_instance_ids,
-                parameter_ids_by_denotation=source_state.get("parameter_ids", {}),
-                variant=next_variant,
-            )
-            _run_reprocess_warmup(
-                ctx=ctx,
-                scenario=scenario,
-                raw_points=raw_points,
-                kpi_id=ctx.state_manager.get_kpi_id(scenario.kpi_id),
-                payload=warmup_payload,
-            )
-            _mark_reprocess_warm(ctx, warmup_key)
-            current_variant = next_variant
-            next_variant = 1 - current_variant
-            before_count, before_count_mode = _safe_count_kpi_points(
-                ctx=ctx,
-                dataset=dataset,
-                source_name=spec.source,
-                sd_type_id=int(source_state["sd_type_id"]),
-                kpi_definition_id=kpi_definition_id,
-                interval=interval,
-                suffix=f"{scenario.id}_{repetition}_before_post_warmup",
-            )
-
-        payload = build_kpi_payload_variant(
-            spec,
-            sd_type_id=str(source_state["sd_type_id"]),
+        _request_kpi_config_refresh(ctx)
+        reprocess_wait_start = time.perf_counter()
+        _enqueue_reprocess_request(
+            ctx=ctx,
+            kpi_definition_id=kpi_definition_id,
             sd_type_uid=source_state["sd_type_uid"],
-            selected_instance_ids=selected_instance_ids,
-            parameter_ids_by_denotation=source_state.get("parameter_ids", {}),
-            variant=next_variant,
+            selected_instance_uids=_resolve_selected_instance_uids(source_state, selected_instance_ids),
         )
-
-        started = utcnow()
-        wall_start = time.perf_counter()
-        ctx.graphql_client.update_kpi(kpi_definition_id, payload)
         timeout_seconds = _resolve_reprocess_timeout(raw_points)
         telemetry_path = ctx.run.output_dir / "raw" / f"reprocess_trace_{scenario.id}_{repetition}.csv"
         telemetry_rows: list[dict[str, float | int | str]] = []
         idle_snapshot = {}
-        first_idle_elapsed: float | None = None
 
         def _on_poll(snapshot, elapsed, idle_count, all_idle):
-            nonlocal first_idle_elapsed
             telemetry_rows.append(_flatten_queue_snapshot(snapshot, elapsed, idle_count, all_idle))
-            if all_idle and first_idle_elapsed is None:
-                first_idle_elapsed = elapsed
 
         try:
-            idle_snapshot = ctx.rabbitmq_management_client.wait_for_queues_idle(
-                REPROCESS_QUEUE_NAMES,
-                poll_interval_seconds=ctx.env.poll_interval_seconds,
+            idle_snapshot = _wait_for_reprocess_activity_and_idle(
+                ctx=ctx,
+                queue_names=REPROCESS_QUEUE_NAMES,
+                poll_interval_seconds=min(ctx.env.poll_interval_seconds, 0.25),
                 consecutive_idle_polls=3,
                 timeout_seconds=timeout_seconds,
                 on_poll=_on_poll,
             )
         finally:
             _write_telemetry_csv(telemetry_path, telemetry_rows)
-        total_time = first_idle_elapsed if first_idle_elapsed is not None else (time.perf_counter() - wall_start)
+        reprocess_wait_time = time.perf_counter() - reprocess_wait_start
+        after_export_start = time.perf_counter()
         after_count, after_count_mode = _safe_count_kpi_points(
             ctx=ctx,
             dataset=dataset,
@@ -158,20 +129,31 @@ class ReprocessExperiment(BaseExperiment):
             interval=interval,
             suffix=f"{scenario.id}_{repetition}_after",
         )
+        after_export_time = time.perf_counter() - after_export_start
+        total_time = time.perf_counter() - full_wall_start
+        _validate_reprocess_result(
+            scenario=scenario,
+            raw_points=raw_points,
+            before_count=before_count,
+            after_count=after_count,
+            idle_snapshot=idle_snapshot,
+        )
         kpi_points = after_count if not math.isnan(after_count) else float(dataset["source_stats"][spec.source]["kpi_points"])
+        kpi_points_written = max(after_count - before_count, 0.0)
 
         metrics = {
             "raw_points_processed": raw_points,
-            "kpi_points_written": kpi_points,
+            "kpi_points_written": kpi_points_written,
             "kpi_points_before": before_count,
             "kpi_points_after": after_count,
             "total_time_s": total_time,
-            "raw_points_per_s": (raw_points / total_time) if total_time else 0.0,
-            "kpi_points_per_s": (kpi_points / total_time) if total_time else 0.0,
+            "before_export_time_s": before_export_time,
+            "reprocess_wait_time_s": reprocess_wait_time,
+            "after_export_time_s": after_export_time,
+            "raw_points_per_s": (raw_points / reprocess_wait_time) if reprocess_wait_time else 0.0,
+            "kpi_points_per_s": (kpi_points / reprocess_wait_time) if reprocess_wait_time else 0.0,
         }
         finished = utcnow()
-        variants[scenario.kpi_id] = next_variant
-        ctx.state_manager.save_runtime_state(runtime_state)
         return ScenarioRunResult(
             run_id=ctx.run.run_id,
             experiment_id=scenario.experiment_id,
@@ -186,11 +168,11 @@ class ReprocessExperiment(BaseExperiment):
                 "kpi_id": scenario.kpi_id,
                 "source": spec.source,
                 "selected_instance_count": len(selected_instance_ids),
-                "variant": next_variant,
+                "trigger": "direct_queue_reprocess_request",
                 "queue_idle_snapshot": idle_snapshot,
                 "queue_idle_timeout_s": timeout_seconds,
                 "queue_trace_csv": str(telemetry_path),
-                "first_idle_elapsed_s": first_idle_elapsed,
+                "queue_wait_elapsed_s": reprocess_wait_time,
                 "before_count_mode": before_count_mode,
                 "after_count_mode": after_count_mode,
                 "simulated": False,
@@ -224,6 +206,16 @@ def _resolve_selected_instance_ids(ctx, source_state: dict, spec, kpi_definition
             return [str(value) for value in selected_ids]
     fallback_count = min(len(spec.selected_instance_labels), len(source_state.get("instance_ids", [])))
     return [str(value) for value in source_state.get("instance_ids", [])[:fallback_count]]
+
+
+def _resolve_selected_instance_uids(source_state: dict, selected_instance_ids: list[str]) -> list[str]:
+    if not selected_instance_ids:
+        return []
+    mapping = {
+        str(instance_id): uid
+        for uid, instance_id in zip(source_state.get("instance_uids", []), source_state.get("instance_ids", []))
+    }
+    return [mapping[value] for value in selected_instance_ids if value in mapping]
 
 
 def _estimate_or_count_raw_points(ctx, dataset: dict, source_name: str, sd_type_id: int, selected_instance_ids: list[str], interval, scenario, repetition: int) -> float:
@@ -281,27 +273,121 @@ def _resolve_reprocess_timeout(raw_points: float) -> float:
     return max(1800.0, min(3600.0, estimated))
 
 
-def _is_reprocess_warm(ctx, warmup_key: str) -> bool:
-    warmed = getattr(ctx, "_reprocess_warmups_done", None)
-    return isinstance(warmed, set) and warmup_key in warmed
-
-
-def _mark_reprocess_warm(ctx, warmup_key: str) -> None:
-    warmed = getattr(ctx, "_reprocess_warmups_done", None)
-    if not isinstance(warmed, set):
-        warmed = set()
-        setattr(ctx, "_reprocess_warmups_done", warmed)
-    warmed.add(warmup_key)
-
-
-def _run_reprocess_warmup(ctx, scenario, raw_points: float, kpi_id: int, payload: dict) -> None:
-    ctx.graphql_client.update_kpi(kpi_id, payload)
+def _request_kpi_config_refresh(ctx) -> None:
+    ctx.rabbitmq_amqp_client.publish_to_queue(MPU_CONNECTION_NOTIFICATION_QUEUE, {})
     ctx.rabbitmq_management_client.wait_for_queues_idle(
-        REPROCESS_QUEUE_NAMES,
-        poll_interval_seconds=ctx.env.poll_interval_seconds,
-        consecutive_idle_polls=3,
-        timeout_seconds=_resolve_reprocess_timeout(raw_points),
+        [MPU_CONNECTION_NOTIFICATION_QUEUE],
+        poll_interval_seconds=min(ctx.env.poll_interval_seconds, 0.25),
+        consecutive_idle_polls=2,
+        timeout_seconds=60.0,
+        require_rates_idle=False,
     )
+
+
+def _enqueue_reprocess_request(ctx, kpi_definition_id: int, sd_type_uid: str, selected_instance_uids: list[str]) -> None:
+    payload = {
+        "jobId": "",
+        "wait": False,
+        "kpiDefinitionID": int(kpi_definition_id),
+        "sdTypeUID": sd_type_uid,
+        "to": utcnow().isoformat(),
+    }
+    if selected_instance_uids:
+        payload["sdInstanceUIDs"] = selected_instance_uids
+    ctx.rabbitmq_amqp_client.publish_to_queue(KPI_REPROCESS_QUEUE, payload)
+
+
+def _validate_reprocess_result(
+    scenario,
+    raw_points: float,
+    before_count: float,
+    after_count: float,
+    idle_snapshot: dict[str, dict],
+) -> None:
+    if raw_points <= 0:
+        raise RuntimeError(
+            f"Scenario {scenario.id} did not process any raw points. "
+            "The scenario is not a valid reprocess benchmark."
+        )
+    saw_activity = bool(idle_snapshot.get("_meta", {}).get("saw_activity", False))
+    if not saw_activity:
+        raise RuntimeError(
+            f"Scenario {scenario.id} did not observe any queue activity during reprocess waiting. "
+            "The benchmark likely measured an idle pipeline instead of a real reprocess run."
+        )
+    if raw_points > 0 and after_count <= 0:
+        raise RuntimeError(
+            f"Scenario {scenario.id} lost KPI points during reprocess "
+            f"(before={before_count}, after={after_count}). "
+            "This indicates that the KPI update removed existing points but no valid recomputation followed."
+        )
+
+
+def _wait_for_reprocess_activity_and_idle(
+    ctx,
+    queue_names: list[str],
+    poll_interval_seconds: float,
+    consecutive_idle_polls: int,
+    timeout_seconds: float,
+    on_poll=None,
+) -> dict[str, dict]:
+    import time
+
+    started = time.perf_counter()
+    idle_count = 0
+    saw_activity = False
+    last_snapshot: dict[str, dict] = {}
+    max_messages_seen = {queue_name: 0 for queue_name in queue_names}
+
+    while True:
+        snapshot = ctx.rabbitmq_management_client.snapshot_queues(queue_names)
+        last_snapshot = snapshot
+        all_idle = True
+
+        for queue_name in queue_names:
+            queue_snapshot = snapshot[queue_name]
+            messages = int(queue_snapshot.get("messages", 0))
+            messages_ready = int(queue_snapshot.get("messages_ready", 0))
+            messages_unack = int(queue_snapshot.get("messages_unacknowledged", 0))
+            publish_rate = float(queue_snapshot.get("publish_rate", 0.0))
+            deliver_rate = float(queue_snapshot.get("deliver_rate", 0.0))
+
+            max_messages_seen[queue_name] = max(max_messages_seen[queue_name], messages)
+
+            if (
+                messages > 0
+                or messages_ready > 0
+                or messages_unack > 0
+                or publish_rate > 0.01
+                or deliver_rate > 0.01
+            ):
+                saw_activity = True
+
+            if messages > 0 or messages_ready > 0 or messages_unack > 0:
+                all_idle = False
+
+        elapsed_seconds = time.perf_counter() - started
+        if on_poll is not None:
+            on_poll(snapshot, elapsed_seconds, idle_count, all_idle)
+
+        if saw_activity and all_idle:
+            idle_count += 1
+            if idle_count >= consecutive_idle_polls:
+                last_snapshot["_meta"] = {
+                    "max_messages_seen": max_messages_seen,
+                    "saw_activity": True,
+                }
+                return last_snapshot
+        elif not all_idle:
+            idle_count = 0
+
+        if elapsed_seconds > timeout_seconds:
+            raise TimeoutError(
+                f"Reprocess did not reach active-and-idle completion within {timeout_seconds} seconds. "
+                f"saw_activity={saw_activity}, last_snapshot={last_snapshot!r}, max_messages_seen={max_messages_seen!r}"
+            )
+
+        time.sleep(poll_interval_seconds)
 
 
 def _flatten_queue_snapshot(snapshot: dict[str, dict], elapsed_seconds: float, idle_count: int, all_idle: bool) -> dict[str, float | int | str]:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import re
 from collections import defaultdict
 from pathlib import Path
 from statistics import mean, median
@@ -40,7 +41,7 @@ class Reporter:
                     metrics_median=metrics_median,
                 )
             )
-        return sorted(summaries, key=lambda item: (item.experiment_id, item.scenario_id))
+        return sorted(summaries, key=lambda item: (item.experiment_id, _natural_sort_key(item.scenario_id)))
 
     def print_console_summary(self, summaries: list[ScenarioSummary]) -> None:
         if not summaries:
@@ -87,3 +88,8 @@ class Reporter:
                             summary.metrics_median[metric_name],
                         ]
                     )
+
+
+def _natural_sort_key(value: str) -> tuple:
+    parts = re.split(r"(\d+)", value)
+    return tuple(int(part) if part.isdigit() else part for part in parts)

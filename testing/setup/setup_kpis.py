@@ -8,6 +8,8 @@ from testing.setup.setup_entities import EntitySetupService
 
 
 SD_INSTANCE_REGISTRATION_QUEUE = "sd-instance-registration-requests"
+KPI_REPROCESS_QUEUE = "kpi-reprocess-requests"
+MPU_CONNECTION_NOTIFICATION_QUEUE = "message-processing-unit-connection-notifications"
 
 
 class KPISetupService:
@@ -60,6 +62,45 @@ class KPISetupService:
                     found = ctx.graphql_client.update_kpi(found["id"], payload)
             state["kpis"][spec.id] = found["id"]
         return state
+
+    def enqueue_reprocess_for_kpis(self, ctx, config, state: dict) -> int:
+        if not ctx.rabbitmq_amqp_client.is_configured():
+            return 0
+
+        self._request_kpi_config_refresh(ctx)
+        requested = 0
+        to_time = datetime.now(timezone.utc).isoformat()
+        for spec in config.kpis.values():
+            kpi_id = state.get("kpis", {}).get(spec.id)
+            source_state = state.get("sources", {}).get(spec.source, {})
+            sd_type_uid = source_state.get("sd_type_uid")
+            if not kpi_id or not sd_type_uid:
+                continue
+            message = {
+                "jobId": "",
+                "wait": False,
+                "kpiDefinitionID": int(kpi_id),
+                "sdTypeUID": sd_type_uid,
+                "to": to_time,
+            }
+            if spec.mode == "SELECTED":
+                selected_uids = self._resolve_selected_instance_uids(source_state, spec.selected_instance_labels)
+                if not selected_uids:
+                    continue
+                message["sdInstanceUIDs"] = selected_uids
+            ctx.rabbitmq_amqp_client.publish_to_queue(KPI_REPROCESS_QUEUE, message)
+            requested += 1
+        return requested
+
+    def _request_kpi_config_refresh(self, ctx) -> None:
+        ctx.rabbitmq_amqp_client.publish_to_queue(MPU_CONNECTION_NOTIFICATION_QUEUE, {})
+        if ctx.rabbitmq_management_client.is_configured():
+            ctx.rabbitmq_management_client.wait_for_queues_idle(
+                [MPU_CONNECTION_NOTIFICATION_QUEUE],
+                poll_interval_seconds=1.0,
+                consecutive_idle_polls=2,
+                timeout_seconds=60.0,
+            )
 
     def _ensure_selected_instances_registered(self, ctx, spec, source_state: dict) -> None:
         if not spec.selected_instance_labels:
@@ -122,3 +163,13 @@ class KPISetupService:
             return resolved
         fallback_count = min(len(selected_labels), len(source_state.get("instance_ids", [])))
         return [str(instance_id) for instance_id in source_state.get("instance_ids", [])[:fallback_count]]
+
+    def _resolve_selected_instance_uids(self, source_state: dict, selected_labels: list[str]) -> list[str]:
+        if not selected_labels:
+            return []
+        visible = set(source_state.get("instance_uids", []))
+        resolved = [label for label in selected_labels if label in visible]
+        if resolved:
+            return resolved
+        fallback_count = min(len(selected_labels), len(source_state.get("instance_uids", [])))
+        return [str(uid) for uid in source_state.get("instance_uids", [])[:fallback_count]]

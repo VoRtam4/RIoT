@@ -94,6 +94,22 @@ class BaseGenerator(ABC):
 
         return self.snapshot_stats()
 
+    def generate_rate_limited(self, duration_seconds: int, events_per_second: float, include_bootstrap: bool = False) -> GeneratorStats:
+        self.initialize(include_bootstrap=include_bootstrap)
+        remaining_fraction = 0.0
+        total_ticks = max(1, int(duration_seconds))
+        for _ in range(total_ticks):
+            remaining_fraction += max(0.0, events_per_second)
+            events_this_tick = int(remaining_fraction)
+            remaining_fraction -= events_this_tick
+            target_active = max(0, self.target_active_count(), events_this_tick)
+            self._fill_active_set(target_active)
+            self._ensure_minimum_active_count(events_this_tick)
+            self._emit_sampled_active_snapshots(events_this_tick)
+            self.timeline.advance()
+
+        return self.snapshot_stats()
+
     def pop_emitted_events(self) -> list[SourceEvent]:
         events = self._emitted_events
         self._emitted_events = []
@@ -166,6 +182,51 @@ class BaseGenerator(ABC):
             instance.active_ticks += 1
             instance.last_emitted_at = event.event_time
             self.active_events += 1
+
+    def _emit_sampled_active_snapshots(self, count: int) -> None:
+        self.max_active_instances = max(self.max_active_instances, self.pool.active_count)
+        if count <= 0:
+            return
+        active_instances = self.pool.active_instances()
+        if not active_instances:
+            return
+        if count <= len(active_instances):
+            selected_instances = self.random.sample(active_instances, count)
+        else:
+            selected_instances = self.random.choices(active_instances, k=count)
+        for instance in selected_instances:
+            self.update_active_fields(instance)
+            event = SourceEvent(
+                source=self.source_name,
+                instance_uid=instance.uid,
+                label=instance.label,
+                simulated_tick=self.timeline.now(),
+                event_time=self.timeline.event_time_for_tick(instance.uid, max_back_jitter_seconds=max(1, self.timeline.tick_seconds)),
+                active=True,
+                tags=instance.tags,
+                fields=dict(instance.fields),
+                metadata={"phase": "active", "generation_mode": "rate_limited"},
+            )
+            self._consume_event(event)
+            instance.active_ticks += 1
+            instance.last_emitted_at = event.event_time
+            self.active_events += 1
+
+    def _ensure_minimum_active_count(self, minimum_active: int) -> None:
+        deficit = max(0, minimum_active - self.pool.active_count)
+        if deficit <= 0:
+            return
+        for uid in self.pool.take_never_activated(deficit):
+            instance = self.pool.activate(uid, self.timeline.now(), self.lifetime_ticks())
+            self.activations += 1
+            self.unique_instances_seen.add(instance.uid)
+        remaining = max(0, minimum_active - self.pool.active_count)
+        if remaining <= 0:
+            return
+        for uid in self.pool.take_returning(remaining):
+            instance = self.pool.activate(uid, self.timeline.now(), self.lifetime_ticks())
+            self.activations += 1
+            self.unique_instances_seen.add(instance.uid)
 
     def _emit_inactive(self, instance: InstanceState, phase: str) -> None:
         event = SourceEvent(

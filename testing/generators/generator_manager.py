@@ -136,7 +136,7 @@ class GeneratorManager:
 
         return records
 
-    def simulate_window(self, duration_minutes: int, load_profile: str, sources: list[str] | None = None) -> dict:
+    def simulate_window(self, duration_minutes: int, load_profile: str, sources: list[str] | None = None, rate_based: bool = False) -> dict:
         dataset_end = datetime.now(timezone.utc)
         dataset_start = dataset_end - timedelta(minutes=duration_minutes)
 
@@ -150,7 +150,7 @@ class GeneratorManager:
             if not spec.payload.get("enabled", True):
                 continue
             generator_class = self.GENERATOR_MAP[source_name]
-            timeline = SimulationTimeline(start_time=dataset_start, tick_seconds=60, seed=self.seed + index)
+            timeline = SimulationTimeline(start_time=dataset_start, tick_seconds=1 if rate_based else 60, seed=self.seed + index)
             generator: BaseGenerator = generator_class(
                 source_name=source_name,
                 payload=spec.payload,
@@ -158,7 +158,14 @@ class GeneratorManager:
                 load_profile=load_profile,
                 seed=self.seed + index,
             )
-            stats: GeneratorStats = generator.simulate(duration_minutes / 60.0, include_bootstrap=False)
+            if rate_based:
+                stats = generator.generate_rate_limited(
+                    duration_seconds=duration_minutes * 60,
+                    events_per_second=self._events_per_second(spec.payload, load_profile),
+                    include_bootstrap=False,
+                )
+            else:
+                stats = generator.simulate(duration_minutes / 60.0, include_bootstrap=False)
             source_stats[source_name] = stats.as_source_stats()
             raw_points += stats.raw_points
             kpi_points += stats.kpi_points
@@ -176,12 +183,13 @@ class GeneratorManager:
         load_profile: str,
         source_name: str,
         include_bootstrap: bool = False,
+        rate_based: bool = False,
     ) -> list:
         dataset_end = datetime.now(timezone.utc)
         dataset_start = dataset_end - timedelta(minutes=duration_minutes)
         spec = self.sources[source_name]
         generator_class = self.GENERATOR_MAP[source_name]
-        timeline = SimulationTimeline(start_time=dataset_start, tick_seconds=60, seed=self.seed)
+        timeline = SimulationTimeline(start_time=dataset_start, tick_seconds=1 if rate_based else 60, seed=self.seed)
         generator: BaseGenerator = generator_class(
             source_name=source_name,
             payload=spec.payload,
@@ -189,6 +197,14 @@ class GeneratorManager:
             load_profile=load_profile,
             seed=self.seed,
         )
+        if rate_based:
+            generator.generate_rate_limited(
+                duration_seconds=duration_minutes * 60,
+                events_per_second=self._events_per_second(spec.payload, load_profile),
+                include_bootstrap=include_bootstrap,
+            )
+            return generator.pop_emitted_events()
+
         generator.initialize(include_bootstrap=include_bootstrap)
         events = generator.pop_emitted_events()
         total_ticks = max(1, duration_minutes)
@@ -198,6 +214,10 @@ class GeneratorManager:
         generator.finalize()
         events.extend(generator.pop_emitted_events())
         return events
+
+    def _events_per_second(self, payload: dict, load_profile: str) -> float:
+        profile = payload.get("profiles", {}).get(load_profile, {})
+        return float(profile.get("events_per_second", 0.0))
 
     def _collect_checkpoint_record(self, dataset, built_at: datetime, generators: dict[str, BaseGenerator]) -> dict:
         source_stats: dict[str, dict[str, float]] = {}

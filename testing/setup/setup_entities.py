@@ -50,6 +50,14 @@ class EntitySetupService:
 
     def _register_sd_types_via_rabbitmq(self, ctx, config) -> None:
         queue_name = "sd-type-registration-requests"
+        ctx.rabbitmq_management_client.wait_for_queue_consumers(
+            {
+                "sd-type-registration-requests": 1,
+                "set-of-sd-types-updates": 1,
+            },
+            poll_interval_seconds=1.0,
+            timeout_seconds=120.0,
+        )
         messages: list[dict] = []
         for source_name, source_spec in config.sources.items():
             payload = build_sd_type_payload(source_name, source_spec.payload)

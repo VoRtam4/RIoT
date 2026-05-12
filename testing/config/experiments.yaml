@@ -1,5 +1,22 @@
 experiments:
   - id: "E1"
+    type: "storage"
+    enabled: true
+    repetitions: 1
+    description: "Measure storage growth and point counts."
+    scenarios:
+      - id: "S1"
+        dataset_id: "D1"
+      - id: "S2"
+        dataset_id: "D2"
+      - id: "S3"
+        dataset_id: "D3"
+      - id: "S4"
+        dataset_id: "D3"
+        metadata:
+          apply_extended_kpi_set: true
+
+  - id: "E2"
     type: "ingest"
     enabled: true
     repetitions: 3
@@ -17,14 +34,14 @@ experiments:
           note: "elevated sustained load"
       - id: "I3"
         load_profile: "stress"
-        duration_minutes: 5
+        duration_minutes: 10
         metadata:
           note: "short stress run"
 
-  - id: "E2"
+  - id: "E3"
     type: "reprocess"
     enabled: true
-    repetitions: 3
+    repetitions: 1
     description: "Measure reprocessing throughput on different history sizes and KPI scopes."
     scenarios:
       - id: "R1"
@@ -37,22 +54,19 @@ experiments:
         dataset_id: "D3"
         kpi_id: "K1"
       - id: "R4"
-        dataset_id: "D2"
-        kpi_id: "K4"
+        dataset_id: "D3"
+        kpi_id: "K5"
       - id: "R5"
         dataset_id: "D2"
         kpi_id: "K4B"
       - id: "R6"
         dataset_id: "D2"
         kpi_id: "K6"
-      - id: "R7"
-        dataset_id: "D3"
-        kpi_id: "K4"
 
-  - id: "E3"
+  - id: "E4"
     type: "history_read"
     enabled: true
-    repetitions: 1
+    repetitions: 3
     description: "Measure historical export performance over REST."
     scenarios:
       - id: "H1"
@@ -127,21 +141,4 @@ experiments:
         filter_mode: "no_filter"
         metadata:
           sort_desc: true
-          note: "large week-long raw export with explicit descending sort"
-
-  - id: "E4"
-    type: "storage"
-    enabled: true
-    repetitions: 1
-    description: "Measure storage growth and point counts."
-    scenarios:
-      - id: "S1"
-        dataset_id: "D1"
-      - id: "S2"
-        dataset_id: "D2"
-      - id: "S3"
-        dataset_id: "D3"
-      - id: "S4"
-        dataset_id: "D3"
-        metadata:
-          apply_extended_kpi_set: true
+          note: "large month-long raw export with explicit descending sort"

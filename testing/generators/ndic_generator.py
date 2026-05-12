@@ -33,7 +33,6 @@ class NDICGenerator(BaseGenerator):
             "sourceIdentification": f"SRC-{index:05d}",
             "primaryLocationCode": f"PLC-{index:05d}",
             "secondaryLocationCode": f"SLC-{index:05d}",
-            "alertCDirection": "positive" if index % 2 else "negative",
             "tmcLocationCode": f"TMC-{index:05d}",
             "tmcPointName": f"Point {index:05d}",
             "tmcAreaRef": region,
@@ -51,7 +50,6 @@ class NDICGenerator(BaseGenerator):
             "trafficSpeedAnyVehicle": 0.0,
             "travelTimeAnyVehicle": 0.0,
             "trafficLevelAnyVehicle": 0.0,
-            "publicationTimestamp": 0.0,
             "isInactive": True,
             "tmcLatitude": round(latitude, 6),
             "tmcLongitude": round(longitude, 6),
@@ -62,7 +60,6 @@ class NDICGenerator(BaseGenerator):
             "trafficSpeedAnyVehicle": instance.fields.get("trafficSpeedAnyVehicle", 0.0),
             "travelTimeAnyVehicle": instance.fields.get("travelTimeAnyVehicle", 0.0),
             "trafficLevelAnyVehicle": instance.fields.get("trafficLevelAnyVehicle", 0.0),
-            "publicationTimestamp": instance.fields.get("publicationTimestamp", 0.0),
             "isInactive": True,
             "tmcLatitude": instance.fields.get("tmcLatitude", 0.0),
             "tmcLongitude": instance.fields.get("tmcLongitude", 0.0),
@@ -81,7 +78,6 @@ class NDICGenerator(BaseGenerator):
                 "trafficSpeedAnyVehicle": round(speed, 2),
                 "travelTimeAnyVehicle": round(travel_time, 2),
                 "trafficLevelAnyVehicle": float(level),
-                "publicationTimestamp": float(int(self.timeline.now().timestamp() * 1000)),
                 "isInactive": False,
             }
         )
