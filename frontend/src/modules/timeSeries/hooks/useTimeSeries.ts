@@ -22,6 +22,8 @@ export const useTimeSeries = (input: TimeSeriesReadInput, enabled: boolean) => {
     queryKey: ["timeSeries", input],
     enabled,
     initialPageParam: null,
+    retry: false,
+    refetchOnReconnect: false,
     refetchOnWindowFocus: false,
 
     queryFn: async ({ pageParam }) => {

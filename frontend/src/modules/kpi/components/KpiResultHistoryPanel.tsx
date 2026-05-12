@@ -4,18 +4,19 @@ import { LineChart } from "@mui/x-charts/LineChart";
 import { useKpiResult } from "../hooks/useKpiResult";
 import { useKpiSubscription } from "../hooks/useKpiSubscription";
 import { useTimeSeriesAggregateKpi } from "../../timeSeries/hooks/useTimeSeriesAggregateKpi";
-import {
-  minusDaysLocal,
-  nowLocal,
-  toUTCString,
-} from "../utils/dateTimeUtils";
+import { toUTCString } from "../utils/dateTimeUtils";
 
 import { colors } from "../../../theme/colors";
+import EmptyStateNotice from "../../../components/EmptyStateNotice";
 
 type Props = {
   kpiDefinitionID?: string;
   sdInstanceID?: string | null;
   sdTypeID?: string | null;
+  from: string;
+  to: string;
+  onFromChange: (value: string) => void;
+  onToChange: (value: string) => void;
 };
 
 function computeAggregateSeconds(from: string, to: string) {
@@ -31,10 +32,11 @@ export default function KpiResultHistoryPanel({
   kpiDefinitionID,
   sdInstanceID,
   sdTypeID,
+  from,
+  to,
+  onFromChange,
+  onToChange,
 }: Props) {
-  const [from, setFrom] = useState(minusDaysLocal(1));
-  const [to, setTo] = useState(nowLocal());
-
   const [debouncedFrom, setDebouncedFrom] = useState(from);
   const [debouncedTo, setDebouncedTo] = useState(to);
 
@@ -144,9 +146,14 @@ export default function KpiResultHistoryPanel({
   const y = chartData.map((d) => d.value);
 
   if (!sdInstanceID || ! kpiDefinitionID) {
-    return <div className="d-flex justify-content-center align-items-center">
-      <span className="form-label">Select the device item to view the KPI definition evaluation history</span>
-    </div>;
+    return (
+      <div className="h-100 d-flex align-items-center">
+        <EmptyStateNotice
+          title="Select a device"
+          description="Choose a device from the sidebar to view the KPI evaluation history."
+        />
+      </div>
+    );
   }
 
   return (
@@ -186,7 +193,7 @@ export default function KpiResultHistoryPanel({
             step="1"
             className="form-control"
             value={from}
-            onChange={(e) => setFrom(e.target.value)}
+            onChange={(e) => onFromChange(e.target.value)}
           />
         </div>
 
@@ -198,7 +205,7 @@ export default function KpiResultHistoryPanel({
             step="1"
             className="form-control"
             value={to}
-            onChange={(e) => setTo(e.target.value)}
+            onChange={(e) => onToChange(e.target.value)}
           />
         </div>
       </div>

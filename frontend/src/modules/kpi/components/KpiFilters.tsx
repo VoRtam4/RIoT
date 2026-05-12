@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import Select from "react-select";
 import {
   buildOptionSearchText,
@@ -17,6 +17,9 @@ type Props = {
     uid?: string | null;
   }>;
   selectedSdType: string | null;
+  search: string;
+  sort: SortOption;
+  mode: ModeFilter;
   onSearchChange: (v: string) => void;
   onSortChange: (v: SortOption) => void;
   onModeChange: (v: ModeFilter) => void;
@@ -32,15 +35,14 @@ type Option = {
 export default function KpiFilters({
   sdTypes,
   selectedSdType,
+  search,
+  sort,
+  mode,
   onSearchChange,
   onSortChange,
   onModeChange,
   onSdTypeChange,
 }: Props) {
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<SortOption>("label_asc");
-  const [mode, setMode] = useState<ModeFilter>("ALL_MODES");
-
   const sdTypeOptions: Option[] = useMemo(() => {
     return sdTypes.map((sdType) => ({
       value: String(sdType.id),
@@ -73,10 +75,7 @@ export default function KpiFilters({
             className="form-control"
             placeholder="Name or KPI ID..."
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              onSearchChange(e.target.value);
-            }}
+            onChange={(e) => onSearchChange(e.target.value)}
           />
         </div>
 
@@ -104,9 +103,7 @@ export default function KpiFilters({
             value={sortOptions.find((o) => o.value === sort) || null}
             onChange={(v) => {
               if (!v) return;
-              const value = v.value as SortOption;
-              setSort(value);
-              onSortChange(value);
+              onSortChange(v.value as SortOption);
             }}
             isClearable={false}
             {...virtualizedSelectProps}
@@ -121,9 +118,7 @@ export default function KpiFilters({
             value={modeOptions.find((o) => o.value === mode) || null}
             onChange={(v) => {
               if (!v) return;
-              const value = v.value as ModeFilter;
-              setMode(value);
-              onModeChange(value);
+              onModeChange(v.value as ModeFilter);
             }}
             isClearable={false}
             {...virtualizedSelectProps}

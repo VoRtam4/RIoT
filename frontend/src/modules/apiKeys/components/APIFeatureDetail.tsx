@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 import {
   technologyOrder,
   type ApiActionDoc,
@@ -17,25 +15,27 @@ const technologyLabels: Record<ApiTechnology, string> = {
 
 type Props = {
   feature: ApiFeatureDoc;
+  selectedTechnology: ApiTechnology;
+  selectedActionId: string;
+  onTechnologyChange: (technology: ApiTechnology) => void;
+  onActionChange: (actionId: string) => void;
 };
 
-export default function FeatureDetail({ feature }: Props) {
+export default function FeatureDetail({
+  feature,
+  selectedTechnology,
+  selectedActionId,
+  onTechnologyChange,
+  onActionChange,
+}: Props) {
   const featureTechnologies = technologyOrder.filter((technology) =>
     feature.actions.some((action) =>
       action.variants.some((variant) => variant.technology === technology),
     ),
   );
 
-  const [selectedTechnology, setSelectedTechnology] = useState<ApiTechnology>(
-    featureTechnologies[0],
-  );
-
   const actionsForTechnology = feature.actions.filter((action) =>
     action.variants.some((variant) => variant.technology === selectedTechnology),
-  );
-
-  const [selectedActionId, setSelectedActionId] = useState<string>(
-    actionsForTechnology[0]?.id ?? feature.actions[0].id,
   );
 
   const activeAction =
@@ -47,15 +47,7 @@ export default function FeatureDetail({ feature }: Props) {
   );
 
   const selectTechnology = (technology: ApiTechnology) => {
-    setSelectedTechnology(technology);
-
-    const firstActionForTechnology = feature.actions.find((action) =>
-      action.variants.some((variant) => variant.technology === technology),
-    );
-
-    if (firstActionForTechnology) {
-      setSelectedActionId(firstActionForTechnology.id);
-    }
+    onTechnologyChange(technology);
   };
 
   return (
@@ -94,7 +86,7 @@ export default function FeatureDetail({ feature }: Props) {
                 className={`api-docs-chip-button ${
                   activeAction?.id === action.id ? "is-active" : ""
                 }`}
-                onClick={() => setSelectedActionId(action.id)}
+                onClick={() => onActionChange(action.id)}
               >
                 {action.title}
               </button>

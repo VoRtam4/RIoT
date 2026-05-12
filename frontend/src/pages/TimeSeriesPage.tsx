@@ -1,85 +1,108 @@
-import { useMemo, useState } from "react";
-import { useApolloClient } from "@apollo/client/react";
-import { useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import toast from "react-hot-toast";
 
 import TimeSeriesFilters from "../modules/timeSeries/components/TimeSeriesFilters";
 import TimeSeriesTable from "../modules/timeSeries/components/TimeSeriesTable";
 
 import { useTimeSeries } from "../modules/timeSeries/hooks/useTimeSeries";
-
+import { useStartTimeSeriesExport } from "../modules/timeSeries/hooks/useStartTimeSeriesExport";
+import { useTimeSeriesExportStore } from "../modules/timeSeries/stores/timeSeriesExportStore";
+import { type ExportStatus, type TimeSeriesReadInput } from "../generated/graphql";
+import { usePageState } from "../app/navigation/usePageState";
 import {
-  StartTimeSeriesExportDocument,
-  type TimeSeriesReadInput,
-} from "../generated/graphql";
+  draftToTimeSeriesInput,
+  mergeTimeSeriesDraft,
+  timeSeriesPageStateCodec,
+  type TimeSeriesDraftState,
+  type TimeSeriesEntryState,
+} from "../modules/timeSeries/state/timeSeriesPageState";
+
+function isRunningStatus(status: ExportStatus) {
+  return status === "pending" || status === "processing";
+}
 
 export default function TimeSeriesPage() {
-  const [searchParams] = useSearchParams();
-  const client = useApolloClient();
-
-  const initialInput: TimeSeriesReadInput | null = useMemo(() => {
-    const type = searchParams.get("type") as "raw" | "kpi" | null;
-
-    if (!type) return null;
-
-    const sdInstanceID = searchParams.get("sdInstanceID");
-    const sdTypeID = searchParams.get("sdTypeID");
-    const kpiDefinitionID = searchParams.get("kpiDefinitionID");
-
-    return {
-      type,
-      sortDesc: true,
-      limit: 200,
-
-      sdTypeID: sdTypeID ?? undefined,
-      sdInstanceIDs: sdInstanceID ? [sdInstanceID] : [],
-
-      kpiDefinitionIDs:
-        type === "kpi" && kpiDefinitionID
-          ? [kpiDefinitionID]
-          : undefined,
-    };
-  }, [searchParams]);
-
-  const autoRun = searchParams.get("auto") === "1";
-
-  const [input, setInput] = useState<TimeSeriesReadInput | null>(
-    autoRun ? initialInput : null,
+  const activeExport = useTimeSeriesExportStore((s) => s.activeExport);
+  const setActiveExport = useTimeSeriesExportStore((s) => s.setActiveExport);
+  const { startTimeSeriesExport } = useStartTimeSeriesExport();
+  const { query: queryState, entry, setPageState } = usePageState(
+    timeSeriesPageStateCodec,
   );
-
-  const [submitted, setSubmitted] = useState(autoRun);
-
-  const query = useTimeSeries(
-    input as TimeSeriesReadInput,
-    submitted && !!input,
+  const draft = useMemo(
+    () => mergeTimeSeriesDraft(queryState, entry),
+    [entry, queryState],
   );
+  const [applied, setApplied] = useState<TimeSeriesReadInput | null>(
+    queryState.autoRun ? draftToTimeSeriesInput(draft) : null,
+  );
+  const didAutoRunRef = useRef(false);
 
-  const handleExport = async (input: TimeSeriesReadInput) => {
-    const res = await client.mutate({
-      mutation: StartTimeSeriesExportDocument,
-      variables: { input },
-    });
-
-    const id = res.data?.startTimeSeriesExport;
-
-    if (!id) {
-      throw new Error("Export failed");
+  useEffect(() => {
+    if (!draft.autoRun || didAutoRunRef.current) {
+      return;
     }
 
-    window.open(`rest/time-series/export/${id}`, "_blank");
+    setApplied(draftToTimeSeriesInput(draft));
+    didAutoRunRef.current = true;
+    updateDraft({
+      ...draft,
+      autoRun: false,
+    });
+  }, [draft]);
+
+  const query = useTimeSeries(applied as TimeSeriesReadInput, !!applied);
+
+  const updateDraft = (nextDraft: TimeSeriesDraftState) => {
+    const { sdInstanceIDs, kpiDefinitionIDs, ...nextQuery } = nextDraft;
+    const nextEntry: TimeSeriesEntryState = {
+      v: 1,
+      sdInstanceIDs,
+      kpiDefinitionIDs,
+    };
+
+    setPageState(
+      {
+        query: {
+          ...nextQuery,
+          autoRun: false,
+        },
+        entry: nextEntry,
+      },
+      { replace: true },
+    );
+  };
+
+  const handleExport = async (input: TimeSeriesReadInput) => {
+    try {
+      if (activeExport && isRunningStatus(activeExport.status)) {
+        toast.error("An export is already in progress.");
+        return;
+      }
+
+      const exportJob = await startTimeSeriesExport(input);
+
+      if (!exportJob) {
+        throw new Error("Export failed");
+      }
+
+      setActiveExport(exportJob);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Export failed.");
+    }
   };
 
   return (
     <div className="container mt-3">
       <TimeSeriesFilters
-        initialInput={initialInput}
-        onSubmit={(v) => {
-          setInput(v);
-          setSubmitted(true);
+        value={draft}
+        onChange={updateDraft}
+        onSubmit={() => {
+          setApplied(draftToTimeSeriesInput(draft));
         }}
-        onExport={handleExport}
+        onExport={() => handleExport(draftToTimeSeriesInput(draft))}
       />
 
-      {submitted && input && <TimeSeriesTable query={query} />}
+      {applied && <TimeSeriesTable query={query} />}
     </div>
   );
 }

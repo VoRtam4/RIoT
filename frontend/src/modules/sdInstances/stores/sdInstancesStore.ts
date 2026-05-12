@@ -7,6 +7,7 @@ import {
 } from "../../../generated/graphql";
 
 const TTL = 5 * 60_000;
+const ERROR_RETRY_COOLDOWN = 5_000;
 
 type Raw = SdInstancesByTypeQuery["sdInstancesByType"][number];
 
@@ -14,6 +15,7 @@ type Entry = {
   rawSortedAsc: Raw[];
   rawSortedDesc: Raw[];
   lastFetchedAt: number | null;
+  lastAttemptAt: number | null;
   isLoading: boolean;
   error: string | null;
 };
@@ -42,8 +44,13 @@ export const useSdInstancesStore = create<Store>((set, get) => ({
 
   ensure: async (typeId) => {
     const entry = get().byType[typeId];
+    const now = Date.now();
 
-    if (entry?.lastFetchedAt && Date.now() - entry.lastFetchedAt < TTL) {
+    if (entry?.lastFetchedAt && now - entry.lastFetchedAt < TTL) {
+      return;
+    }
+
+    if (entry?.error && entry.lastAttemptAt && now - entry.lastAttemptAt < ERROR_RETRY_COOLDOWN) {
       return;
     }
 
@@ -65,6 +72,7 @@ export const useSdInstancesStore = create<Store>((set, get) => ({
           isLoading: true,
           error: null,
           lastFetchedAt: existing?.lastFetchedAt ?? null,
+          lastAttemptAt: Date.now(),
         },
       },
     }));
@@ -90,6 +98,7 @@ export const useSdInstancesStore = create<Store>((set, get) => ({
             rawSortedAsc,
             rawSortedDesc,
             lastFetchedAt: Date.now(),
+            lastAttemptAt: Date.now(),
             isLoading: false,
             error: null,
           },
@@ -101,6 +110,8 @@ export const useSdInstancesStore = create<Store>((set, get) => ({
           ...s.byType,
           [typeId]: {
             ...(s.byType[typeId] ?? {}),
+            lastFetchedAt: null,
+            lastAttemptAt: Date.now(),
             isLoading: false,
             error: "Failed",
           },

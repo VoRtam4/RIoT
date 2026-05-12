@@ -1,3 +1,11 @@
+/**
+ * @file main.tsx
+ * @brief Vstupní bod frontendové aplikace platformy RIoT.
+ * @author Vojtěch Hubáček
+ * @defgroup riot_frontend Frontend
+ * @ingroup riot
+ * @see ../README.md
+ */
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { ApolloProvider } from "@apollo/client/react";
@@ -9,6 +17,7 @@ import { Toaster } from "react-hot-toast";
 import { ThemeProvider } from "@mui/material";
 import { muiTheme } from "./theme/muiTheme";
 import ThemeInitializer from "./theme/ThemeInitializer";
+import TimeSeriesExportManager from "./modules/timeSeries/components/TimeSeriesExportManager";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./styles/theme.css";
@@ -23,6 +32,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <QueryClientProvider client={queryClient}>
           <>
             <RouterProvider router={router} />
+            <TimeSeriesExportManager />
             <Toaster
               position="bottom-center"
               toastOptions={{
@@ -36,10 +46,20 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                   fontSize: "14px",
                 },
                 success: {
-                  icon: <i className="fa-solid fa-check" style={{ color: "var(--success)" }} />,
+                  icon: (
+                    <i
+                      className="fa-solid fa-check"
+                      style={{ color: "var(--success)" }}
+                    />
+                  ),
                 },
                 error: {
-                  icon: <i className="fa-solid fa-xmark" style={{ color: "var(--error)" }} />,
+                  icon: (
+                    <i
+                      className="fa-solid fa-xmark"
+                      style={{ color: "var(--error)" }}
+                    />
+                  ),
                 },
               }}
             />

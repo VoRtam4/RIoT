@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import Select, { type SingleValue } from "react-select";
 import { matchesSearchText } from "../../../utils/reactSelectSearch";
 import { virtualizedSelectProps } from "../../../utils/reactSelectVirtualized";
@@ -7,6 +7,8 @@ import Box from "@mui/material/Box";
 
 import SdInstanceKpiCard from "./SdInstanceKpiCard";
 import VirtualizedList from "../../../components/virtualization/VirtualizedList";
+import type { SdInstanceDetailSidebarSort } from "../state/sdInstanceDetailPageState";
+import EmptyStateNotice from "../../../components/EmptyStateNotice";
 
 type Kpi = {
   id: string;
@@ -17,12 +19,16 @@ type Props = {
   kpis?: Kpi[];
   selectedKpiId?: string | null;
   loading?: any;
+  search: string;
+  sort: SdInstanceDetailSidebarSort;
+  onSearchChange: (value: string) => void;
+  onSortChange: (value: SdInstanceDetailSidebarSort) => void;
   onSelect: (id: string) => void;
   onOpenDetail: () => void;
 };
 
 type SortOption = {
-  value: "label_asc" | "label_desc";
+  value: SdInstanceDetailSidebarSort;
   label: string;
 };
 
@@ -30,12 +36,13 @@ export default function SdInstanceKpiSidebar({
   kpis = [],
   selectedKpiId,
   loading,
+  search,
+  sort,
+  onSearchChange,
+  onSortChange,
   onSelect,
   onOpenDetail,
 }: Props) {
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<SortOption["value"]>("label_asc");
-
   const sortOptions: SortOption[] = [
     { value: "label_asc", label: "Name ↑" },
     { value: "label_desc", label: "Name ↓" },
@@ -98,7 +105,7 @@ export default function SdInstanceKpiSidebar({
           value={selectedSortOption}
           onChange={(v: SingleValue<SortOption>) => {
             if (!v) return;
-            setSort(v.value);
+            onSortChange(v.value);
           }}
           isClearable={false}
           {...virtualizedSelectProps}
@@ -112,7 +119,7 @@ export default function SdInstanceKpiSidebar({
           className="form-control"
           placeholder="Search..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => onSearchChange(e.target.value)}
         />
       </div>
 
@@ -121,18 +128,23 @@ export default function SdInstanceKpiSidebar({
         <VirtualizedList
           items={filtered}
           rowHeight={84}
+          itemSpacing={5}
           scrollToIndex={selectedIndex}
           pinnedIndex={selectedIndex}
           style={{ height: "100%" }}
           emptyState={
-            <div className="text-muted small form-label">No results</div>
+            <EmptyStateNotice
+              compact
+              title="No matching KPI"
+              description="Try a different search or sort setting."
+            />
           }
           renderItem={(kpi) => (
             <SdInstanceKpiCard
               key={kpi.id}
               kpi={kpi}
               selected={String(kpi.id) === String(selectedKpiId)}
-              onClick={() => onSelect(kpi.id)}
+              onClick={() => onSelect(String(kpi.id))}
             />
           )}
         />

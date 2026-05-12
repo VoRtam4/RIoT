@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useEffect } from "react";
 
 import { useSdTypes } from "../modules/sdTypes/hooks/useSdTypes";
 import { useSdInstancesByType } from "../modules/sdInstances/hooks/useSdInstancesByType";
@@ -11,29 +11,34 @@ import {
   matchesSearchText,
 } from "../utils/reactSelectSearch";
 import { useDebouncedValue } from "../utils/useDebouncedValue";
-
-type SortOption = "label_asc" | "label_desc";
+import { usePageState } from "../app/navigation/usePageState";
+import { sdInstancePageStateCodec } from "../modules/sdInstances/state/sdInstancePageState";
 
 export default function SdInstancesPage() {
   const navigate = useNavigate();
 
   const { sdTypes, loading: typesLoading } = useSdTypes();
-
-  const [selectedSdType, setSelectedSdType] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<SortOption>("label_asc");
-
-  const debouncedSearch = useDebouncedValue(search, 150);
+  const { query, setPageState } = usePageState(sdInstancePageStateCodec);
+  const debouncedSearch = useDebouncedValue(query.q, 150);
 
   useEffect(() => {
     if (!sdTypes.length) return;
-    if (selectedSdType) return;
+    if (query.sdType) return;
 
-    setSelectedSdType(String(sdTypes[0].id));
-  }, [sdTypes, selectedSdType]);
+    setPageState(
+      {
+        query: {
+          ...query,
+          sdType: String(sdTypes[0].id),
+        },
+        entry: null,
+      },
+      { replace: true },
+    );
+  }, [query, sdTypes, setPageState]);
 
   const { sdInstances, loading: instancesLoading } =
-    useSdInstancesByType(selectedSdType);
+    useSdInstancesByType(query.sdType);
 
   const filteredInstances = useMemo(() => {
     let result = (sdInstances ?? []).map((instance: any) => ({
@@ -52,7 +57,7 @@ export default function SdInstancesPage() {
       );
     }
 
-    if (sort === "label_asc") {
+    if (query.sort === "label_asc") {
       result.sort((a, b) =>
         a.sortLabel < b.sortLabel ? -1 : 1,
       );
@@ -63,20 +68,53 @@ export default function SdInstancesPage() {
     }
 
     return result.map((r) => r.instance);
-  }, [sdInstances, debouncedSearch, sort]);
+  }, [sdInstances, debouncedSearch, query.sort]);
 
-  const loading = typesLoading || (selectedSdType !== null && instancesLoading);
+  const loading = typesLoading || (query.sdType !== null && instancesLoading);
 
   return (
     <div className="container mt-3">
       <SdInstanceFilters
         sdTypes={sdTypes}
-        selectedSdType={selectedSdType}
-        onSdTypeChange={setSelectedSdType}
-        search={search}
-        onSearchChange={setSearch}
-        sort={sort}
-        onSortChange={setSort}
+        selectedSdType={query.sdType}
+        onSdTypeChange={(sdType) =>
+          setPageState(
+            {
+              query: {
+                ...query,
+                sdType,
+              },
+              entry: null,
+            },
+            { replace: true },
+          )
+        }
+        search={query.q}
+        onSearchChange={(q) =>
+          setPageState(
+            {
+              query: {
+                ...query,
+                q,
+              },
+              entry: null,
+            },
+            { replace: true },
+          )
+        }
+        sort={query.sort}
+        onSortChange={(sort) =>
+          setPageState(
+            {
+              query: {
+                ...query,
+                sort,
+              },
+              entry: null,
+            },
+            { replace: true },
+          )
+        }
       />
 
       <SdInstanceList

@@ -34,6 +34,9 @@ type Row = {
 
 function isDate(value: any): boolean {
   if (typeof value !== "string") return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (!/^\d{4}-\d{2}-\d{2}(?:[T\s].*)?$/.test(trimmed)) return false;
   return !isNaN(Date.parse(value));
 }
 
@@ -54,7 +57,7 @@ function formatDate(value: string): string {
 }
 
 export default function KpiSdTypeDataPanel({ sdInstanceID, sdType }: Props) {
-  const { rawDataPoint, loading, error } = useRawDataPoint(sdInstanceID);
+  const { rawDataPoint } = useRawDataPoint(sdInstanceID);
 
   const { latest } = useRawDataSubscription(sdType?.id, sdInstanceID);
 
@@ -111,7 +114,7 @@ export default function KpiSdTypeDataPanel({ sdInstanceID, sdType }: Props) {
       {
         parameter: "Time",
         value: formatDate(effectiveEventTime),
-        type: "",
+        type: "string",
       },
       ...dataRows,
     ];
@@ -173,18 +176,6 @@ export default function KpiSdTypeDataPanel({ sdInstanceID, sdType }: Props) {
       },
     },
   });
-
-  if (loading) {
-    return (
-      <div className="h-100 d-flex align-items-center justify-content-center">
-        <div className="spinner-border text-primary" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return <div className="form-label">Failed to load data</div>;
-  }
 
   return (
     <div style={{ height: "100%" }}>

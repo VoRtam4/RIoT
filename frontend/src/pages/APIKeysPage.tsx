@@ -1,5 +1,5 @@
 import { useState } from "react";
-import APIKeyList from "../modules/apiKeys/components/APIKeyList";
+import APIKeySidebar from "../modules/apiKeys/components/APIKeySidebar";
 import APIKeyForm from "../modules/apiKeys/components/APIKeyForm";
 import APIKeyCreatedBox from "../modules/apiKeys/components/APIKeyCreatedBox";
 import { useApiKeys } from "../modules/apiKeys/hooks/useApiKeys";
@@ -8,6 +8,8 @@ import { useUpdateApiKey } from "../modules/apiKeys/hooks/useUpdateApiKey";
 import { useDeleteApiKey } from "../modules/apiKeys/hooks/useDeleteApiKey";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
+import { usePageState } from "../app/navigation/usePageState";
+import { apiKeysPageStateCodec } from "../modules/apiKeys/state/apiKeysPageState";
 
 export default function APIKeysPage() {
   const navigate = useNavigate();
@@ -16,14 +18,18 @@ export default function APIKeysPage() {
   const { createApiKey } = useCreateApiKey();
   const { updateApiKey } = useUpdateApiKey();
   const { deleteApiKey } = useDeleteApiKey();
-
-  const [mode, setMode] = useState<"empty" | "create" | "detail" | "created">(
-    "empty",
-  );
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { query, setPageState } = usePageState(apiKeysPageStateCodec);
+  const [mode, setMode] = useState<"empty" | "create" | "created">("empty");
   const [createdKey, setCreatedKey] = useState<string | null>(null);
-
-  const selected = apiKeys.find((k: any) => k.id === selectedId);
+  const selected = apiKeys.find(
+    (k: any) => String(k.id) === String(query.selected),
+  );
+  const effectiveMode =
+    mode === "create" || mode === "created"
+      ? mode
+      : selected
+        ? "detail"
+        : "empty";
 
   return (
     <div className="container mt-3">
@@ -44,18 +50,76 @@ export default function APIKeysPage() {
               API documentation
             </button>
 
-            <APIKeyList
+            <APIKeySidebar
               apiKeys={apiKeys}
-              selectedId={selectedId}
+              selectedId={query.selected}
               loading={loading}
+              search={query.q}
+              filter={query.filter}
+              sort={query.sort}
+              onSearchChange={(q) =>
+                setPageState(
+                  {
+                    query: {
+                      ...query,
+                      q,
+                    },
+                    entry: null,
+                  },
+                  { replace: true },
+                )
+              }
+              onFilterChange={(filter) =>
+                setPageState(
+                  {
+                    query: {
+                      ...query,
+                      filter,
+                    },
+                    entry: null,
+                  },
+                  { replace: true },
+                )
+              }
+              onSortChange={(sort) =>
+                setPageState(
+                  {
+                    query: {
+                      ...query,
+                      sort,
+                    },
+                    entry: null,
+                  },
+                  { replace: true },
+                )
+              }
               onSelect={(id) => {
-                if (selectedId === id) {
-                  setSelectedId(null);
-                  setMode("empty");
+                setMode("empty");
+
+                if (String(query.selected) === String(id)) {
+                  setPageState(
+                    {
+                      query: {
+                        ...query,
+                        selected: null,
+                      },
+                      entry: null,
+                    },
+                    { replace: true },
+                  );
                   return;
                 }
-                setSelectedId(id);
-                setMode("detail");
+
+                setPageState(
+                  {
+                    query: {
+                      ...query,
+                      selected: String(id),
+                    },
+                    entry: null,
+                  },
+                  { replace: true },
+                );
               }}
             />
           </div>
@@ -63,18 +127,23 @@ export default function APIKeysPage() {
 
         <div className="col-9">
           <div className="panel h-100 p-3 d-flex flex-column">
-            {mode === "empty" && (
-              <div className="d-flex justify-content-center align-items-center h-100">
+            {effectiveMode === "empty" && (
+              <div className="d-flex flex-column h-100">
+                <div className="flex-grow-1" />
                 <button
                   className="btn btn-primary"
-                  onClick={() => setMode("create")}
+                  style={{ alignSelf: "flex-end" }}
+                  onClick={() => {
+                    setCreatedKey(null);
+                    setMode("create");
+                  }}
                 >
                   New key
                 </button>
               </div>
             )}
 
-            {mode === "create" && (
+            {effectiveMode === "create" && (
               <APIKeyForm
                 mode="create"
                 onSubmit={async (data) => {
@@ -94,7 +163,7 @@ export default function APIKeysPage() {
               />
             )}
 
-            {mode === "detail" && selected && (
+            {effectiveMode === "detail" && selected && (
               <APIKeyForm
                 mode="detail"
                 apiKey={selected}
@@ -116,7 +185,16 @@ export default function APIKeysPage() {
                     });
 
                     setMode("empty");
-                    setSelectedId(null);
+                    setPageState(
+                      {
+                        query: {
+                          ...query,
+                          selected: null,
+                        },
+                        entry: null,
+                      },
+                      { replace: true },
+                    );
 
                     toast.success("Deleted");
                   } catch {
@@ -126,8 +204,14 @@ export default function APIKeysPage() {
               />
             )}
 
-            {mode === "created" && createdKey && (
-              <APIKeyCreatedBox value={createdKey} />
+            {effectiveMode === "created" && createdKey && (
+              <APIKeyCreatedBox
+                value={createdKey}
+                onNew={() => {
+                  setCreatedKey(null);
+                  setMode("create");
+                }}
+              />
             )}
           </div>
         </div>

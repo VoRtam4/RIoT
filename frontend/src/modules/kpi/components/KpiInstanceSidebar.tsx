@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Select, { type SingleValue } from "react-select";
 import { matchesSearchText } from "../../../utils/reactSelectSearch";
@@ -8,6 +8,8 @@ import Box from "@mui/material/Box";
 
 import KpiInstanceCard from "./KpiInstanceCard";
 import VirtualizedList from "../../../components/virtualization/VirtualizedList";
+import type { KpiDetailSidebarSort } from "../state/kpiDetailPageState";
+import EmptyStateNotice from "../../../components/EmptyStateNotice";
 
 type Instance = {
   id: string;
@@ -19,11 +21,15 @@ type Props = {
   instances?: Instance[];
   selectedInstanceId?: string | null;
   loading?: boolean;
+  search: string;
+  sort: KpiDetailSidebarSort;
+  onSearchChange: (value: string) => void;
+  onSortChange: (value: KpiDetailSidebarSort) => void;
   onSelect: (id: string) => void;
 };
 
 type SortOption = {
-  value: "label_asc" | "label_desc";
+  value: KpiDetailSidebarSort;
   label: string;
 };
 
@@ -31,12 +37,13 @@ export default function KpiInstanceSidebar({
   instances = [],
   selectedInstanceId,
   loading,
+  search,
+  sort,
+  onSearchChange,
+  onSortChange,
   onSelect,
 }: Props) {
   const navigate = useNavigate();
-
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<SortOption["value"]>("label_asc");
 
   const sortOptions: SortOption[] = [
     { value: "label_asc", label: "Name ↑" },
@@ -106,7 +113,7 @@ export default function KpiInstanceSidebar({
           value={selectedSortOption}
           onChange={(v: SingleValue<SortOption>) => {
             if (!v) return;
-            setSort(v.value);
+            onSortChange(v.value);
           }}
           isClearable={false}
           {...virtualizedSelectProps}
@@ -120,7 +127,7 @@ export default function KpiInstanceSidebar({
           className="form-control"
           placeholder="Search..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => onSearchChange(e.target.value)}
         />
       </div>
 
@@ -135,13 +142,16 @@ export default function KpiInstanceSidebar({
         <VirtualizedList
           items={filtered}
           rowHeight={84}
+          itemSpacing={5}
           scrollToIndex={selectedIndex}
           pinnedIndex={selectedIndex}
           style={{ height: "100%" }}
           emptyState={
-            <div className="text-muted small form-label">
-              No results
-            </div>
+            <EmptyStateNotice
+              compact
+              title="No matching devices"
+              description="Try a different search or sort setting."
+            />
           }
           renderItem={(inst) => (
             <KpiInstanceCard

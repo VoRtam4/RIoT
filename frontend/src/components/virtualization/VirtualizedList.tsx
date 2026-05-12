@@ -11,6 +11,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 type Props<T> = {
   items: T[];
   rowHeight: number;
+  itemSpacing?: number;
   renderItem: (item: T, index: number) => ReactNode;
   emptyState?: ReactNode;
   overscan?: number;
@@ -24,6 +25,7 @@ type Props<T> = {
 export default function VirtualizedList<T>({
   items,
   rowHeight,
+  itemSpacing = 0,
   renderItem,
   emptyState,
   overscan = 4,
@@ -43,7 +45,10 @@ export default function VirtualizedList<T>({
 
   const shouldVirtualize = items.length >= threshold;
 
-  const estimateSize = useCallback(() => rowHeight, [rowHeight]);
+  const estimateSize = useCallback(
+    (index: number) => rowHeight + (index === items.length - 1 ? 0 : itemSpacing),
+    [itemSpacing, items.length, rowHeight],
+  );
   const getScrollElement = useCallback(() => containerRef.current, []);
 
   const virtualizer = useVirtualizer({
@@ -101,7 +106,7 @@ export default function VirtualizedList<T>({
     pinnedIndex < items.length &&
     viewportHeight > 0;
   const pinnedItemStart = shouldEvaluatePinnedItem
-    ? pinnedIndex! * rowHeight
+    ? pinnedIndex! * (rowHeight + itemSpacing)
     : 0;
   const pinnedItemEnd = pinnedItemStart + rowHeight;
   const viewportEnd = scrollTop + viewportHeight;
@@ -208,10 +213,17 @@ export default function VirtualizedList<T>({
                 <div
                   key={item.id ?? index}
                   style={{
-                    height: rowHeight,
+                    height: rowHeight + (index === items.length - 1 ? 0 : itemSpacing),
                   }}
                 >
-                  {renderItem(item, index)}
+                  <div
+                    style={{
+                      height: rowHeight,
+                      marginBottom: index === items.length - 1 ? 0 : itemSpacing,
+                    }}
+                  >
+                    {renderItem(item, index)}
+                  </div>
                 </div>
               ))
             : (
@@ -234,7 +246,15 @@ export default function VirtualizedList<T>({
                         transform: `translateY(${virtualItem.start}px)`,
                       }}
                     >
-                      {renderItem(items[virtualItem.index], virtualItem.index)}
+                      <div
+                        style={{
+                          height: rowHeight,
+                          marginBottom:
+                            virtualItem.index === items.length - 1 ? 0 : itemSpacing,
+                        }}
+                      >
+                        {renderItem(items[virtualItem.index], virtualItem.index)}
+                      </div>
                     </div>
                   ))}
                 </div>

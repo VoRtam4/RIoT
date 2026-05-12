@@ -1,8 +1,13 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import Select from "react-select";
 import { matchesSearchText } from "../../../utils/reactSelectSearch";
 import { virtualizedSelectProps } from "../../../utils/reactSelectVirtualized";
 import VirtualizedList from "../../../components/virtualization/VirtualizedList";
+import EmptyStateNotice from "../../../components/EmptyStateNotice";
+import type {
+  ApiKeysFilter,
+  ApiKeysSort,
+} from "../state/apiKeysPageState";
 
 import APIKeyCard from "./APIKeyCard";
 
@@ -10,29 +15,37 @@ type Props = {
   apiKeys: any[];
   selectedId: string | null;
   loading?: any;
+  search: string;
+  filter: ApiKeysFilter;
+  sort: ApiKeysSort;
+  onSearchChange: (value: string) => void;
+  onFilterChange: (value: ApiKeysFilter) => void;
+  onSortChange: (value: ApiKeysSort) => void;
   onSelect: (id: string) => void;
 };
 
 type FilterOption = {
-  value: "all" | "active" | "inactive";
+  value: ApiKeysFilter;
   label: string;
 };
 
 type SortOption = {
-  value: "label_asc" | "label_desc";
+  value: ApiKeysSort;
   label: string;
 };
 
-export default function APIKeyList({
+export default function APIKeySidebar({
   apiKeys,
   selectedId,
   loading,
+  search,
+  filter,
+  sort,
+  onSearchChange,
+  onFilterChange,
+  onSortChange,
   onSelect,
 }: Props) {
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<FilterOption["value"]>("all");
-  const [sort, setSort] = useState<SortOption["value"]>("label_asc");
-
   const isActive = (k: any) =>
     !k.revoked && (!k.expiresAt || new Date(k.expiresAt) > new Date());
 
@@ -78,7 +91,7 @@ export default function APIKeyList({
   }, [apiKeys, search, filter, sort]);
 
   const selectedIndex = useMemo(
-    () => filtered.findIndex((k) => k.id === selectedId),
+    () => filtered.findIndex((k) => String(k.id) === String(selectedId)),
     [filtered, selectedId],
   );
 
@@ -108,7 +121,7 @@ export default function APIKeyList({
           classNamePrefix="react-select"
           options={filterOptions}
           value={filterOptions.find((f) => f.value === filter)}
-          onChange={(v) => v && setFilter(v.value)}
+          onChange={(v) => v && onFilterChange(v.value)}
           isClearable={false}
           {...virtualizedSelectProps}
         />
@@ -121,7 +134,7 @@ export default function APIKeyList({
           classNamePrefix="react-select"
           options={sortOptions}
           value={sortOptions.find((s) => s.value === sort)}
-          onChange={(v) => v && setSort(v.value)}
+          onChange={(v) => v && onSortChange(v.value)}
           isClearable={false}
           {...virtualizedSelectProps}
         />
@@ -134,24 +147,31 @@ export default function APIKeyList({
           className="form-control"
           placeholder="Hledat..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => onSearchChange(e.target.value)}
         />
       </div>
 
       {/* LIST */}
       <VirtualizedList
         items={filtered}
-        rowHeight={92}
+        rowHeight={84}
+        itemSpacing={5}
         scrollToIndex={selectedIndex}
         pinnedIndex={selectedIndex}
         style={{ flex: 1, minHeight: 0 }}
-        emptyState={<div className="text-muted small form-label">No results</div>}
+        emptyState={
+          <EmptyStateNotice
+            compact
+            title="No matching keys"
+            description="Adjust the search or filter settings."
+          />
+        }
         renderItem={(k) => (
           <APIKeyCard
             key={k.id}
             apiKey={k}
-            selected={selectedId === k.id}
-            onClick={() => onSelect(k.id)}
+            selected={String(selectedId) === String(k.id)}
+            onClick={() => onSelect(String(k.id))}
           />
         )}
       />

@@ -1,9 +1,10 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 import type { SdTypesQuery } from "../../../generated/graphql";
 import KpiCard from "./KpiCard";
 import KpiFilters, { type ModeFilter, type SortOption } from "./KpiFilters";
 import VirtualizedCardGrid from "../../../components/virtualization/VirtualizedCardGrid";
 import { useDebouncedValue } from "../../../utils/useDebouncedValue";
+import EmptyStateNotice from "../../../components/EmptyStateNotice";
 import {
   buildOptionSearchText,
   matchesSearchText,
@@ -23,6 +24,12 @@ type Props = {
   };
   sdTypes: SdTypesQuery["sdTypes"];
   selectedSdType: string | null;
+  search: string;
+  sort: SortOption;
+  mode: ModeFilter;
+  onSearchChange: (value: string) => void;
+  onSortChange: (value: SortOption) => void;
+  onModeChange: (value: ModeFilter) => void;
   onSdTypeChange: (value: string | null) => void;
   loading?: boolean;
 };
@@ -31,14 +38,16 @@ export default function KpiList({
   entry,
   sdTypes,
   selectedSdType,
+  search,
+  sort,
+  mode,
+  onSearchChange,
+  onSortChange,
+  onModeChange,
   onSdTypeChange,
   loading,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<SortOption>("label_asc");
-  const [mode, setMode] = useState<ModeFilter>("ALL_MODES");
 
   const debouncedSearch = useDebouncedValue(search, 150);
 
@@ -75,9 +84,12 @@ export default function KpiList({
       <KpiFilters
         sdTypes={sdTypes}
         selectedSdType={selectedSdType}
-        onSearchChange={setSearch}
-        onSortChange={setSort}
-        onModeChange={setMode}
+        search={search}
+        sort={sort}
+        mode={mode}
+        onSearchChange={onSearchChange}
+        onSortChange={onSortChange}
+        onModeChange={onModeChange}
         onSdTypeChange={onSdTypeChange}
       />
 
@@ -87,7 +99,12 @@ export default function KpiList({
           rowHeight={156}
           minColumnWidth={300}
           style={{ height: "calc(100vh - 220px)" }}
-          emptyState={<div className="text-muted form-label">No results</div>}
+          emptyState={
+            <EmptyStateNotice
+              title="No KPI match the current filter"
+              description="Try a different search phrase, model or mode."
+            />
+          }
           renderItem={(kpi) => (
             <KpiCard key={kpi.id} kpi={kpi} />
           )}

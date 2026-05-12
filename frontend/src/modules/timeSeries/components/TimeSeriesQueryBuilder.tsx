@@ -1,17 +1,21 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   QueryBuilder,
+  type RuleType,
   type RuleGroupType,
   type RuleGroupTypeAny,
   type Field,
 } from "react-querybuilder";
-import { mapToFilterNode } from "../utils/mapQueryToFilterNode";
 import { QueryBuilderBootstrap } from "@react-querybuilder/bootstrap";
 import { defaultValidator } from "react-querybuilder";
 import { QueryBuilderDnD } from "@react-querybuilder/dnd";
 
 import * as ReactDnD from "react-dnd";
 import * as ReactDndHtml5Backend from "react-dnd-html5-backend";
+import type {
+  FilterNodeInput,
+  FilterOperator,
+} from "../../../generated/graphql";
 
 import "bootstrap/dist/css/bootstrap.min.css";
 import "react-querybuilder/dist/query-builder.css";
@@ -23,7 +27,8 @@ type TagParameter = {
 
 type Props = {
   parameters: TagParameter[];
-  onChange?: (filter: any) => void;
+  value?: FilterNodeInput;
+  onChange?: (filter: FilterNodeInput | undefined) => void;
 };
 
 const operators = [
@@ -44,47 +49,156 @@ const mapFields = (params: TagParameter[]): Field[] =>
     inputType: "text",
   }));
 
-export default function TimeSeriesQueryBuilder({
-  parameters,
-  onChange,
-}: Props) {
-  const [query, setQuery] = useState<RuleGroupType>({
+function filterKey(filter?: FilterNodeInput) {
+  return filter ? JSON.stringify(filter) : "";
+}
+
+function emptyQuery(): RuleGroupType {
+  return {
     combinator: "or",
     rules: [],
-  });
+  };
+}
 
-  const fields = mapFields(parameters);
+function mapFilterNodeToQuery(filter?: FilterNodeInput): RuleGroupType {
+  if (!filter || filter.type !== "logical" || !filter.nodes?.length) {
+    return emptyQuery();
+  }
+
+  const mapNode = (
+    node: FilterNodeInput,
+  ): RuleGroupType | RuleType | null => {
+    if (node.type === "logical") {
+      return {
+        combinator: node.operator === "and" ? "and" : "or",
+        rules: (node.nodes ?? [])
+          .map((child) => mapNode(child))
+          .filter(Boolean) as Array<RuleGroupType | RuleType>,
+      };
+    }
+
+    if (node.type === "rule" && node.rule) {
+      return {
+        field: node.rule.tag,
+        operator: node.rule.operator,
+        value: node.rule.value,
+      };
+    }
+
+    return null;
+  };
+
+  const mapped = mapNode(filter);
+
+  return mapped && "rules" in mapped ? mapped : emptyQuery();
+}
+
+function mapQueryToFilterNode(query: RuleGroupType): FilterNodeInput | undefined {
+  if (!query.rules.length) return undefined;
+
+  const nodes = query.rules
+    .map((rule) => {
+      if ("rules" in rule) {
+        return mapQueryToFilterNode(rule);
+      }
+
+      if (!rule.field || !rule.operator || !String(rule.value ?? "").trim()) {
+        return null;
+      }
+
+      return {
+        type: "rule",
+        rule: {
+          tag: String(rule.field),
+          operator: rule.operator as FilterOperator,
+          value: String(rule.value),
+        },
+      } satisfies FilterNodeInput;
+    })
+    .filter(Boolean) as FilterNodeInput[];
+
+  if (!nodes.length) {
+    return undefined;
+  }
+
+  return {
+    type: "logical",
+    operator: query.combinator === "and" ? "and" : "or",
+    nodes,
+  };
+}
+
+export default function TimeSeriesQueryBuilder({
+  parameters,
+  value,
+  onChange,
+}: Props) {
+  const [query, setQuery] = useState<RuleGroupType>(mapFilterNodeToQuery(value));
+  const lastAppliedValueKeyRef = useRef(filterKey(value));
+  const lastEmittedValueKeyRef = useRef<string | null>(null);
+
+  const fields = useMemo(() => mapFields(parameters), [parameters]);
+  const dnd = useMemo(
+    () => ({ ...ReactDnD, ...ReactDndHtml5Backend }),
+    [],
+  );
+
+  useEffect(() => {
+    const nextValueKey = filterKey(value);
+
+    if (nextValueKey === lastAppliedValueKeyRef.current) {
+      return;
+    }
+
+    if (nextValueKey === lastEmittedValueKeyRef.current) {
+      lastAppliedValueKeyRef.current = nextValueKey;
+      return;
+    }
+
+    queueMicrotask(() => {
+      setQuery(mapFilterNodeToQuery(value));
+    });
+    lastAppliedValueKeyRef.current = nextValueKey;
+  }, [value]);
 
   const handleChange = (q: RuleGroupTypeAny) => {
     const typed = q as RuleGroupType;
-    setQuery(typed);
+    const filter = mapQueryToFilterNode(typed);
 
-    const mapped = mapToFilterNode(typed);
-    onChange?.(mapped);
+    setQuery(typed);
+    lastEmittedValueKeyRef.current = filterKey(filter);
+    lastAppliedValueKeyRef.current = lastEmittedValueKeyRef.current;
+    onChange?.(filter);
   };
 
   const validator = (query: RuleGroupTypeAny) => {
     const base = defaultValidator(query);
 
-    const result = typeof base === "boolean" ? {} : { ...base };
+    const result: Record<string, { valid: boolean }> =
+      typeof base === "boolean"
+        ? {}
+        : { ...(base as Record<string, { valid: boolean }>) };
 
-    const validateRule = (rule: any) => {
+    const validateRule = (rule: RuleType) => {
       if (!rule.field || !rule.operator) {
         return { valid: false };
       }
 
-      if (!rule.value || rule.value.trim() === "") {
+      if (!String(rule.value ?? "").trim()) {
         return { valid: false };
       }
 
       return { valid: true };
     };
 
-    const walk = (node: any) => {
-      if (node.rules) {
-        node.rules.forEach(walk);
+    const walk = (node: RuleGroupTypeAny | RuleType) => {
+      if ("rules" in node && Array.isArray(node.rules)) {
+        node.rules.forEach((child) => walk(child as RuleGroupTypeAny | RuleType));
       } else {
-        result[node.id] = validateRule(node);
+        const rule = node as RuleType;
+        if (rule.id) {
+          result[rule.id] = validateRule(rule);
+        }
       }
     };
 
@@ -108,7 +222,7 @@ export default function TimeSeriesQueryBuilder({
       </style>
 
       <QueryBuilderBootstrap>
-        <QueryBuilderDnD dnd={{ ...ReactDnD, ...ReactDndHtml5Backend }}>
+        <QueryBuilderDnD dnd={dnd}>
           <QueryBuilder
             fields={fields}
             query={query}

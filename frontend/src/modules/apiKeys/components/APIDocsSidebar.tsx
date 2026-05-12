@@ -1,13 +1,14 @@
 import type { ApiFeatureDoc } from "../data/apiDocs";
 import ApiDocsFeatureCard from "./APIDocsFeatureCard";
 import VirtualizedList from "../../../components/virtualization/VirtualizedList";
+import EmptyStateNotice from "../../../components/EmptyStateNotice";
 
 type Props = {
   features: ApiFeatureDoc[];
   selectedFeatureId: string | null;
   search: string;
   onSearchChange: (value: string) => void;
-  onSelectFeature: (id: string) => void;
+  onSelectFeature: (id: string | null) => void;
 };
 
 export default function ApiDocsSidebar({
@@ -38,19 +39,28 @@ export default function ApiDocsSidebar({
 
       <VirtualizedList
         items={features}
-        rowHeight={84}
+        rowHeight={100}
+        itemSpacing={5}
         scrollToIndex={selectedIndex}
         pinnedIndex={selectedIndex}
         style={{ flex: 1 }}
         emptyState={
-          <div className="form-label small">No feature matches the filter.</div>
+          <EmptyStateNotice
+            compact
+            title="No matching features"
+            description="Try a different search phrase."
+          />
         }
         renderItem={(feature) => (
           <ApiDocsFeatureCard
             key={feature.id}
             feature={feature}
             selected={feature.id === selectedFeatureId}
-            onClick={() => onSelectFeature(feature.id)}
+            onClick={() =>
+              onSelectFeature(
+                feature.id === selectedFeatureId ? null : feature.id,
+              )
+            }
           />
         )}
       />

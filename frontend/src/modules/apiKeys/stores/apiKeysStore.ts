@@ -6,12 +6,14 @@ import {
 } from "../../../generated/graphql";
 
 const TTL = 5 * 60_000;
+const ERROR_RETRY_COOLDOWN = 5_000;
 
 type Raw = ApiKeysQuery["apiKeys"][number];
 
 type Entry = {
   raw: Raw[];
   lastFetchedAt: number | null;
+  lastAttemptAt: number | null;
   isLoading: boolean;
   error: Error | null;
 };
@@ -27,8 +29,13 @@ export const useApiKeysStore = create<Store>((set, get) => ({
 
   ensure: async () => {
     const entry = get().entry;
+    const now = Date.now();
 
-    if (entry?.lastFetchedAt && Date.now() - entry.lastFetchedAt < TTL) {
+    if (entry?.lastFetchedAt && now - entry.lastFetchedAt < TTL) {
+      return;
+    }
+
+    if (entry?.error && entry.lastAttemptAt && now - entry.lastAttemptAt < ERROR_RETRY_COOLDOWN) {
       return;
     }
 
@@ -46,6 +53,7 @@ export const useApiKeysStore = create<Store>((set, get) => ({
         isLoading: true,
         error: null,
         lastFetchedAt: existing?.lastFetchedAt ?? null,
+        lastAttemptAt: Date.now(),
       },
     });
 
@@ -59,6 +67,7 @@ export const useApiKeysStore = create<Store>((set, get) => ({
         entry: {
           raw: data?.apiKeys ?? [],
           lastFetchedAt: Date.now(),
+          lastAttemptAt: Date.now(),
           isLoading: false,
           error: null,
         },
@@ -68,6 +77,7 @@ export const useApiKeysStore = create<Store>((set, get) => ({
         entry: {
           raw: [],
           lastFetchedAt: null,
+          lastAttemptAt: Date.now(),
           isLoading: false,
           error: e as Error,
         },

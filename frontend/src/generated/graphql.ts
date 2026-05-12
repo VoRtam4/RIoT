@@ -91,6 +91,7 @@ export type BooleanNotExistsAtomKpiNode = AtomKpiNode & KpiNode & {
 };
 
 export type ExportStatus =
+  | 'cancelled'
   | 'done'
   | 'expired'
   | 'failed'
@@ -231,6 +232,7 @@ export type LogicalOperator =
 export type Mutation = {
   __typename?: 'Mutation';
   assignRoleToUser: Scalars['Boolean']['output'];
+  cancelTimeSeriesExport: TimeSeriesExport;
   createAPIKey: Scalars['String']['output'];
   createKPIDefinition: KpiDefinition;
   createSDInstanceGroup: SdInstanceGroup;
@@ -240,8 +242,8 @@ export type Mutation = {
   deleteSDInstanceGroup: Scalars['Boolean']['output'];
   deleteSDType: Scalars['Boolean']['output'];
   deleteUserConfig: Scalars['Boolean']['output'];
-  startTimeSeriesExport: Scalars['String']['output'];
-  startTimeSeriesExportAggregateKPI: Scalars['String']['output'];
+  startTimeSeriesExport: TimeSeriesExport;
+  startTimeSeriesExportAggregateKPI: TimeSeriesExport;
   statisticsMutate: Scalars['Boolean']['output'];
   updateAPIKey: Scalars['Boolean']['output'];
   updateKPIDefinition: KpiDefinition;
@@ -253,6 +255,11 @@ export type Mutation = {
 
 export type MutationAssignRoleToUserArgs = {
   input: AssignRoleInput;
+};
+
+
+export type MutationCancelTimeSeriesExportArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -463,6 +470,7 @@ export type Query = {
   statisticsQuerySensorsWithFields: Array<OutputData>;
   statisticsQuerySimpleSensors: Array<OutputData>;
   timeSeriesDistinctTagValues: TimeSeriesDistinctTagValuesResponse;
+  timeSeriesExport: TimeSeriesExport;
   timeSeriesRead: TimeSeriesReadResponse;
   timeSeriesReadAggregateKPI: TimeSeriesReadResponse;
   userConfig: UserConfig;
@@ -549,6 +557,11 @@ export type QueryStatisticsQuerySimpleSensorsArgs = {
 
 export type QueryTimeSeriesDistinctTagValuesArgs = {
   request: TimeSeriesDistinctTagValuesInput;
+};
+
+
+export type QueryTimeSeriesExportArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -761,6 +774,7 @@ export type Subscription = {
   onKPIFulfillmentChecked: Array<KpiFulfillmentCheckResult>;
   onRawDataPointArrived: Array<RawDataPoint>;
   onSDInstanceRegistered: SdInstance;
+  onTimeSeriesExportUpdated: TimeSeriesExport;
 };
 
 
@@ -776,6 +790,11 @@ export type SubscriptionOnRawDataPointArrivedArgs = {
 
 export type SubscriptionOnSdInstanceRegisteredArgs = {
   filter?: InputMaybe<SdInstanceRegisteredFilter>;
+};
+
+
+export type SubscriptionOnTimeSeriesExportUpdatedArgs = {
+  filter: TimeSeriesExportFilter;
 };
 
 export type TimeSeriesCursor = {
@@ -823,6 +842,10 @@ export type TimeSeriesExport = {
   expiresAt?: Maybe<Scalars['Date']['output']>;
   id: Scalars['ID']['output'];
   status: ExportStatus;
+};
+
+export type TimeSeriesExportFilter = {
+  ids?: InputMaybe<Array<Scalars['ID']['input']>>;
 };
 
 export type TimeSeriesParameter = {
@@ -1067,12 +1090,33 @@ export type TimeSeriesReadQueryVariables = Exact<{
 
 export type TimeSeriesReadQuery = { __typename?: 'Query', timeSeriesRead: { __typename?: 'TimeSeriesReadResponse', base: any, hasMoreBatches: boolean, hasMoreData: boolean, error?: string | null, data?: Array<{ __typename?: 'TimeSeriesDataPoint', time: any, tags: any, data: any }> | null, parameters?: Array<{ __typename?: 'TimeSeriesParameter', denotation: string, label: string, role: ParameterRole }> | null, nextCursor?: { __typename?: 'TimeSeriesCursor', time: any, sdInstanceUID: string, kpiDefinitionID?: string | null } | null } };
 
+export type TimeSeriesExportQueryVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type TimeSeriesExportQuery = { __typename?: 'Query', timeSeriesExport: { __typename?: 'TimeSeriesExport', id: string, status: ExportStatus, downloadUrl?: string | null, createdAt: any, expiresAt?: any | null, error?: string | null } };
+
 export type StartTimeSeriesExportMutationVariables = Exact<{
   input: TimeSeriesReadInput;
 }>;
 
 
-export type StartTimeSeriesExportMutation = { __typename?: 'Mutation', startTimeSeriesExport: string };
+export type StartTimeSeriesExportMutation = { __typename?: 'Mutation', startTimeSeriesExport: { __typename?: 'TimeSeriesExport', id: string, status: ExportStatus, downloadUrl?: string | null, createdAt: any, expiresAt?: any | null, error?: string | null } };
+
+export type CancelTimeSeriesExportMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+}>;
+
+
+export type CancelTimeSeriesExportMutation = { __typename?: 'Mutation', cancelTimeSeriesExport: { __typename?: 'TimeSeriesExport', id: string, status: ExportStatus, downloadUrl?: string | null, createdAt: any, expiresAt?: any | null, error?: string | null } };
+
+export type OnTimeSeriesExportUpdatedSubscriptionVariables = Exact<{
+  filter: TimeSeriesExportFilter;
+}>;
+
+
+export type OnTimeSeriesExportUpdatedSubscription = { __typename?: 'Subscription', onTimeSeriesExportUpdated: { __typename?: 'TimeSeriesExport', id: string, status: ExportStatus, downloadUrl?: string | null, createdAt: any, expiresAt?: any | null, error?: string | null } };
 
 export type TimeSeriesReadAggregateKpiQueryVariables = Exact<{
   request: TimeSeriesReadAggregateKpiInput;
@@ -1107,5 +1151,8 @@ export const SdInstanceDocument = {"kind":"Document","definitions":[{"kind":"Ope
 export const SdTypesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"SdTypes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sdTypes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"uid"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"parameters"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"denotation"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"role"}}]}}]}}]}}]} as unknown as DocumentNode<SdTypesQuery, SdTypesQueryVariables>;
 export const SdTypeByIdDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"SdTypeById"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"sdType"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"uid"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"parameters"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"denotation"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"role"}}]}}]}}]}}]} as unknown as DocumentNode<SdTypeByIdQuery, SdTypeByIdQueryVariables>;
 export const TimeSeriesReadDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"TimeSeriesRead"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"request"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"TimeSeriesReadInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"timeSeriesRead"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"request"},"value":{"kind":"Variable","name":{"kind":"Name","value":"request"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"base"}},{"kind":"Field","name":{"kind":"Name","value":"data"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"time"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"data"}}]}},{"kind":"Field","name":{"kind":"Name","value":"parameters"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"denotation"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"role"}}]}},{"kind":"Field","name":{"kind":"Name","value":"hasMoreBatches"}},{"kind":"Field","name":{"kind":"Name","value":"hasMoreData"}},{"kind":"Field","name":{"kind":"Name","value":"nextCursor"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"time"}},{"kind":"Field","name":{"kind":"Name","value":"sdInstanceUID"}},{"kind":"Field","name":{"kind":"Name","value":"kpiDefinitionID"}}]}},{"kind":"Field","name":{"kind":"Name","value":"error"}}]}}]}}]} as unknown as DocumentNode<TimeSeriesReadQuery, TimeSeriesReadQueryVariables>;
-export const StartTimeSeriesExportDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"StartTimeSeriesExport"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"TimeSeriesReadInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"startTimeSeriesExport"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}]}]}}]} as unknown as DocumentNode<StartTimeSeriesExportMutation, StartTimeSeriesExportMutationVariables>;
+export const TimeSeriesExportDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"TimeSeriesExport"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"timeSeriesExport"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"downloadUrl"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"expiresAt"}},{"kind":"Field","name":{"kind":"Name","value":"error"}}]}}]}}]} as unknown as DocumentNode<TimeSeriesExportQuery, TimeSeriesExportQueryVariables>;
+export const StartTimeSeriesExportDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"StartTimeSeriesExport"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"TimeSeriesReadInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"startTimeSeriesExport"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"downloadUrl"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"expiresAt"}},{"kind":"Field","name":{"kind":"Name","value":"error"}}]}}]}}]} as unknown as DocumentNode<StartTimeSeriesExportMutation, StartTimeSeriesExportMutationVariables>;
+export const CancelTimeSeriesExportDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CancelTimeSeriesExport"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"cancelTimeSeriesExport"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"downloadUrl"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"expiresAt"}},{"kind":"Field","name":{"kind":"Name","value":"error"}}]}}]}}]} as unknown as DocumentNode<CancelTimeSeriesExportMutation, CancelTimeSeriesExportMutationVariables>;
+export const OnTimeSeriesExportUpdatedDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"subscription","name":{"kind":"Name","value":"OnTimeSeriesExportUpdated"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"filter"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"TimeSeriesExportFilter"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"onTimeSeriesExportUpdated"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"filter"},"value":{"kind":"Variable","name":{"kind":"Name","value":"filter"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"downloadUrl"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"expiresAt"}},{"kind":"Field","name":{"kind":"Name","value":"error"}}]}}]}}]} as unknown as DocumentNode<OnTimeSeriesExportUpdatedSubscription, OnTimeSeriesExportUpdatedSubscriptionVariables>;
 export const TimeSeriesReadAggregateKpiDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"TimeSeriesReadAggregateKpi"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"request"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"TimeSeriesReadAggregateKPIInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"timeSeriesReadAggregateKPI"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"request"},"value":{"kind":"Variable","name":{"kind":"Name","value":"request"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"parameters"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"denotation"}},{"kind":"Field","name":{"kind":"Name","value":"label"}},{"kind":"Field","name":{"kind":"Name","value":"role"}}]}},{"kind":"Field","name":{"kind":"Name","value":"base"}},{"kind":"Field","name":{"kind":"Name","value":"data"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"time"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"data"}}]}},{"kind":"Field","name":{"kind":"Name","value":"hasMoreBatches"}},{"kind":"Field","name":{"kind":"Name","value":"hasMoreData"}},{"kind":"Field","name":{"kind":"Name","value":"nextCursor"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"time"}},{"kind":"Field","name":{"kind":"Name","value":"sdInstanceUID"}},{"kind":"Field","name":{"kind":"Name","value":"kpiDefinitionID"}}]}},{"kind":"Field","name":{"kind":"Name","value":"error"}}]}}]}}]} as unknown as DocumentNode<TimeSeriesReadAggregateKpiQuery, TimeSeriesReadAggregateKpiQueryVariables>;

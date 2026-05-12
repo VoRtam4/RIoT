@@ -39,6 +39,9 @@ export default function APIKeyCard({ apiKey, selected, onClick }: Props) {
             py: 1.5,
             height: "100%",
             overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
           }}
         >
           {/* LABEL */}

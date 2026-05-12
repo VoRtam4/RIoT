@@ -1953,13 +1953,14 @@ Content-Type: application/json
       {
         id: "export-history",
         title: "Start History Export",
-        summary: "Start an export job and then download the generated CSV file.",
+        summary:
+          "Start an asynchronous export job and receive the initial export snapshot.",
         variants: [
           {
             technology: "graphql",
             label: gql,
             summary:
-              "GraphQL returns an export job identifier that can be used with the REST download endpoint.",
+              "GraphQL starts the job and returns the current TimeSeriesExport state immediately.",
             requestExample: `mutation StartExport {
   startTimeSeriesExport(
     input: {
@@ -1969,21 +1970,37 @@ Content-Type: application/json
       sortDesc: true
       limit: 1000
     }
-  )
+  ) {
+    id
+    status
+    downloadUrl
+    createdAt
+    expiresAt
+    error
+  }
 }`,
             responseExample: `{
   "data": {
-    "startTimeSeriesExport": "export-job-123"
+    "startTimeSeriesExport": {
+      "id": 41,
+      "status": "pending",
+      "downloadUrl": null,
+      "createdAt": "2026-05-02T23:53:23.626667429Z",
+      "expiresAt": null,
+      "error": null
+    }
   }
-}
-
-GET /rest/time-series/export/export-job-123`,
+}`,
+            notes: [
+              "Use the returned id for status checks, cancellation, or subscriptions.",
+              "The CSV file is still downloaded through REST once the job reaches done.",
+            ],
           },
           {
             technology: "rest",
             label: rest,
             summary:
-              "Start the export with a body payload. The response returns a ready-to-download REST URL.",
+              "POST the history request and receive the same export snapshot shape as GraphQL.",
             requestExample: `POST /rest/time-series/export
 Content-Type: application/json
 
@@ -1995,14 +2012,19 @@ Content-Type: application/json
   "limit": 1000
 }`,
             responseExample: `{
-  "url": "/rest/time-series/export/export-job-123"
+  "id": 41,
+  "status": "pending",
+  "downloadUrl": null,
+  "createdAt": "2026-05-02T23:53:23.626667429Z",
+  "expiresAt": null,
+  "error": null
 }`,
           },
           {
             technology: "websocket",
             label: ws,
             summary:
-              "The WebSocket export action returns the created export identifier in the payload URL field.",
+              "The low-level WebSocket request returns the same TimeSeriesExport payload in the response.",
             requestExample: `{
   "type": "request",
   "id": "history-export",
@@ -2019,9 +2041,255 @@ Content-Type: application/json
   "id": "history-export",
   "success": true,
   "payload": {
-    "url": "export-job-123"
+    "id": 41,
+    "status": "pending",
+    "downloadUrl": null,
+    "createdAt": "2026-05-02T23:53:23.626667429Z",
+    "expiresAt": null,
+    "error": null
   }
 }`,
+          },
+        ],
+      },
+      {
+        id: "export-status",
+        title: "Get Export Status",
+        summary:
+          "Load the current state of one export job without waiting for the file download endpoint.",
+        variants: [
+          {
+            technology: "graphql",
+            label: gql,
+            summary:
+              "Use the export ID to fetch a single snapshot that can be pending, processing, done, failed, cancelled, or expired.",
+            requestExample: `query ExportStatus {
+  timeSeriesExport(id: 41) {
+    id
+    status
+    downloadUrl
+    createdAt
+    expiresAt
+    error
+  }
+}`,
+            responseExample: `{
+  "data": {
+    "timeSeriesExport": {
+      "id": 41,
+      "status": "done",
+      "downloadUrl": "/rest/time-series/export/41",
+      "createdAt": "2026-05-02T23:53:23.626667429Z",
+      "expiresAt": "2026-05-03T00:23:31.688347473Z",
+      "error": null
+    }
+  }
+}`,
+          },
+          {
+            technology: "rest",
+            label: rest,
+            summary:
+              "The status endpoint returns the same export shape as the GraphQL query and WebSocket status request.",
+            requestExample: `GET /rest/time-series/export/41/status`,
+            responseExample: `{
+  "id": 41,
+  "status": "done",
+  "downloadUrl": "/rest/time-series/export/41",
+  "createdAt": "2026-05-02T23:53:23.626667429Z",
+  "expiresAt": "2026-05-03T00:23:31.688347473Z",
+  "error": null
+}`,
+          },
+          {
+            technology: "websocket",
+            label: ws,
+            summary:
+              "The low-level request/response WebSocket API exposes an explicit status action as well.",
+            requestExample: `{
+  "type": "request",
+  "id": "history-export-status",
+  "action": "time-series-export-status",
+  "payload": {
+    "id": 41
+  }
+}`,
+            responseExample: `{
+  "type": "response",
+  "id": "history-export-status",
+  "success": true,
+  "payload": {
+    "id": 41,
+    "status": "done",
+    "downloadUrl": "/rest/time-series/export/41",
+    "createdAt": "2026-05-02T23:53:23.626667429Z",
+    "expiresAt": "2026-05-03T00:23:31.688347473Z",
+    "error": null
+  }
+}`,
+          },
+        ],
+      },
+      {
+        id: "cancel-export",
+        title: "Cancel Export",
+        summary:
+          "Request cancellation of one export job and receive its latest snapshot.",
+        variants: [
+          {
+            technology: "graphql",
+            label: gql,
+            summary:
+              "GraphQL cancellation returns the terminal or already-completed export snapshot.",
+            requestExample: `mutation CancelExport {
+  cancelTimeSeriesExport(id: 41) {
+    id
+    status
+    downloadUrl
+    createdAt
+    expiresAt
+    error
+  }
+}`,
+            responseExample: `{
+  "data": {
+    "cancelTimeSeriesExport": {
+      "id": 41,
+      "status": "cancelled",
+      "downloadUrl": null,
+      "createdAt": "2026-05-02T23:53:23.626667429Z",
+      "expiresAt": "2026-05-03T00:23:31.688347473Z",
+      "error": null
+    }
+  }
+}`,
+          },
+          {
+            technology: "rest",
+            label: rest,
+            summary:
+              "Use DELETE on the export resource to request cancellation.",
+            requestExample: `DELETE /rest/time-series/export/41`,
+            responseExample: `{
+  "id": 41,
+  "status": "cancelled",
+  "downloadUrl": null,
+  "createdAt": "2026-05-02T23:53:23.626667429Z",
+  "expiresAt": "2026-05-03T00:23:31.688347473Z",
+  "error": null
+}`,
+          },
+          {
+            technology: "websocket",
+            label: ws,
+            summary:
+              "The low-level WebSocket API uses a dedicated cancel action with the export id in the payload.",
+            requestExample: `{
+  "type": "request",
+  "id": "history-export-cancel",
+  "action": "time-series-export-cancel",
+  "payload": {
+    "id": 41
+  }
+}`,
+            responseExample: `{
+  "type": "response",
+  "id": "history-export-cancel",
+  "success": true,
+  "payload": {
+    "id": 41,
+    "status": "cancelled",
+    "downloadUrl": null,
+    "createdAt": "2026-05-02T23:53:23.626667429Z",
+    "expiresAt": "2026-05-03T00:23:31.688347473Z",
+    "error": null
+  }
+}`,
+          },
+        ],
+      },
+      {
+        id: "subscribe-export",
+        title: "Subscribe To Export Updates",
+        summary:
+          "Receive push updates when the export moves through pending, processing, done, failed, cancelled, or expired.",
+        variants: [
+          {
+            technology: "graphql",
+            label: gql,
+            summary:
+              "Apollo-style GraphQL subscriptions stream the same TimeSeriesExport payload filtered by export IDs.",
+            requestExample: `subscription OnExportUpdated {
+  onTimeSeriesExportUpdated(filter: { ids: [41] }) {
+    id
+    status
+    downloadUrl
+    createdAt
+    expiresAt
+    error
+  }
+}`,
+            responseExample: `{
+  "data": {
+    "onTimeSeriesExportUpdated": {
+      "id": 41,
+      "status": "done",
+      "downloadUrl": "/rest/time-series/export/41",
+      "createdAt": "2026-05-02T23:53:23.626667429Z",
+      "expiresAt": "2026-05-03T00:23:31.688347473Z",
+      "error": null
+    }
+  }
+}`,
+          },
+          {
+            technology: "websocket",
+            label: ws,
+            summary:
+              "The low-level WebSocket API subscribes to the shared time_series_export_updated topic and pushes event messages.",
+            requestExample: `{
+  "type": "subscribe",
+  "id": "history-export-events",
+  "topic": "time_series_export_updated",
+  "payload": {
+    "ids": [41]
+  }
+}`,
+            responseExample: `{
+  "type": "event",
+  "id": "history-export-events",
+  "topic": "time_series_export_updated",
+  "payload": {
+    "id": 41,
+    "status": "done",
+    "downloadUrl": "/rest/time-series/export/41",
+    "createdAt": "2026-05-02T23:53:23.626667429Z",
+    "expiresAt": "2026-05-03T00:23:31.688347473Z",
+    "error": null
+  }
+}`,
+          },
+        ],
+      },
+      {
+        id: "download-export",
+        title: "Download Export File",
+        summary:
+          "Download the generated CSV file through REST once the export status reaches done.",
+        variants: [
+          {
+            technology: "rest",
+            label: rest,
+            summary:
+              "The download endpoint serves the file. If called too early it waits for job completion, so the recommended flow is start -> status/subscription -> download.",
+            requestExample: `GET /rest/time-series/export/41`,
+            responseExample: `HTTP/1.1 200 OK
+Content-Type: text/csv
+Content-Disposition: attachment; filename="time-series-export-41.csv"
+
+time,sdInstanceUID,temperature
+2026-05-02T23:53:24Z,boiler-sensor-a-17,71.2
+2026-05-02T23:53:25Z,boiler-sensor-a-17,71.3`,
           },
         ],
       },
@@ -2034,7 +2302,8 @@ Content-Type: application/json
           {
             technology: "graphql",
             label: gql,
-            summary: "GraphQL already exposes the aggregate export mutation.",
+            summary:
+              "The aggregate export uses the same asynchronous TimeSeriesExport lifecycle as raw history export.",
             requestExample: `mutation StartAggregateExport {
   startTimeSeriesExportAggregateKPI(
     input: {
@@ -2045,14 +2314,36 @@ Content-Type: application/json
       to: "2026-04-14T23:59:59Z"
       aggregateSeconds: 3600
     }
-  )
+  ) {
+    id
+    status
+    downloadUrl
+    createdAt
+    expiresAt
+    error
+  }
 }`,
+            responseExample: `{
+  "data": {
+    "startTimeSeriesExportAggregateKPI": {
+      "id": 56,
+      "status": "pending",
+      "downloadUrl": null,
+      "createdAt": "2026-05-02T23:58:11.054112902Z",
+      "expiresAt": null,
+      "error": null
+    }
+  }
+}`,
+            notes: [
+              "Use the same status, cancellation, subscription, and REST download operations as normal history export.",
+            ],
           },
           {
             technology: "rest",
             label: rest,
             summary:
-              "A dedicated aggregate export endpoint can be enabled through the existing handler.",
+              "POST the aggregate export request to the dedicated REST endpoint and receive the same export snapshot payload.",
             requestExample: `POST /rest/time-series/export/aggregate-kpi
 Content-Type: application/json
 
@@ -2065,14 +2356,19 @@ Content-Type: application/json
   "aggregateSeconds": 3600
 }`,
             responseExample: `{
-  "url": "/rest/time-series/export/export-job-456"
+  "id": 56,
+  "status": "pending",
+  "downloadUrl": null,
+  "createdAt": "2026-05-02T23:58:11.054112902Z",
+  "expiresAt": null,
+  "error": null
 }`,
           },
           {
             technology: "websocket",
             label: ws,
             summary:
-              "The aggregate export action returns the export identifier through the low-level WebSocket API.",
+              "The low-level aggregate export action also returns the common TimeSeriesExport payload.",
             requestExample: `{
   "type": "request",
   "id": "history-export-aggregate",
@@ -2089,7 +2385,12 @@ Content-Type: application/json
   "id": "history-export-aggregate",
   "success": true,
   "payload": {
-    "url": "export-job-456"
+    "id": 56,
+    "status": "pending",
+    "downloadUrl": null,
+    "createdAt": "2026-05-02T23:58:11.054112902Z",
+    "expiresAt": null,
+    "error": null
   }
 }`,
           },

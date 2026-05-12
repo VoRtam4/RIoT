@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import Select, { type MultiValue, type SingleValue } from "react-select";
 
-import type { TimeSeriesReadInput } from "../../../generated/graphql";
+import type { FilterNodeInput } from "../../../generated/graphql";
 import TimeSeriesQueryBuilder from "../../timeSeries/components/TimeSeriesQueryBuilder";
 import { useSdTypes } from "../../sdTypes/hooks/useSdTypes";
 import { useKpiDefinitionsBySdType } from "../../kpi/hooks/useKpiDefinitionsBySdType";
@@ -17,6 +17,7 @@ import {
   toLocalInputValue,
   toUTCString,
 } from "../../kpi/utils/dateTimeUtils";
+import type { TimeSeriesDraftState } from "../state/timeSeriesPageState";
 
 type Option = {
   value: string;
@@ -30,64 +31,33 @@ type SortOption = {
 };
 
 type Props = {
-  onSubmit: (input: TimeSeriesReadInput) => void;
-  onExport: (input: TimeSeriesReadInput) => void;
-  initialInput?: TimeSeriesReadInput | null;
+  value: TimeSeriesDraftState;
+  onChange: (next: TimeSeriesDraftState) => void;
+  onSubmit: () => void;
+  onExport: () => void;
 };
 
 export default function TimeSeriesFilters({
+  value,
+  onChange,
   onSubmit,
   onExport,
-  initialInput,
 }: Props) {
   const { sdTypes } = useSdTypes();
-
-  const [input, setInput] = useState<TimeSeriesReadInput>(
-    initialInput ?? {
-      type: "raw",
-      sortDesc: true,
-      limit: 200,
-      sdInstanceIDs: [],
-      from: toUTCString(minusDaysLocal(1)),
-      to: toUTCString(nowLocal()),
-    },
-  );
-
-  const [selectedSdType, setSelectedSdType] = useState<string | null>(
-    initialInput?.sdTypeID ?? null,
-  );
-
-  const [selectedKpis, setSelectedKpis] = useState<string[]>(
-    initialInput?.kpiDefinitionIDs ?? [],
-  );
-
-  const { entry: kpiEntry } = useKpiDefinitionsBySdType(selectedSdType);
-  const { entry: instancesEntry } = useSdInstancesByType(selectedSdType);
-
-  useEffect(() => {
-    if (!initialInput) return;
-
-    setInput(initialInput);
-    setSelectedSdType(initialInput.sdTypeID ?? null);
-    setSelectedKpis(initialInput.kpiDefinitionIDs ?? []);
-  }, [initialInput]);
+  const { entry: kpiEntry } = useKpiDefinitionsBySdType(value.sdTypeID);
+  const { entry: instancesEntry } = useSdInstancesByType(value.sdTypeID);
 
   useEffect(() => {
     if (!sdTypes.length) return;
-    if (selectedSdType) return;
+    if (value.sdTypeID) return;
 
-    const first = sdTypes[0];
-    const id = String(first.id);
-
-    setSelectedSdType(id);
-
-    setInput((s) => ({
-      ...s,
-      sdTypeID: id,
-      sdInstanceIDs: [],
-      kpiDefinitionIDs: s.type === "kpi" ? [] : undefined,
-    }));
-  }, [sdTypes, selectedSdType]);
+    onChange({
+      ...value,
+      sdTypeID: String(sdTypes[0].id),
+      from: value.from ?? toUTCString(minusDaysLocal(1)),
+      to: value.to ?? toUTCString(nowLocal()),
+    });
+  }, [onChange, sdTypes, value]);
 
   const sdTypeOptions: Option[] = useMemo(
     () =>
@@ -120,9 +90,9 @@ export default function TimeSeriesFilters({
   );
 
   const tagParameters = useMemo(() => {
-    if (!selectedSdType) return [];
+    if (!value.sdTypeID) return [];
 
-    const type = sdTypes.find((t: any) => String(t.id) === selectedSdType);
+    const type = sdTypes.find((t: any) => String(t.id) === value.sdTypeID);
     if (!type?.parameters) return [];
 
     return type.parameters
@@ -131,7 +101,14 @@ export default function TimeSeriesFilters({
         denotation: p.denotation,
         label: p.label ?? p.denotation,
       }));
-  }, [sdTypes, selectedSdType]);
+  }, [sdTypes, value.sdTypeID]);
+
+  const updateValue = (patch: Partial<TimeSeriesDraftState>) => {
+    onChange({
+      ...value,
+      ...patch,
+    });
+  };
 
   return (
     <div className="card p-3 mb-3">
@@ -146,24 +123,20 @@ export default function TimeSeriesFilters({
               { value: "kpi", label: "KPI" },
             ]}
             value={{
-              value: input.type,
-              label: input.type.toUpperCase(),
+              value: value.type,
+              label: value.type.toUpperCase(),
             }}
             onChange={(v: SingleValue<Option>) => {
               const type = (v?.value ?? "raw") as "raw" | "kpi";
 
-              setInput((s) => ({
+              onChange({
+                ...value,
                 type,
-                sortDesc: true,
-                limit: 200,
+                sort: "DESC",
+                limit: 100,
                 sdInstanceIDs: [],
-                from: s.from,
-                to: s.to,
-                sdTypeID: selectedSdType ?? undefined,
-                kpiDefinitionIDs: type === "kpi" ? [] : undefined,
-              }));
-
-              setSelectedKpis([]);
+                kpiDefinitionIDs: type === "kpi" ? [] : [],
+              });
             }}
             {...virtualizedSelectProps}
           />
@@ -175,21 +148,16 @@ export default function TimeSeriesFilters({
           <Select<Option, false>
             classNamePrefix="react-select"
             options={sdTypeOptions}
-            value={
-              sdTypeOptions.find((o) => o.value === selectedSdType) ?? null
-            }
+            value={sdTypeOptions.find((o) => o.value === value.sdTypeID) ?? null}
             onChange={(v: SingleValue<Option>) => {
               const id = v?.value ?? null;
 
-              setSelectedSdType(id);
-              setSelectedKpis([]);
-
-              setInput((s) => ({
-                ...s,
-                sdTypeID: id ?? undefined,
+              onChange({
+                ...value,
+                sdTypeID: id,
                 sdInstanceIDs: [],
-                kpiDefinitionIDs: s.type === "kpi" ? [] : undefined,
-              }));
+                kpiDefinitionIDs: value.type === "kpi" ? [] : [],
+              });
             }}
             filterOption={filterSelectOption}
             {...virtualizedSelectProps}
@@ -197,23 +165,20 @@ export default function TimeSeriesFilters({
         </div>
 
         {/* KPI */}
-        {input.type === "kpi" && (
+        {value.type === "kpi" && (
           <div className="col-md-4">
             <label className="form-label">KPI</label>
             <Select<Option, true>
               isMulti
               classNamePrefix="react-select"
               options={kpiOptions}
-              value={kpiOptions.filter((o) => selectedKpis.includes(o.value))}
+              value={kpiOptions.filter((o) =>
+                value.kpiDefinitionIDs.includes(o.value),
+              )}
               onChange={(v: MultiValue<Option>) => {
-                const ids = v.map((i) => i.value);
-
-                setSelectedKpis(ids);
-
-                setInput((s) => ({
-                  ...s,
-                  kpiDefinitionIDs: ids,
-                }));
+                updateValue({
+                  kpiDefinitionIDs: v.map((i) => i.value),
+                });
               }}
               closeMenuOnSelect={false}
               filterOption={filterSelectOption}
@@ -231,13 +196,12 @@ export default function TimeSeriesFilters({
             closeMenuOnSelect={false}
             options={instancesOptions}
             value={instancesOptions.filter((o) =>
-              (input.sdInstanceIDs ?? []).includes(o.value),
+              value.sdInstanceIDs.includes(o.value),
             )}
             onChange={(v: MultiValue<Option>) => {
-              setInput((s) => ({
-                ...s,
+              updateValue({
                 sdInstanceIDs: v.map((i) => i.value),
-              }));
+              });
             }}
             filterOption={filterSelectOption}
             {...virtualizedSelectProps}
@@ -251,12 +215,11 @@ export default function TimeSeriesFilters({
             type="datetime-local"
             step="1"
             className="form-control"
-            value={input.from ? toLocalInputValue(new Date(input.from)) : ""}
+            value={value.from ? toLocalInputValue(new Date(value.from)) : ""}
             onChange={(e) =>
-              setInput((s) => ({
-                ...s,
+              updateValue({
                 from: e.target.value ? toUTCString(e.target.value) : undefined,
-              }))
+              })
             }
           />
         </div>
@@ -268,12 +231,11 @@ export default function TimeSeriesFilters({
             type="datetime-local"
             step="1"
             className="form-control"
-            value={input.to ? toLocalInputValue(new Date(input.to)) : ""}
+            value={value.to ? toLocalInputValue(new Date(value.to)) : ""}
             onChange={(e) =>
-              setInput((s) => ({
-                ...s,
+              updateValue({
                 to: e.target.value ? toUTCString(e.target.value) : undefined,
-              }))
+              })
             }
           />
         </div>
@@ -289,26 +251,24 @@ export default function TimeSeriesFilters({
               { value: "NONE", label: "NONE" },
             ]}
             value={
-              input.sortDesc == null
+              value.sort === "NONE"
                 ? { value: "NONE", label: "NONE" }
-                : input.sortDesc
+                : value.sort === "DESC"
                   ? { value: "DESC", label: "DESC" }
                   : { value: "ASC", label: "ASC" }
             }
             onChange={(v: SingleValue<SortOption>) => {
-              setInput((s) => {
-                if (v?.value === "NONE") {
-                  return {
-                    ...s,
-                    sortDesc: undefined,
-                    limit: undefined,
-                  };
-                }
-                return {
-                  ...s,
-                  sortDesc: v?.value === "DESC",
-                  limit: s.limit ?? 50,
-                };
+              if (v?.value === "NONE") {
+                updateValue({
+                  sort: "NONE",
+                  limit: undefined,
+                });
+                return;
+              }
+
+              updateValue({
+                sort: v?.value ?? "DESC",
+                limit: value.limit ?? 100,
               });
             }}
             {...virtualizedSelectProps}
@@ -316,19 +276,16 @@ export default function TimeSeriesFilters({
         </div>
       </div>
 
-      {/* TAG FILTER */}
-      {(input.type === "raw" || input.type === "kpi") && selectedSdType && tagParameters.length > 0 && (
+      {(value.type === "raw" || value.type === "kpi") &&
+        value.sdTypeID &&
+        tagParameters.length > 0 && (
         <div className="col-12 mt-3">
           <label className="form-label">Tag filters</label>
 
           <TimeSeriesQueryBuilder
             parameters={tagParameters}
-            onChange={(filter) =>
-              setInput((s) => ({
-                ...s,
-                filters: filter,
-              }))
-            }
+            value={value.filters as FilterNodeInput | undefined}
+            onChange={(filter) => updateValue({ filters: filter })}
           />
         </div>
       )}
@@ -337,12 +294,12 @@ export default function TimeSeriesFilters({
       <div className="d-flex justify-content-end gap-2 mt-3">
         <button
           className="btn btn-outline-light"
-          onClick={() => onExport(input)}
+          onClick={onExport}
         >
           Download
         </button>
 
-        <button className="btn btn-primary" onClick={() => onSubmit(input)}>
+        <button className="btn btn-primary" onClick={onSubmit}>
           Show
         </button>
       </div>

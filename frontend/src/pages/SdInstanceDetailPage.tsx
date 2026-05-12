@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useRef } from "react";
 import { useUserConfig } from "../modules/auth/hooks/useUserConfig";
 import { useSdInstance } from "../modules/sdInstances/hooks/useSdInstance";
 import { useKpiDefinitionsBySdInstance } from "../modules/kpi/hooks/useKpiDefinitionsBySdInstance";
@@ -8,10 +8,20 @@ import { useSdType } from "../modules/sdTypes/hooks/useSdType";
 import SdInstanceKpiSidebar from "../modules/sdInstances/components/SdInstanceKpiSidebar";
 import KpiSdTypeDataPanel from "../modules/kpi/components/KpiSdTypeDataPanel";
 import KpiResultHistoryPanel from "../modules/kpi/components/KpiResultHistoryPanel";
+import { usePageState } from "../app/navigation/usePageState";
+import { sdInstanceDetailPageStateCodec } from "../modules/sdInstances/state/sdInstanceDetailPageState";
+import {
+  minusDaysLocal,
+  nowLocal,
+} from "../modules/kpi/utils/dateTimeUtils";
 
 export default function SdInstanceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const defaultRangeRef = useRef({
+    from: minusDaysLocal(1),
+    to: nowLocal(),
+  });
 
   const { config, toggleSdInstance } = useUserConfig();
 
@@ -22,12 +32,33 @@ export default function SdInstanceDetailPage() {
     useSdInstance(id ?? null);
 
   const { kpiDefinitions, loading: kpiLoading } = useKpiDefinitionsBySdInstance(id ?? null);
-
-  const [selectedKpiId, setSelectedKpiId] = useState<string | null>(null);
+  const { query, setPageState } = usePageState(sdInstanceDetailPageStateCodec);
 
   const { sdType } = useSdType(instance?.type?.id);
+  const selectedKpiId = query.kpi;
+  const from = query.from ?? defaultRangeRef.current.from;
+  const to = query.to ?? defaultRangeRef.current.to;
 
   const loading = instanceLoading || kpiLoading;
+
+  useEffect(() => {
+    if (
+      !loading &&
+      query.kpi &&
+      !(kpiDefinitions ?? []).some((kpi) => String(kpi.id) === String(query.kpi))
+    ) {
+      setPageState(
+        {
+          query: {
+            ...query,
+            kpi: null,
+          },
+          entry: null,
+        },
+        { replace: true },
+      );
+    }
+  }, [kpiDefinitions, loading, query, setPageState]);
 
   if (!instance) {
     return <div className="container mt-3">Not found</div>;
@@ -37,21 +68,51 @@ export default function SdInstanceDetailPage() {
     <div className="container-fluid mt-3">
       {/* HEADER */}
       <div className="card p-3 mb-3">
-        <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
-          <div className="d-flex align-items-baseline gap-2">
-            <span
-              className="form-label"
-              style={{ fontSize: "1.25rem", fontWeight: 600 }}
+        <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
+          <div style={{ minWidth: 0, flex: "1 1 320px" }}>
+            <div
+              className="d-flex align-items-center flex-wrap gap-2"
+              style={{ minWidth: 0 }}
             >
-              {instance.label || instance.uid || instance.id}
-            </span>
+              <span
+                className="form-label mb-0"
+                style={{
+                  fontSize: "1.25rem",
+                  fontWeight: 600,
+                  minWidth: 0,
+                  overflowWrap: "anywhere",
+                  wordBreak: "break-word",
+                }}
+              >
+                {instance.label ?? "\u00A0"}
+              </span>
 
-            <span
-              className="form-label"
-              style={{ fontSize: "0.9rem", opacity: 0.7 }}
+              <span
+                className="form-label mb-0"
+                style={{
+                  fontSize: "0.9rem",
+                  opacity: 0.7,
+                  minWidth: 0,
+                  overflowWrap: "anywhere",
+                  wordBreak: "break-word",
+                }}
+              >
+                ({sdType?.label ?? "\u00A0"})
+              </span>
+            </div>
+
+            <div
+              className="form-label mt-1 mb-0"
+              style={{
+                fontSize: "0.9rem",
+                opacity: 0.7,
+                minWidth: 0,
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+              }}
             >
-              ({sdType?.label || sdType?.uid || "\u00A0"})
-            </span>
+              {instance.uid ?? "\u00A0"} ({sdType?.uid ?? "\u00A0"})
+            </div>
           </div>
 
           <div className="d-flex gap-2">
@@ -78,13 +139,28 @@ export default function SdInstanceDetailPage() {
             <button
               className="btn btn-outline-light"
               onClick={() =>
-                navigate(
-                  `/history?type=kpi&sdInstanceID=${id}${
-                    selectedKpiId
-                      ? `&kpiDefinitionID=${selectedKpiId}`
-                      : ""
-                  }`
-                )
+                {
+                  const searchParams = new URLSearchParams();
+                  searchParams.set("type", "raw");
+                  searchParams.set("auto", "1");
+                  if (instance.type?.id) {
+                    searchParams.set("sdType", String(instance.type.id));
+                  }
+
+                  navigate(
+                    {
+                      pathname: "/history",
+                      search: `?${searchParams.toString()}`,
+                    },
+                    {
+                      state: {
+                        v: 1,
+                        sdInstanceIDs: id ? [String(id)] : [],
+                        kpiDefinitionIDs: [],
+                      },
+                    },
+                  );
+                }
               }
             >
               History
@@ -106,7 +182,7 @@ export default function SdInstanceDetailPage() {
           style={{
             position: "sticky",
             top: 16,
-            height: "calc(100vh - 180px)",
+            height: "calc(100vh - 200px)",
             overflow: "hidden",
           }}
         >
@@ -115,7 +191,47 @@ export default function SdInstanceDetailPage() {
               kpis={kpiDefinitions}
               selectedKpiId={selectedKpiId}
               loading={loading}
-              onSelect={setSelectedKpiId}
+              search={query.kpiQ}
+              sort={query.kpiSort}
+              onSearchChange={(kpiQ) =>
+                setPageState(
+                  {
+                    query: {
+                      ...query,
+                      kpiQ,
+                    },
+                    entry: null,
+                  },
+                  { replace: true },
+                )
+              }
+              onSortChange={(kpiSort) =>
+                setPageState(
+                  {
+                    query: {
+                      ...query,
+                      kpiSort,
+                    },
+                    entry: null,
+                  },
+                  { replace: true },
+                )
+              }
+              onSelect={(nextKpiId) =>
+                setPageState(
+                  {
+                    query: {
+                      ...query,
+                      kpi:
+                        String(selectedKpiId) === String(nextKpiId)
+                          ? null
+                          : String(nextKpiId),
+                    },
+                    entry: null,
+                  },
+                  { replace: true },
+                )
+              }
               onOpenDetail={() => {
                 if (!selectedKpiId) return;
                 navigate(`/kpi/${selectedKpiId}`);
@@ -129,19 +245,47 @@ export default function SdInstanceDetailPage() {
           className="me-3"
           style={{
             display: "grid",
-            gridTemplateRows: "auto auto auto",
+            gridTemplateRows: selectedKpiId ? "auto auto auto" : "auto auto",
             gap: 16,
             alignContent: "start",
           }}
         >
 
           {/* KPI HISTORY */}
-          <div className="card p-3">
-            <KpiResultHistoryPanel
-              kpiDefinitionID={selectedKpiId ?? undefined}
-              sdInstanceID={id}
-            />
-          </div>
+          {selectedKpiId ? (
+            <div className="card p-3">
+              <KpiResultHistoryPanel
+                kpiDefinitionID={selectedKpiId ?? undefined}
+                sdInstanceID={id}
+                from={from}
+                to={to}
+                onFromChange={(nextFrom) =>
+                  setPageState(
+                    {
+                      query: {
+                        ...query,
+                        from: nextFrom,
+                      },
+                      entry: null,
+                    },
+                    { replace: true },
+                  )
+                }
+                onToChange={(nextTo) =>
+                  setPageState(
+                    {
+                      query: {
+                        ...query,
+                        to: nextTo,
+                      },
+                      entry: null,
+                    },
+                    { replace: true },
+                  )
+                }
+              />
+            </div>
+          ) : null}
 
           {/* RAW DATA */}
           <div className="card p-0">

@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useUserConfig } from "../modules/auth/hooks/useUserConfig";
+import Chip from "@mui/material/Chip";
 
 import { useKpiDefinition } from "../modules/kpi/hooks/useKpiDefinition";
 import { useSdType } from "../modules/sdTypes/hooks/useSdType";
@@ -10,10 +11,20 @@ import { useSdInstancesByKpiDefinition } from "../modules/sdInstances/hooks/useS
 import KpiInstanceSidebar from "../modules/kpi/components/KpiInstanceSidebar";
 import KpiSdTypeDataPanel from "../modules/kpi/components/KpiSdTypeDataPanel";
 import KpiResultHistoryPanel from "../modules/kpi/components/KpiResultHistoryPanel";
+import { usePageState } from "../app/navigation/usePageState";
+import { kpiDetailPageStateCodec } from "../modules/kpi/state/kpiDetailPageState";
+import {
+  minusDaysLocal,
+  nowLocal,
+} from "../modules/kpi/utils/dateTimeUtils";
 
 export default function KpiDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const defaultRangeRef = useRef({
+    from: minusDaysLocal(1),
+    to: nowLocal(),
+  });
 
   const { config, toggleKpi } = useUserConfig();
   const isFavorite = id && config.favoriteKpis.includes(String(id));
@@ -33,8 +44,16 @@ export default function KpiDetailPage() {
       mode === "selected" ? id ?? null : null,
       mode === "selected",
     );
+  const { query, setPageState } = usePageState(kpiDetailPageStateCodec);
 
-  const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
+  const loading =
+    kpiLoading ||
+    sdTypeLoading ||
+    (mode === "all"
+      ? instancesByTypeLoading
+      : mode === "selected"
+        ? instancesByKpiLoading
+        : false);
 
   const instances = useMemo(() => {
     if (!kpi) return [];
@@ -54,28 +73,87 @@ export default function KpiDetailPage() {
     return [];
   }, [kpi, mode, instancesEntryByType, instancesByKpi]);
 
-  const loading =
-    kpiLoading ||
-    sdTypeLoading ||
-    (mode === "all"
-      ? instancesByTypeLoading
-      : mode === "selected"
-        ? instancesByKpiLoading
-        : false);
+  const selectedInstanceId = query.inst;
+
+  const from = query.from ?? defaultRangeRef.current.from;
+  const to = query.to ?? defaultRangeRef.current.to;
+
+  useEffect(() => {
+    if (
+      !loading &&
+      query.inst &&
+      !instances.some((instance) => String(instance.id) === String(query.inst))
+    ) {
+      setPageState(
+        {
+          query: {
+            ...query,
+            inst: null,
+          },
+          entry: null,
+        },
+        { replace: true },
+      );
+    }
+  }, [instances, loading, query, setPageState]);
 
   return (
     <div className="container-fluid mt-3">
       {/* HEADER */}
       <div className="card p-3 mb-3">
-        <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
-          <div className="d-flex align-items-baseline gap-2">
-            <span className="form-label" style={{ fontSize: "1.25rem", fontWeight: 600 }}>
-              {kpi?.label || "\u00A0"}
-            </span>
+        <div className="d-flex justify-content-between align-items-start flex-wrap gap-3">
+          <div style={{ minWidth: 0, flex: "1 1 320px" }}>
+            <div
+              className="d-flex align-items-center flex-wrap gap-2"
+              style={{ minWidth: 0 }}
+            >
+              <span
+                className="form-label mb-0"
+                style={{
+                  fontSize: "1.25rem",
+                  fontWeight: 600,
+                  minWidth: 0,
+                  overflowWrap: "anywhere",
+                  wordBreak: "break-word",
+                }}
+              >
+                {kpi?.label ?? "\u00A0"}
+              </span>
 
-            <span className="form-label" style={{ fontSize: "0.9rem", opacity: 0.7 }}>
-              ({sdType?.label || sdType?.uid || "\u00A0"})
-            </span>
+              <span
+                className="form-label mb-0"
+                style={{
+                  fontSize: "0.9rem",
+                  opacity: 0.7,
+                  minWidth: 0,
+                  overflowWrap: "anywhere",
+                  wordBreak: "break-word",
+                }}
+              >
+                ({sdType?.label ?? "\u00A0"})
+              </span>
+
+              {kpi?.sdInstanceMode && (
+                <Chip
+                  label={String(kpi.sdInstanceMode).toUpperCase()}
+                  size="small"
+                  color="primary"
+                />
+              )}
+            </div>
+
+            <div
+              className="form-label mt-1 mb-0"
+              style={{
+                fontSize: "0.9rem",
+                opacity: 0.7,
+                minWidth: 0,
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+              }}
+            >
+              {kpi?.id ?? "\u00A0"} ({sdType?.uid ?? "\u00A0"})
+            </div>
           </div>
 
           <div className="d-flex gap-2">
@@ -89,11 +167,28 @@ export default function KpiDetailPage() {
             <button
               className="btn btn-outline-light"
               onClick={() =>
-                navigate(
-                  `/history?type=kpi&kpiDefinitionID=${id}${
-                    selectedInstanceId ? `&sdInstanceID=${selectedInstanceId}` : ""
-                  }`
-                )
+                {
+                  const searchParams = new URLSearchParams();
+                  searchParams.set("type", "kpi");
+                  searchParams.set("auto", "1");
+                  if (kpi?.sdTypeID) {
+                    searchParams.set("sdType", String(kpi.sdTypeID));
+                  }
+
+                  navigate(
+                    {
+                      pathname: "/history",
+                      search: `?${searchParams.toString()}`,
+                    },
+                    {
+                      state: {
+                        v: 1,
+                        sdInstanceIDs: selectedInstanceId ? [selectedInstanceId] : [],
+                        kpiDefinitionIDs: id ? [String(id)] : [],
+                      },
+                    },
+                  );
+                }
               }
             >
               History
@@ -115,14 +210,51 @@ export default function KpiDetailPage() {
           style={{
             position: "sticky",
             top: 16,
-            height: "calc(100vh - 180px)",
+            height: "calc(100vh - 200px)",
           }}
         >
           <KpiInstanceSidebar
             instances={instances}
             selectedInstanceId={selectedInstanceId}
             loading={loading}
-            onSelect={setSelectedInstanceId}
+            search={query.instQ}
+            sort={query.instSort}
+            onSearchChange={(instQ) =>
+              setPageState(
+                {
+                  query: {
+                    ...query,
+                    instQ,
+                  },
+                  entry: null,
+                },
+                { replace: true },
+              )
+            }
+            onSortChange={(instSort) =>
+              setPageState(
+                {
+                  query: {
+                    ...query,
+                    instSort,
+                  },
+                  entry: null,
+                },
+                { replace: true },
+              )
+            }
+            onSelect={(inst) =>
+              setPageState(
+                {
+                  query: {
+                    ...query,
+                    inst: selectedInstanceId === inst ? null : inst,
+                  },
+                  entry: null,
+                },
+                { replace: true },
+              )
+            }
           />
         </div>
 
@@ -131,6 +263,32 @@ export default function KpiDetailPage() {
             <KpiResultHistoryPanel
               kpiDefinitionID={id}
               sdInstanceID={selectedInstanceId}
+              from={from}
+              to={to}
+              onFromChange={(nextFrom) =>
+                setPageState(
+                  {
+                    query: {
+                      ...query,
+                      from: nextFrom,
+                    },
+                    entry: null,
+                  },
+                  { replace: true },
+                )
+              }
+              onToChange={(nextTo) =>
+                setPageState(
+                  {
+                    query: {
+                      ...query,
+                      to: nextTo,
+                    },
+                    entry: null,
+                  },
+                  { replace: true },
+                )
+              }
             />
           </div>
 

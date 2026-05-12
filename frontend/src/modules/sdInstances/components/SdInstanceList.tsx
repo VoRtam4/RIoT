@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import SdInstanceCard from "./SdInstanceCard";
 import VirtualizedCardGrid from "../../../components/virtualization/VirtualizedCardGrid";
+import EmptyStateNotice from "../../../components/EmptyStateNotice";
 
 type Instance = {
   id: string;
@@ -32,7 +33,12 @@ export default function SdInstanceList({ instances = [], loading, }: Props) {
         rowHeight={136}
         minColumnWidth={300}
         style={{ height: "calc(100vh - 220px)" }}
-        emptyState={<div className="text-muted form-label">No results</div>}
+        emptyState={
+          <EmptyStateNotice
+            title="No devices match the current filter"
+            description="Try a different search phrase or model."
+          />
+        }
         renderItem={(inst) => (
           <SdInstanceCard
             key={inst.id}

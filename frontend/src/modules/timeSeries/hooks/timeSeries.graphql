@@ -23,7 +23,47 @@ query TimeSeriesRead($request: TimeSeriesReadInput!) {
 }
 
 mutation StartTimeSeriesExport($input: TimeSeriesReadInput!) {
-  startTimeSeriesExport(input: $input)
+  startTimeSeriesExport(input: $input) {
+    id
+    status
+    downloadUrl
+    createdAt
+    expiresAt
+    error
+  }
+}
+
+mutation CancelTimeSeriesExport($id: ID!) {
+  cancelTimeSeriesExport(id: $id) {
+    id
+    status
+    downloadUrl
+    createdAt
+    expiresAt
+    error
+  }
+}
+
+query TimeSeriesExport($id: ID!) {
+  timeSeriesExport(id: $id) {
+    id
+    status
+    downloadUrl
+    createdAt
+    expiresAt
+    error
+  }
+}
+
+subscription OnTimeSeriesExportUpdated($filter: TimeSeriesExportFilter!) {
+  onTimeSeriesExportUpdated(filter: $filter) {
+    id
+    status
+    downloadUrl
+    createdAt
+    expiresAt
+    error
+  }
 }
 
 query TimeSeriesReadAggregateKpi($request: TimeSeriesReadAggregateKPIInput!) {

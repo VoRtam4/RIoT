@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useSdTypes } from "../modules/sdTypes/hooks/useSdTypes";
 import { useKpiDefinitionsBySdType } from "../modules/kpi/hooks/useKpiDefinitionsBySdType";
 import KpiList from "../modules/kpi/components/KpiList";
+import { usePageState } from "../app/navigation/usePageState";
+import { kpiPageStateCodec } from "../modules/kpi/state/kpiPageState";
 
 export default function KpiPage() {
   const navigate = useNavigate();
@@ -12,16 +14,30 @@ export default function KpiPage() {
     sdTypes,
     loading: sdTypesLoading,
   } = useSdTypes();
-
-  const [selectedSdType, setSelectedSdType] = useState<string | null>(null);
+  const { query, setPageState } = usePageState(kpiPageStateCodec);
 
   const activeSdType = useMemo(() => {
-    return selectedSdType ?? (sdTypes[0] ? String(sdTypes[0].id) : null);
-  }, [sdTypes, selectedSdType]);
+    return query.sdType ?? (sdTypes[0] ? String(sdTypes[0].id) : null);
+  }, [query.sdType, sdTypes]);
+
+  useEffect(() => {
+    if (!sdTypes.length || query.sdType) return;
+
+    setPageState(
+      {
+        query: {
+          ...query,
+          sdType: String(sdTypes[0].id),
+        },
+        entry: null,
+      },
+      { replace: true },
+    );
+  }, [query, sdTypes, setPageState]);
 
   const { entry, loading: kpisLoading, } = useKpiDefinitionsBySdType(activeSdType);
 
-  const loading = sdTypesLoading || (selectedSdType !== null && kpisLoading);
+  const loading = sdTypesLoading || (query.sdType !== null && kpisLoading);
 
   return (
     <div className="container mt-3">
@@ -29,7 +45,57 @@ export default function KpiPage() {
         entry={entry}
         sdTypes={sdTypes}
         selectedSdType={activeSdType}
-        onSdTypeChange={setSelectedSdType}
+        search={query.q}
+        sort={query.sort}
+        mode={query.mode}
+        onSearchChange={(q) =>
+          setPageState(
+            {
+              query: {
+                ...query,
+                q,
+              },
+              entry: null,
+            },
+            { replace: true },
+          )
+        }
+        onSortChange={(sort) =>
+          setPageState(
+            {
+              query: {
+                ...query,
+                sort,
+              },
+              entry: null,
+            },
+            { replace: true },
+          )
+        }
+        onModeChange={(mode) =>
+          setPageState(
+            {
+              query: {
+                ...query,
+                mode,
+              },
+              entry: null,
+            },
+            { replace: true },
+          )
+        }
+        onSdTypeChange={(sdType) =>
+          setPageState(
+            {
+              query: {
+                ...query,
+                sdType,
+              },
+              entry: null,
+            },
+            { replace: true },
+          )
+        }
         loading={loading}
       />
 

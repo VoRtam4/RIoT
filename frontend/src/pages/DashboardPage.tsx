@@ -5,6 +5,7 @@ import { useSdInstance } from "../modules/sdInstances/hooks/useSdInstance";
 import KpiCard from "../modules/kpi/components/KpiCard";
 import SdInstanceCard from "../modules/sdInstances/components/SdInstanceCard";
 import VirtualizedList from "../components/virtualization/VirtualizedList";
+import EmptyStateNotice from "../components/EmptyStateNotice";
 
 export default function DashboardPage() {
 
@@ -29,9 +30,15 @@ export default function DashboardPage() {
             <VirtualizedList
               items={config.favoriteSdInstances}
               rowHeight={136}
+              itemSpacing={5}
               threshold={20}
               style={{ height: "min(60vh, 520px)" }}
-              emptyState={<div className="text-muted form-label">No results</div>}
+              emptyState={
+                <EmptyStateNotice
+                  title="No favourite devices yet"
+                  description="Add devices to favourites to keep them here."
+                />
+              }
               renderItem={(id) => (
                 <SdInstanceItem key={id} id={id} />
               )}
@@ -47,9 +54,15 @@ export default function DashboardPage() {
             <VirtualizedList
               items={config.favoriteKpis}
               rowHeight={156}
+              itemSpacing={5}
               threshold={20}
               style={{ height: "min(60vh, 520px)" }}
-              emptyState={<div className="text-muted form-label">No results</div>}
+              emptyState={
+                <EmptyStateNotice
+                  title="No favourite KPI yet"
+                  description="Add KPI definitions to favourites to keep them here."
+                />
+              }
               renderItem={(id) => (
                 <KpiItem key={id} id={id} />
               )}
