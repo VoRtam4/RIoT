@@ -1,3 +1,15 @@
+"""
+@file ingest_experiment.py
+@brief Experiment měřící online příjem a zpracování zpráv přes RabbitMQ.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 import csv

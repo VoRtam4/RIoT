@@ -1,3 +1,14 @@
+/**
+ * @file TimeSeriesExportToast.tsx
+ * @brief Toast upozornění pro průběh, dokončení a chyby exportů časových řad.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useEffect, useState } from "react";
 import type { TimeSeriesExport } from "../../../generated/graphql";
 

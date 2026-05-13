@@ -1,3 +1,15 @@
+"""
+@file dataset_registry.py
+@brief Registr dostupných datových sad a jejich parametrů pro experimenty.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 

@@ -1,3 +1,16 @@
+/**
+ * @file client.go
+ * @brief Relační databázový klient Backend Core a operace nad perzistentními entitami systému.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní databázový základ pro práci se sledovanými entitami, uživateli a KPI.
+ * - Vojtěch Hubáček: doplnění operací pro role, API klíče, IP restrikce, raw data, per-user KPI přístupy, načítání entit podle atributů, PerformOnStartupOperations, upserty a úpravy operací nad výsledky KPI.
+ *
+ * @ingroup riot_backend_core
+ */
 package dbClient
 
 import (

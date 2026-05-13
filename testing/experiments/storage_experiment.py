@@ -1,3 +1,15 @@
+"""
+@file storage_experiment.py
+@brief Experiment ověřující ukládání raw a KPI dat do historické časové databáze.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 from testing.core.models import ScenarioRunResult, utcnow

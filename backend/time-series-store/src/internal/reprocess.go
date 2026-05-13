@@ -1,3 +1,14 @@
+/**
+ * @file reprocess.go
+ * @brief Obsluha čtení historických dat a synchronizace požadavků pro opětovné vyhodnocení KPI.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_time_series_store
+ */
 package internal
 
 import (

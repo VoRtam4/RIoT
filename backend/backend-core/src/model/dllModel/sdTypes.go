@@ -1,3 +1,16 @@
+/**
+ * @file sdTypes.go
+ * @brief Doménový model typů zdrojů dat, jejich parametrů a rolí parametrů.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní model typů zdrojů dat a parametrů.
+ * - Vojtěch Hubáček: doplnění labelů a rozlišení parametrů na field a tag.
+ *
+ * @ingroup riot_backend_core
+ */
 package dllModel
 
 import "github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"

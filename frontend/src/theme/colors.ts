@@ -1,3 +1,14 @@
+/**
+ * @file colors.ts
+ * @brief Centrální paleta barev používaná tématem a globálními styly.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 export const colors = {
   bgMain: "#0b1e2d",
   bgNavbar: "#102a43",

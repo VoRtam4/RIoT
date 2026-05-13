@@ -1,3 +1,16 @@
+/**
+ * @file model.go
+ * @brief Databázové entity Backend Core používané perzistentní vrstvou systému.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní základ sledovaných entit a uživatelského modelu.
+ * - Vojtěch Hubáček: doplnění uživatelských rolí, API klíčů, IP restrikcí, labelů, raw datových bodů a času události u výsledků KPI.
+ *
+ * @ingroup riot_backend_core
+ */
 package dbModel
 
 import (

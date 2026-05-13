@@ -1,3 +1,15 @@
+"""
+@file metrics_client.py
+@brief Klient pro čtení metrik z monitoringu a jejich připojení k výsledkům experimentů.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 

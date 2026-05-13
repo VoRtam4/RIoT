@@ -1,3 +1,14 @@
+/**
+ * @file APICodeSection.tsx
+ * @brief Komponenta pro zobrazení ukázkového API požadavku ve zvoleném formátu.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 type Props = {
   title: string;
   code: string;

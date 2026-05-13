@@ -1,3 +1,14 @@
+/**
+ * @file permissions.go
+ * @brief Definice rolí, zdrojů, operací a výchozích oprávnění pro autorizaci Backend Core.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package auth
 
 import "strings"

@@ -1,3 +1,14 @@
+/**
+ * @file exportJob.go
+ * @brief Správa asynchronních exportů historických dat a jejich stavových událostí.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality exportních úloh nad historickými daty.
+ *
+ * @ingroup riot_backend_core
+ */
 package domainLogicLayer
 
 import (

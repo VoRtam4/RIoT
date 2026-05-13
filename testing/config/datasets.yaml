@@ -1,3 +1,13 @@
+# @file datasets.yaml
+# @brief Konfigurace velikostí a profilů syntetických datových sad.
+#
+# @author Vojtěch Hubáček
+#
+# @par Autorský podíl
+# - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+#
+# @ingroup riot_testing
+
 datasets:
   - id: "D0"
     label: "Sanity dataset"

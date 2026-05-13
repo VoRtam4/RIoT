@@ -1,3 +1,14 @@
+/**
+ * @file debug.go
+ * @brief Pomocné ladicí funkce pro výpis hodnot v běhu aplikace.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_commons
+ */
 package sharedUtils
 
 import (

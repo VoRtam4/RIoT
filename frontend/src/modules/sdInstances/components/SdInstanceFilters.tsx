@@ -1,3 +1,14 @@
+/**
+ * @file SdInstanceFilters.tsx
+ * @brief Filtrační ovládání seznamu sledovaných instancí.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import Select, { type SingleValue } from "react-select";
 import {
   buildOptionSearchText,

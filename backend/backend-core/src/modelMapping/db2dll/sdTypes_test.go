@@ -1,3 +1,16 @@
+/**
+ * @file sdTypes_test.go
+ * @brief Test mapování typů zdrojů dat z databázového modelu do doménového modelu.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní test mapování typů zdrojů dat.
+ * - Vojtěch Hubáček: úprava testovaných očekávání pro labely a parametry typů zdrojů.
+ *
+ * @ingroup riot_backend_core
+ */
 package db2dll
 
 import (

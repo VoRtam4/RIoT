@@ -1,3 +1,14 @@
+/**
+ * @file KpiPage.tsx
+ * @brief Stránka seznamu KPI definic s filtrováním podle typu a instance.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 

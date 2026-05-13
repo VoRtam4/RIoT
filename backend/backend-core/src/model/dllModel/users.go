@@ -1,3 +1,16 @@
+/**
+ * @file users.go
+ * @brief Doménový model uživatelů, session dat a uživatelské konfigurace.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní uživatelský model a session data.
+ * - Vojtěch Hubáček: doplnění vazby uživatele na roli.
+ *
+ * @ingroup riot_backend_core
+ */
 package dllModel
 
 import (

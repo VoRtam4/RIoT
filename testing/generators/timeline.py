@@ -1,3 +1,15 @@
+"""
+@file timeline.py
+@brief Tvorba časové osy událostí pro online ingest i historické seedování.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

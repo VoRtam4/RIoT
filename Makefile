@@ -1,6 +1,11 @@
 # @file Makefile
 # @brief Hlavní Makefile pro lokální správu Docker Compose stacku platformy RIoT.
+#
 # @author Vojtěch Hubáček
+#
+# @par Autorský podíl
+# - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+#
 # @defgroup riot_root Root
 # @ingroup riot
 # @see README.md

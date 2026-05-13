@@ -1,7 +1,14 @@
 /**
  * @file client.go
  * @brief Sdílený RabbitMQ klient používaný backendovými moduly platformy RIoT.
- * @author Vojtěch Hubáček, Michal Bureš
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní implementace RabbitMQ klienta a základních publikačních a konzumentských operací.
+ * - Vojtěch Hubáček: doplnění dávkového publikování přes PublishJSONBatches a streamového RPC konzumenta ConsumeRPCStream.
+ *
  * @defgroup riot_commons Commons
  * @ingroup riot
  * @see ../../README.md

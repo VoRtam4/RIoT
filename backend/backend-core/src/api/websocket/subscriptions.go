@@ -1,3 +1,14 @@
+/**
+ * @file subscriptions.go
+ * @brief WebSocket subscription bridge pro předávání interních událostí klientům.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package websocket
 
 import (

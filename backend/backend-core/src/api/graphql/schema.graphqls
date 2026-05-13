@@ -1,3 +1,15 @@
+# @file schema.graphqls
+# @brief GraphQL schéma Backend Core pro správu zdrojů dat, KPI, autorizace, API klíčů, raw dat a časové vrstvy.
+#
+# @author Michal Bureš
+# @author Vojtěch Hubáček
+#
+# @par Autorský podíl
+# - Michal Bureš: původní základ GraphQL schématu pro zdroje dat, KPI a uživatelskou konfiguraci.
+# - Vojtěch Hubáček: doplnění autorizace operací, API klíčů, IP restrikcí, raw dat, time-series API, rolí, tag/field parametrů, labelů, nových KPI operací, per-user a By dotazů a subscription onTimeSeriesExportUpdated a onRawDataPointArrived.
+#
+# @ingroup riot_backend_core
+
 # ----- SD types and instances -----
 
 enum SDParameterType {

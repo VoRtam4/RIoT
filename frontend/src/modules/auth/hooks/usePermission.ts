@@ -1,3 +1,14 @@
+/**
+ * @file usePermission.ts
+ * @brief Hook pro vyhodnocení oprávnění aktuálního uživatele ve frontendu.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useEffect } from "react";
 import { useQuery } from "@apollo/client/react";
 import { RoleDocument, type RoleQuery } from "../../../generated/graphql";

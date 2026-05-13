@@ -1,3 +1,14 @@
+/**
+ * @file apiKeys.go
+ * @brief Doménový model API klíčů a jejich omezení.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package dllModel
 
 import (

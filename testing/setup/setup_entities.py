@@ -1,3 +1,15 @@
+"""
+@file setup_entities.py
+@brief Příprava sledovaných typů, instancí a skupin před spuštěním experimentů.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 from testing.setup.payload_builders import build_sd_type_payload

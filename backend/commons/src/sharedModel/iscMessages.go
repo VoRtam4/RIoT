@@ -1,3 +1,16 @@
+/**
+ * @file iscMessages.go
+ * @brief Sdílené datové zprávy používané pro interní komunikaci služeb platformy RIoT.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní modely interních zpráv pro základní tok systému.
+ * - Vojtěch Hubáček: doplnění zpráv pro časovou databázi, role parametrů typů zdrojů, reprocessing a tuple komunikaci a úprava části původních struktur.
+ *
+ * @ingroup riot_commons
+ */
 package sharedModel
 
 import "time"

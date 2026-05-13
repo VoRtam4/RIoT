@@ -1,3 +1,14 @@
+/**
+ * @file KpiInstanceSidebar.tsx
+ * @brief Postranní panel instance otevřené v kontextu KPI definice.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Select, { type SingleValue } from "react-select";

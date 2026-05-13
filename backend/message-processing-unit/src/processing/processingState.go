@@ -1,3 +1,16 @@
+/**
+ * @file processingState.go
+ * @brief Sdílený runtime stav typů zdrojů, KPI konfigurace a návazných dat modulu.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní mapa KPI definic podle denotace typu zdroje, UUID jednotky, DenotationMapUpdates a InitializeProcessing.
+ * - Vojtěch Hubáček: rozšíření zbývajícího stavového modelu, synchronizační logiky a návazných aktualizací konfigurace.
+ *
+ * @ingroup riot_message_processing_unit
+ */
 package processing
 
 import (

@@ -1,3 +1,14 @@
+/**
+ * @file DashboardPage.tsx
+ * @brief Úvodní dashboard se souhrnem sledovaných instancí, KPI a aktuálních výsledků.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useUserConfig } from "../modules/auth/hooks/useUserConfig";
 import { useKpiDefinition } from "../modules/kpi/hooks/useKpiDefinition";
 import { useSdInstance } from "../modules/sdInstances/hooks/useSdInstance";

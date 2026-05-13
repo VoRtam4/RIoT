@@ -1,3 +1,13 @@
+## @file Dockerfile
+#  @brief Dockerfile pro sestavení a spuštění modulu Backend Core.
+#
+#  @author Michal Bureš
+#
+#  @par Autorský podíl
+#  - Michal Bureš: návrh a implementace celé funkcionality souboru.
+#
+#  @ingroup riot_backend_core
+
 # Use an official Go runtime as a parent image
 FROM golang:1.24.1-alpine AS build
 # Set the working directory inside the container

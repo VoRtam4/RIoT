@@ -1,3 +1,14 @@
+/**
+ * @file timeSeries.go
+ * @brief Sdílené modely pro práci s historickými raw a KPI daty v časové vrstvě.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_commons
+ */
 package sharedModel
 
 import (

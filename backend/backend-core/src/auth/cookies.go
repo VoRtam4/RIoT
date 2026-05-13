@@ -1,3 +1,14 @@
+/**
+ * @file cookies.go
+ * @brief Práce s cookies používanými pro OAuth2 stav, session JWT a refresh token.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package auth
 
 import (

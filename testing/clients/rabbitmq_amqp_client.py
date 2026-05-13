@@ -1,3 +1,15 @@
+"""
+@file rabbitmq_amqp_client.py
+@brief AMQP klient pro přímé publikování syntetických zpráv do RabbitMQ front RIoT.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 import json

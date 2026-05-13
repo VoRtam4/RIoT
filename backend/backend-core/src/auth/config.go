@@ -1,3 +1,14 @@
+/**
+ * @file config.go
+ * @brief Konfigurace OAuth2 autentizace používané Backend Core.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package auth
 
 import (

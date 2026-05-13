@@ -1,3 +1,15 @@
+"""
+@file graphql_client.py
+@brief GraphQL klient používaný pro správu entit, KPI a čtení výsledků přes Backend Core.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,3 +1,13 @@
+## @file Dockerfile
+#  @brief Dockerfile pro sestavení a spuštění modulu Message Processing Unit.
+#
+#  @author Michal Bureš
+#
+#  @par Autorský podíl
+#  - Michal Bureš: návrh a implementace celé funkcionality souboru.
+#
+#  @ingroup riot_message_processing_unit
+
 # Use an official Go runtime as a parent image
 FROM golang:1.24.1-alpine
 # Set the working directory inside the container

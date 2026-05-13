@@ -1,3 +1,15 @@
+"""
+@file generator_manager.py
+@brief Koordinace generátorů a tvorba datových sad podle konfigurace experimentu.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone

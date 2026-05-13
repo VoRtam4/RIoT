@@ -1,3 +1,14 @@
+/**
+ * @file useKpiResult.ts
+ * @brief Hook pro čtení aktuálního nebo historického výsledku KPI.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useQuery } from "@apollo/client/react";
 import {
   KpiResultDocument,

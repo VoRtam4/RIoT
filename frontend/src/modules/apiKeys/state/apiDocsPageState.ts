@@ -1,3 +1,14 @@
+/**
+ * @file apiDocsPageState.ts
+ * @brief Perzistentní stav stránky API dokumentace a zvolené části dokumentace.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import type { PageStateCodec } from "../../../app/navigation/usePageState";
 
 export type ApiDocsQueryState = {

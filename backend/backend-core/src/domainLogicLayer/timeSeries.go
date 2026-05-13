@@ -1,3 +1,14 @@
+/**
+ * @file timeSeries.go
+ * @brief Doménová logika pro streamované čtení historických raw a KPI časových řad.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality čtení časových řad v doménové vrstvě.
+ *
+ * @ingroup riot_backend_core
+ */
 package domainLogicLayer
 
 import (

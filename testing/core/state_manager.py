@@ -1,3 +1,15 @@
+"""
+@file state_manager.py
+@brief Správa lokálního stavu připravených entit, instancí a KPI mezi běhy experimentů.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 import json

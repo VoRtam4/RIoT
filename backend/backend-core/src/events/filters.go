@@ -1,3 +1,14 @@
+/**
+ * @file filters.go
+ * @brief Sestavení filtrů pro odběr backendových událostí podle GraphQL vstupů.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package events
 
 import (

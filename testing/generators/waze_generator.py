@@ -1,3 +1,15 @@
+"""
+@file waze_generator.py
+@brief Generátor syntetických Waze jam událostí pro scénáře dopravních kolon.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 from typing import Any

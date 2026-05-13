@@ -1,3 +1,14 @@
+/**
+ * @file chunks.go
+ * @brief Pomocná logika pro dělení časových intervalů dotazů na stabilní zpracovatelné úseky.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_time_series_store
+ */
 package internal
 
 import "time"

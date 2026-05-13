@@ -1,3 +1,14 @@
+/**
+ * @file buildColumns.ts
+ * @brief Sestavení sloupců tabulky historických dat podle vybraných parametrů.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 type TimeSeriesParameterLike = {
   denotation: string;
   label: string;

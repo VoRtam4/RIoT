@@ -1,3 +1,14 @@
+/**
+ * @file useKpiDefinitionsBySdType.ts
+ * @brief Hook pro načítání KPI definic navázaných na konkrétní sledovaný typ.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useEffect } from "react";
 import { useKpiDefinitionsBySdTypeStore } from "../stores/kpiDefinitionsBySdTypeStore";
 

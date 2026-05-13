@@ -1,3 +1,14 @@
+/**
+ * @file apiKeysPageState.ts
+ * @brief Perzistentní stav stránky správy API klíčů.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import type { PageStateCodec } from "../../../app/navigation/usePageState";
 
 export type ApiKeysFilter = "all" | "active" | "inactive";

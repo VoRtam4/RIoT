@@ -1,7 +1,14 @@
 /**
  * @file main.go
- * @brief Vstupní bod modulu Message Processing Unit platformy RIoT.
- * @author Vojtěch Hubáček, Michal Bureš
+ * @brief Vstupní bod modulu Message Processing Unit platformy RIoT a registrace jeho konzumentů zpráv.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní základ vstupního bodu a spuštění hlavního toku modulu.
+ * - Vojtěch Hubáček: doplnění workerů a posluchačů pro aktualizace typů zdrojů, reprocessing, rušení úloh a navazující provozní logiku.
+ *
  * @defgroup riot_message_processing_unit Message Processing Unit
  * @ingroup riot
  * @see ../README.md

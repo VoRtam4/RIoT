@@ -1,3 +1,14 @@
+/**
+ * @file ProtectedRoute.tsx
+ * @brief Ochranná routa řešící přístup nepřihlášených uživatelů do aplikace.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../modules/auth/hooks/useAuth";

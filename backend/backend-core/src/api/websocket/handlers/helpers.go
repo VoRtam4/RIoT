@@ -1,3 +1,14 @@
+/**
+ * @file helpers.go
+ * @brief Pomocné funkce WebSocket handlerů pro autorizaci, parsování payloadů a odpovědi.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package handlers
 
 import (

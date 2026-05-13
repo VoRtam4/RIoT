@@ -1,3 +1,15 @@
+"""
+@file profiles.py
+@brief Profily intenzity, variability a hodnot používané generátory událostí.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 

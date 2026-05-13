@@ -1,7 +1,14 @@
 /**
  * @file main.go
- * @brief Vstupní bod modulu Backend Core platformy RIoT.
- * @author Vojtěch Hubáček, Michal Bureš
+ * @brief Vstupní bod modulu Backend Core platformy RIoT a spuštění jeho interních komunikačních smyček.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní základ vstupního bodu a inicializace serverové části.
+ * - Vojtěch Hubáček: doplnění runISCLoop a napojení zpracování příchozích raw datových bodů přes ProcessIncomingRawDataPoints.
+ *
  * @defgroup riot_backend_core Backend Core
  * @ingroup riot
  * @see ../README.md

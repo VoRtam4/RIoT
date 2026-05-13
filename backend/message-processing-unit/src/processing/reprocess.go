@@ -1,3 +1,14 @@
+/**
+ * @file reprocess.go
+ * @brief Řízení přepočtu KPI nad historickými surovými daty.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_message_processing_unit
+ */
 package processing
 
 import (

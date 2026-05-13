@@ -1,3 +1,15 @@
+"""
+@file history_read_experiment.py
+@brief Experiment měřící čtení historických raw a KPI dat přes API.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 import csv

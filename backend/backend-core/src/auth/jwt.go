@@ -1,3 +1,14 @@
+/**
+ * @file jwt.go
+ * @brief Tvorba, parsování a validace JWT tokenů pro session autentizaci.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package auth
 
 import (

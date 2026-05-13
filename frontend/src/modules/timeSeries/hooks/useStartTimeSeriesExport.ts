@@ -1,3 +1,14 @@
+/**
+ * @file useStartTimeSeriesExport.ts
+ * @brief Hook pro založení asynchronního exportu historických dat.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useMutation } from "@apollo/client/react";
 import {
   StartTimeSeriesExportDocument,

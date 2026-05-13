@@ -1,3 +1,15 @@
+"""
+@file payload_builders.py
+@brief Skládání GraphQL a RabbitMQ payloadů pro inicializaci zdrojů dat, instancí a KPI.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 from typing import Any

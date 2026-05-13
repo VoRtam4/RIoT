@@ -1,3 +1,14 @@
+/**
+ * @file useKpiDefinition.ts
+ * @brief Hook pro načtení jedné KPI definice a jejích detailů.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useQuery } from "@apollo/client/react";
 import {
   KpiDefinitionDocument,

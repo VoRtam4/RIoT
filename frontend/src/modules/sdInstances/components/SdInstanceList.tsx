@@ -1,3 +1,14 @@
+/**
+ * @file SdInstanceList.tsx
+ * @brief Seznam sledovaných instancí s virtuálním vykreslováním a výběrem detailu.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useRef } from "react";
 import SdInstanceCard from "./SdInstanceCard";
 import VirtualizedCardGrid from "../../../components/virtualization/VirtualizedCardGrid";

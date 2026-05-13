@@ -1,3 +1,14 @@
+/**
+ * @file misc.go
+ * @brief Sdílené pomocné prvky doménové vrstvy Backend Core.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace sdíleného základu doménové vrstvy.
+ *
+ * @ingroup riot_backend_core
+ */
 package domainLogicLayer
 
 import (

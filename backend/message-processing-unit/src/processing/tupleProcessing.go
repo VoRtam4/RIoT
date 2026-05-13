@@ -1,3 +1,14 @@
+/**
+ * @file tupleProcessing.go
+ * @brief Dávkové zpracování vstupních tuple zpráv a orchestrace navazujícího raw a KPI toku.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_message_processing_unit
+ */
 package processing
 
 import (

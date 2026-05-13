@@ -1,3 +1,13 @@
+# @file sdInstances.graphql
+# @brief GraphQL dotazy a subscription pro sledované instance a raw datové body.
+#
+# @author Vojtěch Hubáček
+#
+# @par Autorský podíl
+# - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+#
+# @ingroup riot_frontend
+
 query SdInstances {
   sdInstances {
     id

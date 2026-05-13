@@ -1,3 +1,14 @@
+/**
+ * @file apiKeys.go
+ * @brief Mapování API klíčů z databázového modelu do doménového modelu.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package db2dll
 
 import (

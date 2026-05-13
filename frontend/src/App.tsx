@@ -1,3 +1,14 @@
+/**
+ * @file App.tsx
+ * @brief Kořenová React komponenta aplikace s inicializací tématu, routingu a globálních providerů.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useState } from "react";
 import reactLogo from "./assets/react.svg";
 import viteLogo from "./assets/vite.svg";

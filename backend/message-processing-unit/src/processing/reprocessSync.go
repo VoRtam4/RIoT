@@ -1,3 +1,14 @@
+/**
+ * @file reprocessSync.go
+ * @brief Synchronizace aktivních přepočtů KPI s požadavky na rušení a mazání výsledků.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_message_processing_unit
+ */
 package processing
 
 import (

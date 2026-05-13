@@ -1,3 +1,14 @@
+/**
+ * @file timeSeries.go
+ * @brief Mapování GraphQL vstupů časové vrstvy do sdíleného doménového modelu.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package gql2dll
 
 import (

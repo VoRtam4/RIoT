@@ -1,3 +1,14 @@
+/**
+ * @file apiKeys.go
+ * @brief Mapování vstupů API klíčů z GraphQL modelu do doménového modelu.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package gql2dll
 
 import (

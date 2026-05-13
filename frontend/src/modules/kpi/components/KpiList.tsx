@@ -1,3 +1,14 @@
+/**
+ * @file KpiList.tsx
+ * @brief Seznam KPI definic s podporou výběru a virtualizovaného vykreslení.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useMemo, useRef } from "react";
 import type { SdTypesQuery } from "../../../generated/graphql";
 import KpiCard from "./KpiCard";

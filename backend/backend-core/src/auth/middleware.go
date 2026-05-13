@@ -1,3 +1,16 @@
+/**
+ * @file middleware.go
+ * @brief HTTP middleware pro autentizaci požadavků a uložení principala do kontextu.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní základ middleware pro session autentizaci.
+ * - Vojtěch Hubáček: integrace principala do kontextu požadavku a navázání middleware na novou autorizační vrstvu.
+ *
+ * @ingroup riot_backend_core
+ */
 package auth
 
 import (

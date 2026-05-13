@@ -1,3 +1,14 @@
+/**
+ * @file sse.go
+ * @brief REST SSE rozhraní pro odběr událostí Backend Core.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package handlers
 
 import (

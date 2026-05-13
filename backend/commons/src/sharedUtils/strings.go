@@ -1,3 +1,14 @@
+/**
+ * @file strings.go
+ * @brief Pomocné funkce pro generování a bezpečné zkracování textových hodnot.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_commons
+ */
 package sharedUtils
 
 import (

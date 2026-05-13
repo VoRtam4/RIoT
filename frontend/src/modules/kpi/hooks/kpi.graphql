@@ -1,3 +1,13 @@
+# @file kpi.graphql
+# @brief GraphQL operace a subscription pro KPI definice a jejich výsledky.
+#
+# @author Vojtěch Hubáček
+#
+# @par Autorský podíl
+# - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+#
+# @ingroup riot_frontend
+
 query KpiDefinitions {
   kpiDefinitions {
     id

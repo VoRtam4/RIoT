@@ -1,7 +1,12 @@
 /**
  * @file main.go
- * @brief Vstupní bod modulu Time Series Store platformy RIoT.
+ * @brief Vstupní bod modulu Time Series Store platformy RIoT a registrace jeho komunikačních toků.
+ *
  * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
  * @defgroup riot_time_series_store Time Series Store
  * @ingroup riot
  * @see ../README.md

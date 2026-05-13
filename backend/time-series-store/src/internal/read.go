@@ -1,3 +1,14 @@
+/**
+ * @file read.go
+ * @brief Streamované čtení historických dat z InfluxDB a jejich převod do interního modelu.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_time_series_store
+ */
 package internal
 
 import (

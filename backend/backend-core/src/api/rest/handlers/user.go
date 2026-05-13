@@ -1,3 +1,14 @@
+/**
+ * @file user.go
+ * @brief REST handlery pro práci s uživatelskou konfigurací.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package handlers
 
 import (

@@ -1,3 +1,15 @@
+"""
+@file reporter.py
+@brief Tvorba souhrnných reportů experimentů ve formátech JSON, CSV a Markdown.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 import csv

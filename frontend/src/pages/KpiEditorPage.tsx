@@ -1,3 +1,14 @@
+/**
+ * @file KpiEditorPage.tsx
+ * @brief Editor KPI definic s vizuálním skládáním podmínek nad parametry zdrojů dat.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useParams } from "react-router-dom";
 import KpiEditorForm from "../modules/kpi/components/KpiEditorForm";
 

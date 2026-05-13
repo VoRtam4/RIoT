@@ -1,3 +1,14 @@
+/**
+ * @file SdInstanceDetailPage.tsx
+ * @brief Detail sledované instance s raw daty, KPI a historickými výsledky.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useRef } from "react";
 import { useUserConfig } from "../modules/auth/hooks/useUserConfig";

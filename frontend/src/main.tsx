@@ -1,7 +1,12 @@
 /**
  * @file main.tsx
  * @brief Vstupní bod frontendové aplikace platformy RIoT.
+ *
  * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
  * @defgroup riot_frontend Frontend
  * @ingroup riot
  * @see ../README.md

@@ -1,3 +1,14 @@
+/**
+ * @file useTimeSeriesExport.ts
+ * @brief Hook pro načtení stavu a metadat exportu časových řad.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useApolloClient } from "@apollo/client/react";
 import {
   TimeSeriesExportDocument,

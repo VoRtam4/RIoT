@@ -1,3 +1,14 @@
+/**
+ * @file dateTimeUtils.ts
+ * @brief Pomocné funkce pro formátování a převody datumu a času ve KPI modulech.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 export function toLocalInputValue(date: Date) {
   const offset = date.getTimezoneOffset();
   const local = new Date(date.getTime() - offset * 60000);

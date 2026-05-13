@@ -1,3 +1,15 @@
+"""
+@file dataset_builder.py
+@brief Sestavování syntetických datových sad z generátorů dopravních událostí.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone

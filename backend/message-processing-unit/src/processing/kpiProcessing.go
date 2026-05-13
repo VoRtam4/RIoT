@@ -1,3 +1,16 @@
+/**
+ * @file kpiProcessing.go
+ * @brief Zpracování KPI nad vstupními daty a příprava výsledků pro další vrstvy systému.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní vyhodnocování KPI a příprava výsledků k publikaci.
+ * - Vojtěch Hubáček: doplnění stavové logiky a perzistence KPI výsledků do časové vrstvy.
+ *
+ * @ingroup riot_message_processing_unit
+ */
 package processing
 
 import (

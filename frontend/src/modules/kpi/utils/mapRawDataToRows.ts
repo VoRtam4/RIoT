@@ -1,3 +1,14 @@
+/**
+ * @file mapRawDataToRows.ts
+ * @brief Mapování raw dat sledované instance do tabulkových řádků.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 type Row = {
   key: string;
   value: any;

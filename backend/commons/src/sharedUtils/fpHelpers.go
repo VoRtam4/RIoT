@@ -1,3 +1,14 @@
+/**
+ * @file fpHelpers.go
+ * @brief Obecné pomocné funkce pro práci se slice hodnotami ve funkcionálním stylu.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_commons
+ */
 package sharedUtils
 
 // Map is a custom functional programming helper function useful to change the type of slice items.

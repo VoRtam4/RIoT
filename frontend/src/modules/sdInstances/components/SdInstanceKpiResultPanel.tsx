@@ -1,3 +1,14 @@
+/**
+ * @file SdInstanceKpiResultPanel.tsx
+ * @brief Panel aktuálních výsledků KPI pro vybranou sledovanou instanci.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useKpiResult } from "../../kpi/hooks/useKpiResult";
 import { useKpiSubscription } from "../../kpi/hooks/useKpiSubscription";
 

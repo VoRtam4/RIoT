@@ -1,3 +1,13 @@
+# @file auth.graphql
+# @brief GraphQL operace pro přihlášení, session a načtení uživatelské konfigurace.
+#
+# @author Vojtěch Hubáček
+#
+# @par Autorský podíl
+# - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+#
+# @ingroup riot_frontend
+
 query UserConfig {
   userConfig {
     userID

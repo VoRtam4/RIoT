@@ -1,3 +1,15 @@
+"""
+@file __init__.py
+@brief Balíček experimentů ověřujících ingest, historii, reprocessing a ukládání dat.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 """Experiment implementations."""
 
 from testing.experiments.history_read_experiment import HistoryReadExperiment

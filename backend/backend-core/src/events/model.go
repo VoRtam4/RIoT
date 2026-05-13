@@ -1,3 +1,14 @@
+/**
+ * @file model.go
+ * @brief Datový model interních událostí publikovaných Backend Core.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package events
 
 import "time"

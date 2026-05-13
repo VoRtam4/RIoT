@@ -1,3 +1,14 @@
+/**
+ * @file principal.go
+ * @brief Model a autentizace principala pro session, API klíče a hostovský přístup.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package auth
 
 import (

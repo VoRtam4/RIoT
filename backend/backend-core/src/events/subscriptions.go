@@ -1,3 +1,14 @@
+/**
+ * @file subscriptions.go
+ * @brief Subscription adaptéry převádějící interní události na streamy pro API vrstvu.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package events
 
 import (

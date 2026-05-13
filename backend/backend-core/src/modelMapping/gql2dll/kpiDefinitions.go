@@ -1,3 +1,16 @@
+/**
+ * @file kpiDefinitions.go
+ * @brief Mapování GraphQL vstupů KPI definic do doménového stromu KPI podmínek.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní mapování základních KPI operací.
+ * - Vojtěch Hubáček: rozšíření mapování o nově přidané KPI operace a labely KPI definic.
+ *
+ * @ingroup riot_backend_core
+ */
 package gql2dll
 
 import (

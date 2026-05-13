@@ -1,3 +1,16 @@
+/**
+ * @file kpiDefinitions.go
+ * @brief Doménová logika pro správu KPI definic a spuštění navazujícího reprocessingu.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní základ správy KPI definic.
+ * - Vojtěch Hubáček: doplnění userID vazeb, By operací, aktivace reprocessingu a kontroly reálné změny definice před přepočtem.
+ *
+ * @ingroup riot_backend_core
+ */
 package domainLogicLayer
 
 import (

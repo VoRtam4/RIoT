@@ -1,3 +1,14 @@
+/**
+ * @file cborCoding.go
+ * @brief Pomocné funkce pro CBOR kódování a dekódování payloadů přenášených systémem.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_commons
+ */
 package sharedUtils
 
 import (

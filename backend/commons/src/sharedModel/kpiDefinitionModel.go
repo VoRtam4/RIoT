@@ -1,3 +1,16 @@
+/**
+ * @file kpiDefinitionModel.go
+ * @brief Sdílený model stromové definice KPI a jejích logických a porovnávacích operátorů.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní model stromové KPI definice a základních operátorů.
+ * - Vojtěch Hubáček: rozšíření modelu o nové KPI operace !=, exist, not exist a NOT.
+ *
+ * @ingroup riot_commons
+ */
 package sharedModel
 
 type LogicalOperationNodeType string

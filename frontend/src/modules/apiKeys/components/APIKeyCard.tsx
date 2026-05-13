@@ -1,3 +1,14 @@
+/**
+ * @file APIKeyCard.tsx
+ * @brief Karta API klíče se stavem, oprávněními a základními akcemi.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import Card from "@mui/material/Card";
 import CardActionArea from "@mui/material/CardActionArea";
 import CardContent from "@mui/material/CardContent";

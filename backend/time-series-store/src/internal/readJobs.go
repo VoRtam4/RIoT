@@ -1,3 +1,14 @@
+/**
+ * @file readJobs.go
+ * @brief Evidence aktivních čtecích úloh a jejich rušení během dlouhých exportů dat.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_time_series_store
+ */
 package internal
 
 import (

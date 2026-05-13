@@ -1,3 +1,14 @@
+/**
+ * @file sdInstancesStore.ts
+ * @brief Lokální store seznamu sledovaných instancí a vybrané instance.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { create } from "zustand";
 import { apolloClient } from "../../../app/apollo";
 import {

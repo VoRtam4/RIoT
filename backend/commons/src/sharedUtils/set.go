@@ -1,3 +1,14 @@
+/**
+ * @file set.go
+ * @brief Generická množina hodnot postavená nad mapou.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_commons
+ */
 package sharedUtils
 
 type Set[T comparable] struct {

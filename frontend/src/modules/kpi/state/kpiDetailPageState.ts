@@ -1,3 +1,14 @@
+/**
+ * @file kpiDetailPageState.ts
+ * @brief Perzistentní stav detailu KPI, vybrané instance a historického panelu.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import type { PageStateCodec } from "../../../app/navigation/usePageState";
 
 export type KpiDetailSidebarSort = "label_asc" | "label_desc";

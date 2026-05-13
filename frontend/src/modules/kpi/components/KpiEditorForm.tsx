@@ -1,3 +1,14 @@
+/**
+ * @file KpiEditorForm.tsx
+ * @brief Hlavní formulář editoru KPI včetně výběru typu, instance a podmínek.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useState, useMemo, useEffect } from "react";
 import Select, { type MultiValue } from "react-select";
 import { useNavigate } from "react-router-dom";

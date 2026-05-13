@@ -1,3 +1,14 @@
+/**
+ * @file sessionRedirect.ts
+ * @brief Pomocná logika přesměrování podle stavu uživatelské session.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useAuthStore } from "../stores/authStore";
 
 let redirectInFlight = false;

@@ -1,3 +1,14 @@
+/**
+ * @file hooks.go
+ * @brief GORM hooky pro udržování konzistence databázových entit Backend Core.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package dbModel
 
 import (

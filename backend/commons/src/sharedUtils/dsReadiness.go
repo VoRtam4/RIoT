@@ -1,3 +1,14 @@
+/**
+ * @file dsReadiness.go
+ * @brief Kontrola dostupnosti závislých síťových služeb před spuštěním modulů.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_commons
+ */
 package sharedUtils
 
 import (

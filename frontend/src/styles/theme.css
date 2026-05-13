@@ -1,3 +1,14 @@
+/**
+ * @file theme.css
+ * @brief Globální CSS proměnné a utility navázané na vizuální téma RIoT.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 body {
   background-color: var(--bg-main);
   color: var(--text-main);

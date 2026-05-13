@@ -1,3 +1,14 @@
+/**
+ * @file TimeSeriesFilters.tsx
+ * @brief Filtrační panel historických dat pro výběr typu, instance, času a parametrů.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useEffect, useMemo } from "react";
 import Select, { type MultiValue, type SingleValue } from "react-select";
 

@@ -1,3 +1,15 @@
+"""
+@file ndic_generator.py
+@brief Generátor syntetických NDIC událostí pro scénáře silničních segmentů.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 from typing import Any

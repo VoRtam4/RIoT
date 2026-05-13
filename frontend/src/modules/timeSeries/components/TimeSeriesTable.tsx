@@ -1,3 +1,14 @@
+/**
+ * @file TimeSeriesTable.tsx
+ * @brief Tabulka historických časových řad s dynamickými sloupci.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import {
   MaterialReactTable,
   useMaterialReactTable,

@@ -1,3 +1,14 @@
+/**
+ * @file EmptyStateNotice.tsx
+ * @brief Sdílená komponenta prázdného stavu seznamů a detailních panelů.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 type Props = {
   title: string;
   description?: string;

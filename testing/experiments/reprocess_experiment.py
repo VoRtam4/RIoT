@@ -1,3 +1,15 @@
+"""
+@file reprocess_experiment.py
+@brief Experiment ověřující opětovné vyhodnocení KPI nad historickými daty.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 import csv

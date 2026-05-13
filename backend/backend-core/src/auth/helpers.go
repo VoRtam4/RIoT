@@ -1,3 +1,16 @@
+/**
+ * @file helpers.go
+ * @brief Pomocná logika pro OAuth2 přihlášení, tvorbu uživatelů a přiřazení výchozích rolí.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní pomocná autentizační logika pro OAuth2 tok a uživatelské záznamy.
+ * - Vojtěch Hubáček: doplnění práce s rolemi a přiřazování rolí uživatelům během autentizace.
+ *
+ * @ingroup riot_backend_core
+ */
 package auth
 
 import (

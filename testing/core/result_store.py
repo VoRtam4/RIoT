@@ -1,3 +1,15 @@
+"""
+@file result_store.py
+@brief Ukládání surových i agregovaných výsledků experimentů do výstupních souborů.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 import json

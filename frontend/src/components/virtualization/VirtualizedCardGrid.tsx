@@ -1,3 +1,14 @@
+/**
+ * @file VirtualizedCardGrid.tsx
+ * @brief Sdílená virtualizovaná mřížka karet pro seznamy instancí a KPI.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import {
   useRef,
   useState,

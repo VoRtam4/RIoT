@@ -1,3 +1,13 @@
+# @file kpis.yaml
+# @brief Konfigurace KPI definic používaných při benchmarkových experimentech.
+#
+# @author Vojtěch Hubáček
+#
+# @par Autorský podíl
+# - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+#
+# @ingroup riot_testing
+
 kpis:
   - id: "K1"
     label: "WAZE congestion high"

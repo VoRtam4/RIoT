@@ -1,3 +1,14 @@
+/**
+ * @file rawDataPoint.go
+ * @brief Doménová logika pro čtení aktuálních raw datových bodů sledovaných instancí.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality raw datových bodů v doménové vrstvě.
+ *
+ * @ingroup riot_backend_core
+ */
 package domainLogicLayer
 
 import (

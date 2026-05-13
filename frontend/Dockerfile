@@ -1,3 +1,13 @@
+## @file Dockerfile
+#  @brief Dockerfile pro sestavení a spuštění frontendové aplikace.
+#
+#  @author Vojtěch Hubáček
+#
+#  @par Autorský podíl
+#  - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+#
+#  @ingroup riot_frontend
+
 FROM node:20 AS builder
 WORKDIR /app
 ARG BACKEND_CORE_URL

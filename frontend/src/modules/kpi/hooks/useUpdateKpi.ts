@@ -1,3 +1,14 @@
+/**
+ * @file useUpdateKpi.ts
+ * @brief Hook pro uložení změn existující KPI definice.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useMutation } from "@apollo/client/react";
 import {
   UpdateKpiDefinitionDocument,

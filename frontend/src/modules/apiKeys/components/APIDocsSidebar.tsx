@@ -1,3 +1,14 @@
+/**
+ * @file APIDocsSidebar.tsx
+ * @brief Postranní navigace kategorií a akcí ve frontendové API dokumentaci.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import type { ApiFeatureDoc } from "../data/apiDocs";
 import ApiDocsFeatureCard from "./APIDocsFeatureCard";
 import VirtualizedList from "../../../components/virtualization/VirtualizedList";

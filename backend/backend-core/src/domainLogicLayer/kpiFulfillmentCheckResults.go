@@ -1,3 +1,16 @@
+/**
+ * @file kpiFulfillmentCheckResults.go
+ * @brief Doménová logika pro čtení výsledků vyhodnocení KPI.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní základ práce s výsledky vyhodnocení KPI.
+ * - Vojtěch Hubáček: doplnění operací omezených podle userID a By operací pro čtení výsledků podle KPI, instance a dalších vazeb.
+ *
+ * @ingroup riot_backend_core
+ */
 package domainLogicLayer
 
 import (

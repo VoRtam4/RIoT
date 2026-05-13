@@ -1,3 +1,14 @@
+/**
+ * @file util.go
+ * @brief Sdílené pomocné funkce pro skládání dotazů a obecnou práci s GORM entitami.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package dbUtil
 
 import (

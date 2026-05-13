@@ -1,3 +1,14 @@
+/**
+ * @file SdInstancePage.tsx
+ * @brief Stránka seznamu sledovaných instancí s filtrováním a výběrem detailu.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useNavigate } from "react-router-dom";
 import { useMemo, useEffect } from "react";
 

@@ -1,3 +1,14 @@
+/**
+ * @file messageProcessingUnit.go
+ * @brief Sdílené modely runtime stavu a cache používané modulem Message Processing Unit.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_commons
+ */
 package sharedModel
 
 import "time"

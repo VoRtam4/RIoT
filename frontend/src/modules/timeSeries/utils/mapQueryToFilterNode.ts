@@ -1,3 +1,14 @@
+/**
+ * @file mapQueryToFilterNode.ts
+ * @brief Převod dotazové struktury historických dat na strom filtrů.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 export function mapToFilterNode(query: any): any {
   if (!query || !query.rules) return undefined;
 

@@ -1,3 +1,16 @@
+/**
+ * @file kpiFulfillmentCheckResults.go
+ * @brief Doménový model výsledků vyhodnocení KPI.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní model výsledků vyhodnocení KPI.
+ * - Vojtěch Hubáček: doplnění času události EventTime.
+ *
+ * @ingroup riot_backend_core
+ */
 package dllModel
 
 import "time"

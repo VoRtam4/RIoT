@@ -1,3 +1,16 @@
+/**
+ * @file kpiFulfillmentCheckResults.go
+ * @brief Mapování výsledků vyhodnocení KPI z databázového modelu do doménového modelu.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní mapování výsledků vyhodnocení KPI.
+ * - Vojtěch Hubáček: doplnění mapování času události EventTime.
+ *
+ * @ingroup riot_backend_core
+ */
 package db2dll
 
 import (

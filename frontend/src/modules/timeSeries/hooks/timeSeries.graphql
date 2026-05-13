@@ -1,3 +1,13 @@
+# @file timeSeries.graphql
+# @brief GraphQL operace a subscription pro historii, agregace a exporty časových řad.
+#
+# @author Vojtěch Hubáček
+#
+# @par Autorský podíl
+# - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+#
+# @ingroup riot_frontend
+
 query TimeSeriesRead($request: TimeSeriesReadInput!) {
   timeSeriesRead(request: $request) {
     base

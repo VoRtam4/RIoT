@@ -4,7 +4,7 @@
 
 Autor práce: **Vojtěch Hubáček**
 
-Tento soubor slouží jako úvodní README k odevzdávané složce bakalářské práce. Práce rozšiřuje platformu RIoT pro práci s dopravními daty v reálném čase, jejich historizaci, opětovné vyhodnocování KPI a zpřístupnění přes autorizovaná aplikační rozhraní. Výsledkem je obecně použitelný systém, který lze využít samostatně i jako serverovou část pro další aplikace.
+Tento soubor slouží jako úvodní README k odevzdávané složce bakalářské práce. Práce rozvíjí projekt [RIoT-Platform](https://github.com/RIoT-Platform) a rozšiřuje platformu RIoT pro práci s dopravními daty v reálném čase, jejich historizaci, opětovné vyhodnocování KPI a zpřístupnění přes autorizovaná aplikační rozhraní. Výsledkem je obecně použitelný systém, který lze využít samostatně i jako serverovou část pro další aplikace.
 
 Řešení navazuje na původní platformu RIoT **Michala Bureše** a na systém RTAlerts **Dominika Vondrušky**, z něhož vychází dopravní aplikační doména a práce s konkrétními zdroji otevřených dat. Podrobné technické popisy, návody ke spuštění a dokumentace jednotlivých modulů jsou uvedené přímo v README souborech odpovídajících částí.
 

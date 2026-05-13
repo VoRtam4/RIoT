@@ -1,3 +1,14 @@
+/**
+ * @file injectCssVariables.ts
+ * @brief Vložení barevných a layoutových CSS proměnných do dokumentu.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { colors } from "./colors";
 
 const toKebabCase = (str: string) =>

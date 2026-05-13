@@ -1,3 +1,14 @@
+/**
+ * @file errorHandling.go
+ * @brief Pomocné funkce pro jednotné logování a ukončování aplikace při chybách.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_commons
+ */
 package sharedUtils
 
 import "log"

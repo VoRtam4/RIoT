@@ -1,3 +1,14 @@
+/**
+ * @file client_test.go
+ * @brief Test vybraných operací relačního databázového klienta.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package dbClient
 
 import (

@@ -1,3 +1,14 @@
+/**
+ * @file planner.go
+ * @brief Tvorba interního plánu pro vykonání požadavků na čtení časových dat.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_time_series_store
+ */
 package internal
 
 import (

@@ -1,3 +1,14 @@
+/**
+ * @file apiKeys.go
+ * @brief Doménová logika správy API klíčů, oprávnění a IP restrikcí.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality správy API klíčů v doménové vrstvě.
+ *
+ * @ingroup riot_backend_core
+ */
 package domainLogicLayer
 
 import (

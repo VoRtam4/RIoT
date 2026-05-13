@@ -1,3 +1,16 @@
+/**
+ * @file shortcuts.go
+ * @brief Zkrácené pomocné funkce pro konzumaci interních RabbitMQ zpráv.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní zkratky pro konzumaci základních interních zpráv.
+ * - Vojtěch Hubáček: doplnění consumeRawDataPointJSONMessages, consumeSDInstanceRegistrationRequestJSONMessages a úprava dalších konzumentů pro tuple zprávy.
+ *
+ * @ingroup riot_backend_core
+ */
 package isc
 
 import (

@@ -1,3 +1,14 @@
+/**
+ * @file useSdTypes.ts
+ * @brief Hook pro načítání seznamu sledovaných typů.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useEffect } from "react";
 import { useSdTypesStore } from "../stores/sdTypesStore";
 

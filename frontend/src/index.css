@@ -1,3 +1,14 @@
+/**
+ * @file index.css
+ * @brief Globální CSS reset, typografie a základní layoutové styly celé aplikace.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 :root {
   --text: #6b6375;
   --text-h: #08060d;

@@ -1,3 +1,14 @@
+/**
+ * @file APIKeySidebar.tsx
+ * @brief Postranní panel detailu a akcí nad vybraným API klíčem.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useMemo } from "react";
 import Select from "react-select";
 import { matchesSearchText } from "../../../utils/reactSelectSearch";

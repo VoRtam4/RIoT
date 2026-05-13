@@ -1,3 +1,14 @@
+/**
+ * @file TimeSeriesPage.tsx
+ * @brief Stránka pro dotazování, agregaci a export historických časových řad.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 

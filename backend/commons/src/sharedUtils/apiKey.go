@@ -1,3 +1,14 @@
+/**
+ * @file apiKey.go
+ * @brief Pomocné funkce pro generování, hashování a ověřování API klíčů.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_commons
+ */
 package sharedUtils
 
 import (

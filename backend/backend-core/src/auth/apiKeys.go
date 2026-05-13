@@ -1,3 +1,14 @@
+/**
+ * @file apiKeys.go
+ * @brief Pomocné funkce pro extrakci API klíčů a vyhodnocení jejich IP omezení.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package auth
 
 import (

@@ -1,3 +1,15 @@
+"""
+@file mhd_generator.py
+@brief Generátor syntetických MHD událostí pro scénáře linek a zpoždění.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 from typing import Any

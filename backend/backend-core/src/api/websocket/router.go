@@ -1,3 +1,14 @@
+/**
+ * @file router.go
+ * @brief Směrování WebSocket požadavků a subscription zpráv na odpovídající handlery.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package websocket
 
 import (

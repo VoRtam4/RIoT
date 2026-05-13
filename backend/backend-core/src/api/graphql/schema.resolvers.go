@@ -1,3 +1,16 @@
+/**
+ * @file schema.resolvers.go
+ * @brief Implementace resolverů GraphQL API Backend Core.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní resolverová logika pro základní GraphQL API.
+ * - Vojtěch Hubáček: doplnění autorizace operací, per-user operací, API klíčů, IP restrikcí, raw dat, time-series rozhraní, rolí, tag/field parametrů, labelů, nových KPI operací, By dotazů a sjednocených subscription událostí pro všechna rozhraní.
+ *
+ * @ingroup riot_backend_core
+ */
 package graphql
 
 import (

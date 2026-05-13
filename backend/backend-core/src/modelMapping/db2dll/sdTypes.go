@@ -1,3 +1,16 @@
+/**
+ * @file sdTypes.go
+ * @brief Mapování typů zdrojů dat z databázového modelu do doménového modelu.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní mapování typů zdrojů dat a jejich parametrů.
+ * - Vojtěch Hubáček: doplnění mapování labelů, rolí parametrů field/tag a zjednodušení převodu string enumů přetypováním na doménové typy.
+ *
+ * @ingroup riot_backend_core
+ */
 package db2dll
 
 import (

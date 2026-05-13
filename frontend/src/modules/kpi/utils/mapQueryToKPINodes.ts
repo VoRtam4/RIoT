@@ -1,3 +1,14 @@
+/**
+ * @file mapQueryToKPINodes.ts
+ * @brief Převod uložené KPI podmínky na uzly vizuálního editoru.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 type Group = any;
 
 type SDParam = {

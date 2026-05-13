@@ -1,3 +1,15 @@
+"""
+@file rest_client.py
+@brief REST klient pro volání exportů, historie a dalších REST operací Backend Core.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 import time

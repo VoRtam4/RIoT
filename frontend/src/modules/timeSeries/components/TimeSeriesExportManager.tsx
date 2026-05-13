@@ -1,3 +1,14 @@
+/**
+ * @file TimeSeriesExportManager.tsx
+ * @brief Ovládání spuštění, sledování a stažení exportů historických dat.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import { apiEndpoints } from "../../../app/apiEndpoints";

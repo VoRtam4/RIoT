@@ -1,3 +1,15 @@
+"""
+@file base_generator.py
+@brief Společný základ generátorů syntetických časových řad a dopravních událostí.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

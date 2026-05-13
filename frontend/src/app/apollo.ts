@@ -1,3 +1,14 @@
+/**
+ * @file apollo.ts
+ * @brief Konfigurace Apollo klienta pro GraphQL požadavky a subscription spojení.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import {
   ApolloClient,
   ApolloLink,

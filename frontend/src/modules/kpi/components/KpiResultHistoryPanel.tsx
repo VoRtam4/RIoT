@@ -1,3 +1,14 @@
+/**
+ * @file KpiResultHistoryPanel.tsx
+ * @brief Panel historických výsledků KPI s filtrováním a zobrazením časové řady.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useEffect, useMemo, useState } from "react";
 import { LineChart } from "@mui/x-charts/LineChart";
 

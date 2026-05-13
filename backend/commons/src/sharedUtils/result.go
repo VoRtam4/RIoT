@@ -1,3 +1,14 @@
+/**
+ * @file result.go
+ * @brief Generický výsledek operace nesoucí úspěšný payload nebo chybu.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_commons
+ */
 package sharedUtils
 
 type Result[T any] struct {

@@ -1,3 +1,16 @@
+/**
+ * @file setup.go
+ * @brief Inicializace GraphQL handleru, transportů a autentizace GraphQL požadavků.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní nastavení GraphQL serveru.
+ * - Vojtěch Hubáček: napojení na společný server, autorizace operací a API key přístup v GraphQL transportech.
+ *
+ * @ingroup riot_backend_core
+ */
 package graphql
 
 import (

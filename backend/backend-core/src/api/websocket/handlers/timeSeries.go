@@ -1,3 +1,14 @@
+/**
+ * @file timeSeries.go
+ * @brief WebSocket handlery pro streamování, agregace a exporty časových dat.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package handlers
 
 import (

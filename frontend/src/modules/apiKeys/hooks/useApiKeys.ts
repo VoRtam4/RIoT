@@ -1,3 +1,14 @@
+/**
+ * @file useApiKeys.ts
+ * @brief Hook pro načítání seznamu API klíčů aktuálního uživatele.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useEffect } from "react";
 import { useApiKeysStore } from "../stores/apiKeysStore";
 

@@ -1,3 +1,16 @@
+/**
+ * @file json.go
+ * @brief Serializace a deserializace vybraných sdílených modelů do JSON reprezentace.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní serializace a deserializace modelů KPI definic.
+ * - Vojtěch Hubáček: rozšíření JSON serializace a deserializace o nově přidané KPI operace.
+ *
+ * @ingroup riot_commons
+ */
 package sharedModel
 
 import (

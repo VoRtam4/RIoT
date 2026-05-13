@@ -1,3 +1,13 @@
+# @file sources.yaml
+# @brief Konfigurace typů zdrojů dat a parametrů syntetických dopravních domén.
+#
+# @author Vojtěch Hubáček
+#
+# @par Autorský podíl
+# - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+#
+# @ingroup riot_testing
+
 sources:
   waze:
     enabled: true

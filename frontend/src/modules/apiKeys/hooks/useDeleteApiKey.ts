@@ -1,3 +1,14 @@
+/**
+ * @file useDeleteApiKey.ts
+ * @brief Hook pro odstranění API klíče přes GraphQL API.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useMutation } from "@apollo/client/react";
 import {
   DeleteApiKeyDocument,

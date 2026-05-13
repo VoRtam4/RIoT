@@ -1,3 +1,14 @@
+/**
+ * @file authStore.ts
+ * @brief Lokální autentizační store uživatele, oprávnění a stavu session.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { create } from "zustand";
 
 export type Permission = {

@@ -1,3 +1,16 @@
+/**
+ * @file rawProcessing.go
+ * @brief Normalizace příchozích surových dat a příprava změn pro další části platformy.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní základ zpracování příchozích surových hodnot.
+ * - Vojtěch Hubáček: doplnění práce se stavem, časovou vrstvou, kontrol parametrů a aktualizací typů zdrojů.
+ *
+ * @ingroup riot_message_processing_unit
+ */
 package processing
 
 import (

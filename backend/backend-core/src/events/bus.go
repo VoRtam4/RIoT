@@ -1,3 +1,14 @@
+/**
+ * @file bus.go
+ * @brief Interní event bus pro předávání událostí mezi backendovou logikou a streamovacími rozhraními.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package events
 
 import (

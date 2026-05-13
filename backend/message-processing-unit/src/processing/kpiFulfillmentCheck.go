@@ -1,3 +1,16 @@
+/**
+ * @file kpiFulfillmentCheck.go
+ * @brief Vyhodnocení stromu KPI podmínek nad aktuálními parametry zdroje dat.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní implementace vyhodnocování KPI podmínek.
+ * - Vojtěch Hubáček: doplnění operací !=, exist, not exist a logické negace NOT.
+ *
+ * @ingroup riot_message_processing_unit
+ */
 package processing
 
 import (

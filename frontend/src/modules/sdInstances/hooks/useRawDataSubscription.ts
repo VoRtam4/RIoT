@@ -1,3 +1,14 @@
+/**
+ * @file useRawDataSubscription.ts
+ * @brief Subscription hook pro živý příjem raw datových bodů sledovaných instancí.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useSubscription } from "@apollo/client/react";
 import {
   OnRawDataPointArrivedDocument,

@@ -1,3 +1,14 @@
+/**
+ * @file APIActionDetail.tsx
+ * @brief Detail konkrétní API akce s popisem požadavku, odpovědi a oprávnění.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import type { ApiActionDoc, ApiFeatureDoc } from "../data/apiDocs";
 import { getApiInterfaceDisplayUrl } from "../../../app/apiEndpoints";
 

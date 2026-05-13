@@ -1,3 +1,14 @@
+/**
+ * @file TimeSeriesQueryBuilder.tsx
+ * @brief Builder filtrů pro dotazování historických raw a KPI dat.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   QueryBuilder,

@@ -1,3 +1,14 @@
+/**
+ * @file apiSnapshot.go
+ * @brief Načtení přehledu GraphQL operací pro odvození a inicializaci API oprávnění.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package misc
 
 import (

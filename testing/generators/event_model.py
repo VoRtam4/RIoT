@@ -1,3 +1,15 @@
+"""
+@file event_model.py
+@brief Model syntetické události před odesláním do RabbitMQ nebo časové databáze.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

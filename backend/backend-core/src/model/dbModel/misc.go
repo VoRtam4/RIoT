@@ -1,3 +1,14 @@
+/**
+ * @file misc.go
+ * @brief Pomocné databázové operace nad modely KPI definic.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package dbModel
 
 import (

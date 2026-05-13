@@ -1,3 +1,14 @@
+/**
+ * @file APIDocsPages.tsx
+ * @brief Stránka interaktivní dokumentace GraphQL, REST a WebSocket API pro API klíče.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useEffect, useMemo } from "react";
 
 import { apiFeatures } from "../modules/apiKeys/data/apiDocs";

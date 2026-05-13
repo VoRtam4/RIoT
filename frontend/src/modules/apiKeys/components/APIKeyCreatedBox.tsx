@@ -1,3 +1,14 @@
+/**
+ * @file APIKeyCreatedBox.tsx
+ * @brief Bezpečnostní box zobrazující nově vytvořený API klíč pouze po založení.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import toast from "react-hot-toast";
 
 type Props = {

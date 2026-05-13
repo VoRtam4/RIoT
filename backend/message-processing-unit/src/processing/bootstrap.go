@@ -1,3 +1,14 @@
+/**
+ * @file bootstrap.go
+ * @brief Bootstrap runtime stavu modulu a synchronizace počátečních cache dat.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_message_processing_unit
+ */
 package processing
 
 import (

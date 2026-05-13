@@ -1,3 +1,16 @@
+/**
+ * @file sharedConstants.go
+ * @brief Sdílené konstanty pro názvy RabbitMQ front, exchanges a dalších systémových identifikátorů.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní sada sdílených konstant platformy RIoT.
+ * - Vojtěch Hubáček: doplnění konstant pro time-series tok, registraci instancí, bootstrap cache a další fronty navazující na historizaci dat.
+ *
+ * @ingroup riot_commons
+ */
 package sharedConstants
 
 const (

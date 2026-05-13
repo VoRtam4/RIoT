@@ -1,3 +1,14 @@
+/**
+ * @file KpiDetailPage.tsx
+ * @brief Detail KPI definice s aktuálními výsledky a historickým panelem.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useMemo, useRef } from "react";
 import { useUserConfig } from "../modules/auth/hooks/useUserConfig";

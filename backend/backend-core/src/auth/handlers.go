@@ -1,3 +1,14 @@
+/**
+ * @file handlers.go
+ * @brief HTTP handlery pro přihlášení, OAuth2 callback, obnovu session a odhlášení.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package auth
 
 import (

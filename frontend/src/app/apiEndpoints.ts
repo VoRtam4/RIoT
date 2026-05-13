@@ -1,3 +1,14 @@
+/**
+ * @file apiEndpoints.ts
+ * @brief Centrální definice backendových URL pro GraphQL, REST a WebSocket komunikaci.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import type { ApiTechnology } from "../modules/apiKeys/data/apiDocs";
 
 const defaultApiOrigin = import.meta.env.VITE_API_ORIGIN?.trim() || "";

@@ -1,3 +1,14 @@
+/**
+ * @file filters.go
+ * @brief Převod filtračních uzlů časových dotazů na odpovídající Flux výrazy.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_time_series_store
+ */
 package internal
 
 import (

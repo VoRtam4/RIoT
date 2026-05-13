@@ -1,7 +1,12 @@
 """
 @file runner.py
 @brief Vstupní CLI pro benchmarkové a experimentální testování platformy RIoT.
+
 @author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
 @defgroup riot_testing Testing
 @ingroup riot
 @see README.md

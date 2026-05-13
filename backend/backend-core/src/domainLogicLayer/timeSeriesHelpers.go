@@ -1,3 +1,14 @@
+/**
+ * @file timeSeriesHelpers.go
+ * @brief Pomocné funkce pro přípravu požadavků, filtrů a RPC streamů časových řad.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé pomocné vrstvy pro time series dotazy, agregace a autorizaci požadavků.
+ *
+ * @ingroup riot_backend_core
+ */
 package domainLogicLayer
 
 import (

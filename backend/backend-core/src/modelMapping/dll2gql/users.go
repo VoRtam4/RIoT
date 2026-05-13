@@ -1,3 +1,14 @@
+/**
+ * @file users.go
+ * @brief Mapování uživatelské konfigurace z doménového modelu do GraphQL modelu.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package dll2gql
 
 import (

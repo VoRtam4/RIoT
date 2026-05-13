@@ -1,3 +1,14 @@
+/**
+ * @file APIFeatureDetail.tsx
+ * @brief Detail skupiny API funkcí v dokumentaci pro API klíče.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import {
   technologyOrder,
   type ApiActionDoc,

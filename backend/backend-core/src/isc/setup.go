@@ -1,3 +1,16 @@
+/**
+ * @file setup.go
+ * @brief Příprava RabbitMQ infrastruktury používané interní komunikací Backend Core.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní základ deklarace RabbitMQ infrastruktury.
+ * - Vojtěch Hubáček: doplnění deklarací front vycházejících z nových sdílených konstant pro historizaci, cache, reprocessing a registraci instancí.
+ *
+ * @ingroup riot_backend_core
+ */
 package isc
 
 import (

@@ -1,3 +1,14 @@
+/**
+ * @file useAuth.ts
+ * @brief Hook pro přihlášení, odhlášení a načtení aktuální session.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useEffect } from "react";
 import { useQuery } from "@apollo/client/react";
 import {

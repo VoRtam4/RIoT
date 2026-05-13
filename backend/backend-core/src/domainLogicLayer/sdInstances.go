@@ -1,3 +1,16 @@
+/**
+ * @file sdInstances.go
+ * @brief Doménová logika pro správu sledovaných instancí.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní základ práce se sledovanými instancemi.
+ * - Vojtěch Hubáček: doplnění čtení instancí podle sledovaného typu a KPI definice.
+ *
+ * @ingroup riot_backend_core
+ */
 package domainLogicLayer
 
 import (

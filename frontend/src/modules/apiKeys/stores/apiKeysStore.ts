@@ -1,3 +1,14 @@
+/**
+ * @file apiKeysStore.ts
+ * @brief Lokální store stavu seznamu API klíčů a vybrané položky.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { create } from "zustand";
 import { apolloClient } from "../../../app/apollo";
 import {

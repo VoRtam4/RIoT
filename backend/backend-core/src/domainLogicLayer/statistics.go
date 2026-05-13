@@ -1,3 +1,14 @@
+/**
+ * @file statistics.go
+ * @brief Doménová logika původních statistik a testovacích datových operací.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package domainLogicLayer
 
 import (

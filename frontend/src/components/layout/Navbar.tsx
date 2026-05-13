@@ -1,3 +1,14 @@
+/**
+ * @file Navbar.tsx
+ * @brief Horní navigace aplikace s odkazy na hlavní sekce a uživatelské akce.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { NavLink } from "react-router-dom";
 
 export default function Navbar() {

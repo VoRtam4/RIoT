@@ -1,3 +1,14 @@
+/**
+ * @file usePageState.ts
+ * @brief Pomocný hook pro ukládání a obnovu stavu stránek při navigaci.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useCallback, useMemo } from "react";
 import {
   useLocation,

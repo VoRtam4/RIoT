@@ -1,3 +1,14 @@
+/**
+ * @file useDeleteKpi.ts
+ * @brief Hook pro odstranění KPI definice.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useMutation } from "@apollo/client/react";
 import {
   DeleteKpiDefinitionDocument,

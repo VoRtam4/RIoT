@@ -1,3 +1,14 @@
+/**
+ * @file kpiFulfillmentCheckResults.go
+ * @brief Mapování GraphQL požadavků na výsledky KPI do doménového modelu.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package gql2dll
 
 import (

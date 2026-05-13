@@ -1,3 +1,16 @@
+/**
+ * @file main.go
+ * @brief Zpracování interních zpráv Backend Core přijímaných přes RabbitMQ.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní základ zpracování interní komunikace systému.
+ * - Vojtěch Hubáček: doplnění zpracování raw dat, registrace instancí, reprocessingu, mazání, cache zpráv, rozšíření KPI zpráv o vlastní model a tuple zpracování.
+ *
+ * @ingroup riot_backend_core
+ */
 package isc
 
 import (

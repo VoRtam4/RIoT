@@ -1,3 +1,14 @@
+/**
+ * @file KpiQueryBuilder.tsx
+ * @brief Vizuální builder logických a porovnávacích podmínek KPI.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useState, useEffect } from "react";
 import {
   QueryBuilder,

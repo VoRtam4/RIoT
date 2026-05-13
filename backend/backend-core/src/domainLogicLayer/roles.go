@@ -1,3 +1,14 @@
+/**
+ * @file roles.go
+ * @brief Doménová logika pro načítání uživatelských rolí a oprávnění.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality rolí v doménové vrstvě.
+ *
+ * @ingroup riot_backend_core
+ */
 package domainLogicLayer
 
 import (

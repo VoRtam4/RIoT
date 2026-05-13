@@ -1,3 +1,16 @@
+/**
+ * @file sdInstanceGroups.go
+ * @brief Mapování skupin instancí zdrojů dat z doménového modelu do GraphQL modelu.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní mapování skupin instancí zdrojů dat.
+ * - Vojtěch Hubáček: doplnění mapování labelů.
+ *
+ * @ingroup riot_backend_core
+ */
 package dll2gql
 
 import (

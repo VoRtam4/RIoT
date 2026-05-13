@@ -1,3 +1,14 @@
+/**
+ * @file mapToRows.ts
+ * @brief Mapování odpovědi časových řad do tabulkových řádků.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 type TimeSeriesParameterLike = {
   denotation: string;
   label: string;

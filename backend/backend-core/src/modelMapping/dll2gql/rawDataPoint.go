@@ -1,3 +1,14 @@
+/**
+ * @file rawDataPoint.go
+ * @brief Mapování raw datových bodů z doménového modelu do GraphQL modelu.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package dll2gql
 
 import (

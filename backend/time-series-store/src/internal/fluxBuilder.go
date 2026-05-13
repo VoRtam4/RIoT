@@ -1,3 +1,14 @@
+/**
+ * @file fluxBuilder.go
+ * @brief Sestavování Flux dotazů pro čtení historie, agregace a přepočet KPI.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_time_series_store
+ */
 package internal
 
 import (

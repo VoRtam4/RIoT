@@ -1,3 +1,14 @@
+/**
+ * @file useUserConfig.ts
+ * @brief Hook pro načtení uživatelské konfigurace a dostupných funkcí aplikace.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useMemo } from "react";
 import { useQuery, useMutation } from "@apollo/client/react";
 

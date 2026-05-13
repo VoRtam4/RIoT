@@ -1,3 +1,14 @@
+/**
+ * @file server.go
+ * @brief Společný HTTP server propojující GraphQL, REST, WebSocket a autentizační rozhraní Backend Core.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package api
 
 import (

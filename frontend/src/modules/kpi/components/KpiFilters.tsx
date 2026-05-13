@@ -1,3 +1,14 @@
+/**
+ * @file KpiFilters.tsx
+ * @brief Filtrační ovládání seznamu KPI definic.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useMemo } from "react";
 import Select from "react-select";
 import {

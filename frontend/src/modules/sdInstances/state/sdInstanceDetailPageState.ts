@@ -1,3 +1,14 @@
+/**
+ * @file sdInstanceDetailPageState.ts
+ * @brief Perzistentní stav detailu instance, vybraných KPI a raw panelu.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import type { PageStateCodec } from "../../../app/navigation/usePageState";
 
 export type SdInstanceDetailSidebarSort = "label_asc" | "label_desc";

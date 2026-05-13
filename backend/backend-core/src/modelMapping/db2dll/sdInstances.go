@@ -1,3 +1,16 @@
+/**
+ * @file sdInstances.go
+ * @brief Mapování instancí zdrojů dat z databázového modelu do doménového modelu.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní mapování instancí zdrojů dat.
+ * - Vojtěch Hubáček: doplnění mapování labelů.
+ *
+ * @ingroup riot_backend_core
+ */
 package db2dll
 
 import (

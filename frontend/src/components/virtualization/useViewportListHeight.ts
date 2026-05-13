@@ -1,3 +1,14 @@
+/**
+ * @file useViewportListHeight.ts
+ * @brief Hook pro výpočet dostupné výšky virtualizovaného seznamu podle viewportu.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useEffect, useState, type RefObject } from "react";
 
 type Options = {

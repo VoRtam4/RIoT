@@ -1,3 +1,14 @@
+/**
+ * @file sdTypes.go
+ * @brief Doménová logika pro správu sledovaných typů a jejich konfigurace.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package domainLogicLayer
 
 import (

@@ -1,3 +1,14 @@
+/**
+ * @file apiDocs.ts
+ * @brief Datový popis API dokumentace zobrazované ve frontendové části správy API klíčů.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 export type ApiTechnology = "graphql" | "rest" | "websocket";
 
 export type ApiVariantDoc = {

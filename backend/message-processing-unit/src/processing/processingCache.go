@@ -1,3 +1,14 @@
+/**
+ * @file processingCache.go
+ * @brief Runtime cache posledních surových hodnot a KPI výsledků používaná při zpracování dat.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_message_processing_unit
+ */
 package processing
 
 import (

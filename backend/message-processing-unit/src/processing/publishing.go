@@ -1,3 +1,16 @@
+/**
+ * @file publishing.go
+ * @brief Publikování výsledků zpracování, aktualizací typů zdrojů a dat pro časovou vrstvu.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní publikování surových dat a KPI výsledků.
+ * - Vojtěch Hubáček: rozšíření publikace o batching a implementace ostatních publikačních toků souboru.
+ *
+ * @ingroup riot_message_processing_unit
+ */
 package processing
 
 import (

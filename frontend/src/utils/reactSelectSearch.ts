@@ -1,3 +1,14 @@
+/**
+ * @file reactSelectSearch.ts
+ * @brief Pomocné funkce pro textové vyhledávání a filtrování položek v react-select.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 type SearchableOption = {
   label?: string | number | null;
   value?: string | number | null;

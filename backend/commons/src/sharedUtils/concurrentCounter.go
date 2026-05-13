@@ -1,3 +1,14 @@
+/**
+ * @file concurrentCounter.go
+ * @brief Jednoduché vláknově bezpečné počítadlo pro sdílené použití v modulech.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_commons
+ */
 package sharedUtils
 
 import "sync"

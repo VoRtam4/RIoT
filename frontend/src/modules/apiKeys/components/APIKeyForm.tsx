@@ -1,3 +1,14 @@
+/**
+ * @file APIKeyForm.tsx
+ * @brief Formulář pro vytvoření a úpravu API klíče včetně oprávnění a IP restrikcí.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useEffect, useState } from "react";
 import Select from "react-select";
 import APIKeyIPInput from "./APIKeyIPInput";

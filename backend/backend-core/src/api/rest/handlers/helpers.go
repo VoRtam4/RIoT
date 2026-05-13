@@ -1,3 +1,14 @@
+/**
+ * @file helpers.go
+ * @brief Pomocné funkce REST vrstvy pro autorizaci a parsování vstupních hodnot.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package handlers
 
 import (

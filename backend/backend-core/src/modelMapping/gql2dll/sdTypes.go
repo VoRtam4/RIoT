@@ -1,3 +1,16 @@
+/**
+ * @file sdTypes.go
+ * @brief Mapování vstupů typů zdrojů dat z GraphQL modelu do doménového modelu.
+ *
+ * @author Michal Bureš
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: původní mapování typů zdrojů dat a jejich parametrů.
+ * - Vojtěch Hubáček: doplnění mapování labelů, rolí parametrů field/tag a zjednodušení převodu string enumů přetypováním na doménové typy.
+ *
+ * @ingroup riot_backend_core
+ */
 package gql2dll
 
 import (

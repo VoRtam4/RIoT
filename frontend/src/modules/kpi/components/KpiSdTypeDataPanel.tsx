@@ -1,3 +1,14 @@
+/**
+ * @file KpiSdTypeDataPanel.tsx
+ * @brief Panel parametrů sledovaného typu dostupných pro tvorbu KPI podmínek.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useMemo } from "react";
 import {
   MaterialReactTable,

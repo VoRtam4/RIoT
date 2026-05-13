@@ -1,3 +1,14 @@
+/**
+ * @file pair.go
+ * @brief Generická dvojice hodnot pro sdílené předávání jednoduchých dvojic dat.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_commons
+ */
 package sharedUtils
 
 type Pair[T any, U any] struct {

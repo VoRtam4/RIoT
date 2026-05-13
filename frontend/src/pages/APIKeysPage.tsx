@@ -1,3 +1,14 @@
+/**
+ * @file APIKeysPage.tsx
+ * @brief Stránka správy API klíčů, oprávnění, IP omezení a životnosti klíčů.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useState } from "react";
 import APIKeySidebar from "../modules/apiKeys/components/APIKeySidebar";
 import APIKeyForm from "../modules/apiKeys/components/APIKeyForm";

@@ -1,3 +1,14 @@
+/**
+ * @file mapKPINodesToQuery.ts
+ * @brief Převod uzlů vizuálního editoru zpět na dotazovou strukturu KPI.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import type { RuleGroupType } from "react-querybuilder";
 
 type Node = any;

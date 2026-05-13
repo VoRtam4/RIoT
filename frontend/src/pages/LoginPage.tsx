@@ -1,3 +1,14 @@
+/**
+ * @file LoginPage.tsx
+ * @brief Přihlašovací stránka napojená na autentizační vrstvu Backend Core.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../modules/auth/hooks/useAuth";
 import { useAuthStore } from "../modules/auth/stores/authStore";

@@ -1,3 +1,13 @@
+# @file experiments.yaml
+# @brief Konfigurace scénářů experimentů, iterací a měřených operací.
+#
+# @author Vojtěch Hubáček
+#
+# @par Autorský podíl
+# - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+#
+# @ingroup riot_testing
+
 experiments:
   - id: "E1"
     type: "storage"

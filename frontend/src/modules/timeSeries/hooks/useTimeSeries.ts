@@ -1,3 +1,14 @@
+/**
+ * @file useTimeSeries.ts
+ * @brief Hook pro načítání historických raw dat podle zadaných filtrů.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useApolloClient } from "@apollo/client/react";
 import {

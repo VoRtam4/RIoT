@@ -1,3 +1,14 @@
+/**
+ * @file SdInstanceKpiSidebar.tsx
+ * @brief Postranní panel KPI detailu otevřeného ze sledované instance.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useMemo } from "react";
 import Select, { type SingleValue } from "react-select";
 import { matchesSearchText } from "../../../utils/reactSelectSearch";

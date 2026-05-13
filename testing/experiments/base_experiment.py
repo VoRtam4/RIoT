@@ -1,3 +1,15 @@
+"""
+@file base_experiment.py
+@brief Společný základ experimentů s měřením času, přípravou dat a ukládáním výsledků.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

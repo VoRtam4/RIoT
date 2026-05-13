@@ -1,3 +1,14 @@
+/**
+ * @file reactSelectVirtualized.tsx
+ * @brief Pomocné napojení react-select na virtualizované vykreslování dlouhých seznamů.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { Children, useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { components, type GroupBase, type MenuListProps } from "react-select";

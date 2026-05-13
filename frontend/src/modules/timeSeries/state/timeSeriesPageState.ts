@@ -1,3 +1,14 @@
+/**
+ * @file timeSeriesPageState.ts
+ * @brief Perzistentní stav stránky historických dat, filtrů, dotazu a exportů.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import type { PageStateCodec } from "../../../app/navigation/usePageState";
 import type { FilterNodeInput, TimeSeriesReadInput } from "../../../generated/graphql";
 import {

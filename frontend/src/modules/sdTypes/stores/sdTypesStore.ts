@@ -1,3 +1,14 @@
+/**
+ * @file sdTypesStore.ts
+ * @brief Lokální store sledovaných typů načtených z backendu.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { create } from "zustand";
 import { apolloClient } from "../../../app/apollo";
 import {

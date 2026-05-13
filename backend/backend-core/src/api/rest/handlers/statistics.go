@@ -1,3 +1,14 @@
+/**
+ * @file statistics.go
+ * @brief Odložený návrh REST handleru pro statistické dotazy.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh obsahu souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package handlers
 
 /*

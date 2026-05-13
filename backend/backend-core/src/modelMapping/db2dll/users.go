@@ -1,3 +1,14 @@
+/**
+ * @file users.go
+ * @brief Mapování uživatelů z databázového modelu do doménového modelu.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package db2dll
 
 import (

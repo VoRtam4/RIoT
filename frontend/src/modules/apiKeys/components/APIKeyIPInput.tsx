@@ -1,3 +1,14 @@
+/**
+ * @file APIKeyIPInput.tsx
+ * @brief Vstup pro správu IP adres a CIDR omezení API klíče.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import CreatableSelect from "react-select/creatable";
 import { isValidCIDR } from "../utils/ipValidator";
 

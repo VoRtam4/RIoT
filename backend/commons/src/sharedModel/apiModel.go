@@ -1,3 +1,14 @@
+/**
+ * @file apiModel.go
+ * @brief Sdílené modely pro obecnou API komunikaci přes WebSocket a návazné transportní vrstvy.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_commons
+ */
 package sharedModel
 
 type MessageType string

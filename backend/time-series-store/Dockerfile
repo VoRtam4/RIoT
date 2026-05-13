@@ -1,3 +1,13 @@
+## @file Dockerfile
+#  @brief Dockerfile pro sestavení a spuštění modulu Time Series Store.
+#
+#  @author Vojtěch Hubáček
+#
+#  @par Autorský podíl
+#  - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+#
+#  @ingroup riot_time_series_store
+
 # Use an official Go runtime as a parent image
 FROM golang:1.24.1-alpine
 # Set the working directory inside the container

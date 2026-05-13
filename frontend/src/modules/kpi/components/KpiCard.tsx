@@ -1,3 +1,14 @@
+/**
+ * @file KpiCard.tsx
+ * @brief Karta KPI definice se stavem, vazbami a základními metadaty.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import { useNavigate } from "react-router-dom";
 import Card from "@mui/material/Card";
 import CardActionArea from "@mui/material/CardActionArea";

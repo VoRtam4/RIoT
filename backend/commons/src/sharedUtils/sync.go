@@ -1,3 +1,14 @@
+/**
+ * @file sync.go
+ * @brief Pomocná synchronizační funkce pro paralelní spuštění více operací a čekání na jejich dokončení.
+ *
+ * @author Michal Bureš
+ *
+ * @par Autorský podíl
+ * - Michal Bureš: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_commons
+ */
 package sharedUtils
 
 import "sync"

@@ -1,3 +1,14 @@
+/**
+ * @file apiDocsPermissions.ts
+ * @brief Mapování API dokumentace na oprávnění vyžadovaná jednotlivými operacemi.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 const featurePermissionResource: Record<string, string> = {
   "sd-types": "sd_types",
   "sd-instances": "sd_instances",

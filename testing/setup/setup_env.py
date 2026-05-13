@@ -1,3 +1,15 @@
+"""
+@file setup_env.py
+@brief Validace dostupnosti RIoT služeb a příprava prostředí před testovacím během.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 

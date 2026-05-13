@@ -1,3 +1,14 @@
+/**
+ * @file hub.go
+ * @brief Evidence aktivních WebSocket klientů.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package connection
 
 import (

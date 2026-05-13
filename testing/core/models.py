@@ -1,3 +1,15 @@
+"""
+@file models.py
+@brief Datové modely konfigurace, experimentů, událostí a naměřených výsledků.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict

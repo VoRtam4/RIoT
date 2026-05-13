@@ -1,3 +1,15 @@
+"""
+@file direct_isc_adapter.py
+@brief Transportní adaptér pro přímé odesílání generovaných událostí do ISC RabbitMQ front.
+
+@author Vojtěch Hubáček
+
+@par Autorský podíl
+- Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+
+@ingroup riot_testing
+"""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone

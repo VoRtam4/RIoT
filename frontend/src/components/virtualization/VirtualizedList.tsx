@@ -1,3 +1,14 @@
+/**
+ * @file VirtualizedList.tsx
+ * @brief Sdílený virtualizovaný seznam pro výkonné vykreslení většího počtu položek.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import {
   useRef,
   useCallback,

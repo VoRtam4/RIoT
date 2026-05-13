@@ -1,3 +1,14 @@
+/**
+ * @file timeSeries.go
+ * @brief Mapování odpovědí a dat časové vrstvy do GraphQL modelu.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_backend_core
+ */
 package dll2gql
 
 import (

@@ -1,3 +1,14 @@
+/**
+ * @file apiDocsExamples.ts
+ * @brief Generování ukázkových GraphQL, REST a WebSocket požadavků pro API dokumentaci.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_frontend
+ */
 import type { ApiActionDoc, ApiTechnology } from "../data/apiDocs";
 import {
   formatExampleUrl,

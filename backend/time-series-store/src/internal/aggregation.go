@@ -1,3 +1,14 @@
+/**
+ * @file aggregation.go
+ * @brief Sestavení a zpracování agregačních dotazů nad historickými časovými daty.
+ *
+ * @author Vojtěch Hubáček
+ *
+ * @par Autorský podíl
+ * - Vojtěch Hubáček: návrh a implementace celé funkcionality souboru.
+ *
+ * @ingroup riot_time_series_store
+ */
 package internal
 
 import (
