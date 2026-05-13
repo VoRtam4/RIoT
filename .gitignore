@@ -1,6 +1,5 @@
 # Ingore the IDE folder
 .idea
-.codex
 
 # Ignore most of the docker directory contents
 docker
@@ -22,9 +21,8 @@ backend/*preprocessor
 backend/*downloader
 
 .sync
+apps
 docs
-backend/Lissy
-backend/Analyticity*
 
 # Ignore local testing artifacts
 testing/.state/
