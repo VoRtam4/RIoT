@@ -15,6 +15,7 @@ import { matchesSearchText } from "../../../utils/reactSelectSearch";
 import { virtualizedSelectProps } from "../../../utils/reactSelectVirtualized";
 import VirtualizedList from "../../../components/virtualization/VirtualizedList";
 import EmptyStateNotice from "../../../components/EmptyStateNotice";
+import UrlSyncedSearchInput from "../../../components/UrlSyncedSearchInput";
 import type {
   ApiKeysFilter,
   ApiKeysSort,
@@ -154,11 +155,10 @@ export default function APIKeySidebar({
       {/* SEARCH */}
       <div className="mb-2">
         <label className="form-label">Search</label>
-        <input
-          className="form-control"
+        <UrlSyncedSearchInput
           placeholder="Hledat..."
           value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
+          onChange={onSearchChange}
         />
       </div>
 

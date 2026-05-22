@@ -20,6 +20,7 @@ import SdInstanceKpiCard from "./SdInstanceKpiCard";
 import VirtualizedList from "../../../components/virtualization/VirtualizedList";
 import type { SdInstanceDetailSidebarSort } from "../state/sdInstanceDetailPageState";
 import EmptyStateNotice from "../../../components/EmptyStateNotice";
+import UrlSyncedSearchInput from "../../../components/UrlSyncedSearchInput";
 
 type Kpi = {
   id: string;
@@ -126,11 +127,10 @@ export default function SdInstanceKpiSidebar({
       {/* SEARCH */}
       <div className="mb-3">
         <label className="form-label">Search</label>
-        <input
-          className="form-control"
+        <UrlSyncedSearchInput
           placeholder="Search..."
           value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
+          onChange={onSearchChange}
         />
       </div>
 

@@ -16,6 +16,7 @@ import {
   filterSelectOption,
 } from "../../../utils/reactSelectSearch";
 import { virtualizedSelectProps } from "../../../utils/reactSelectVirtualized";
+import UrlSyncedSearchInput from "../../../components/UrlSyncedSearchInput";
 
 export type SortOption = "label_asc" | "label_desc";
 
@@ -82,11 +83,10 @@ export default function KpiFilters({
       <div className="row g-3">
         <div className="col-md-3">
           <label className="form-label">Search</label>
-          <input
-            className="form-control"
+          <UrlSyncedSearchInput
             placeholder="Name or KPI ID..."
             value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
+            onChange={onSearchChange}
           />
         </div>
 

@@ -13,6 +13,7 @@ import type { ApiFeatureDoc } from "../data/apiDocs";
 import ApiDocsFeatureCard from "./APIDocsFeatureCard";
 import VirtualizedList from "../../../components/virtualization/VirtualizedList";
 import EmptyStateNotice from "../../../components/EmptyStateNotice";
+import UrlSyncedSearchInput from "../../../components/UrlSyncedSearchInput";
 
 type Props = {
   features: ApiFeatureDoc[];
@@ -40,11 +41,10 @@ export default function ApiDocsSidebar({
     >
       <div className="mb-3">
         <label className="form-label">Search Features</label>
-        <input
-          className="form-control"
+        <UrlSyncedSearchInput
           placeholder="For example KPI, API keys, history..."
           value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
+          onChange={onSearchChange}
         />
       </div>
 

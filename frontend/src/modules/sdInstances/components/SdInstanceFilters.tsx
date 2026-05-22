@@ -15,6 +15,7 @@ import {
   filterSelectOption,
 } from "../../../utils/reactSelectSearch";
 import { virtualizedSelectProps } from "../../../utils/reactSelectVirtualized";
+import UrlSyncedSearchInput from "../../../components/UrlSyncedSearchInput";
 
 type SdType = {
   id: string;
@@ -68,11 +69,10 @@ export default function SdInstanceFilters({
         {/* SEARCH */}
         <div className="col-md-4">
           <label className="form-label">Search</label>
-          <input
-            className="form-control"
+          <UrlSyncedSearchInput
             placeholder="Name or UID..."
             value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
+            onChange={onSearchChange}
           />
         </div>
 
