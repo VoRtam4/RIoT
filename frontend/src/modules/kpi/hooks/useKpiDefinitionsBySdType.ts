@@ -12,23 +12,23 @@
 import { useEffect } from "react";
 import { useKpiDefinitionsBySdTypeStore } from "../stores/kpiDefinitionsBySdTypeStore";
 
-export const useKpiDefinitionsBySdType = (id: string | null) => {
+export const useKpiDefinitionsBySdType = (uid: string | null) => {
   const ensure = useKpiDefinitionsBySdTypeStore((s) => s.ensure);
   const refresh = useKpiDefinitionsBySdTypeStore((s) => s.refresh);
 
   const entry = useKpiDefinitionsBySdTypeStore((s) =>
-    id ? s.byTypeId[id] : undefined,
+    uid ? s.byTypeUID[uid] : undefined,
   );
 
   useEffect(() => {
-    if (!id) return;
+    if (!uid) return;
 
     if (!entry) {
-      void refresh(id);
+      void refresh(uid);
     } else {
-      void ensure(id);
+      void ensure(uid);
     }
-  }, [id, entry, ensure, refresh]);
+  }, [uid, entry, ensure, refresh]);
 
   return {
     entry,

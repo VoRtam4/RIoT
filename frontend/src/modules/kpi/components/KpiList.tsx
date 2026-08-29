@@ -19,12 +19,13 @@ import EmptyStateNotice from "../../../components/EmptyStateNotice";
 import {
   buildOptionSearchText,
   matchesSearchText,
+  type SearchMode,
 } from "../../../utils/reactSelectSearch";
 
 type Raw = {
-  id: string;
+  uid?: string | null;
   label?: string | null;
-  sdTypeID: string;
+  sdTypeUID?: string | null;
   sdInstanceMode?: string | null;
 };
 
@@ -36,9 +37,11 @@ type Props = {
   sdTypes: SdTypesQuery["sdTypes"];
   selectedSdType: string | null;
   search: string;
+  searchMode: SearchMode;
   sort: SortOption;
   mode: ModeFilter;
   onSearchChange: (value: string) => void;
+  onSearchModeChange: (value: SearchMode) => void;
   onSortChange: (value: SortOption) => void;
   onModeChange: (value: ModeFilter) => void;
   onSdTypeChange: (value: string | null) => void;
@@ -50,9 +53,11 @@ export default function KpiList({
   sdTypes,
   selectedSdType,
   search,
+  searchMode,
   sort,
   mode,
   onSearchChange,
+  onSearchModeChange,
   onSortChange,
   onModeChange,
   onSdTypeChange,
@@ -62,12 +67,12 @@ export default function KpiList({
 
   const debouncedSearch = useDebouncedValue(search, 150);
 
-  const base =
-    sort === "label_desc"
-      ? entry?.rawSortedDesc ?? []
-      : entry?.rawSortedAsc ?? [];
-
   const filtered = useMemo(() => {
+    const base =
+      sort === "label_desc"
+        ? (entry?.rawSortedDesc ?? [])
+        : (entry?.rawSortedAsc ?? []);
+
     if (!base.length) return [];
 
     return base.filter((kpi) => {
@@ -77,10 +82,11 @@ export default function KpiList({
 
       return matchesSearchText(
         debouncedSearch,
-        buildOptionSearchText(kpi.label, kpi.id, kpi.sdTypeID),
+        searchMode,
+        buildOptionSearchText(kpi.label, kpi.uid, kpi.sdTypeUID),
       );
     });
-  }, [base, debouncedSearch, mode]);
+  }, [entry, sort, debouncedSearch, searchMode, mode]);
 
   if (loading) {
     return (
@@ -96,9 +102,11 @@ export default function KpiList({
         sdTypes={sdTypes}
         selectedSdType={selectedSdType}
         search={search}
+        searchMode={searchMode}
         sort={sort}
         mode={mode}
         onSearchChange={onSearchChange}
+        onSearchModeChange={onSearchModeChange}
         onSortChange={onSortChange}
         onModeChange={onModeChange}
         onSdTypeChange={onSdTypeChange}
@@ -117,7 +125,7 @@ export default function KpiList({
             />
           }
           renderItem={(kpi) => (
-            <KpiCard key={kpi.id} kpi={kpi} />
+            <KpiCard key={kpi.uid ?? kpi.label ?? ""} kpi={kpi} />
           )}
         />
       </div>

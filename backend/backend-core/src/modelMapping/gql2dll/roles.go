@@ -19,7 +19,7 @@ import (
 
 func ToDLLModelRole(role graphQLModel.Role) dllModel.Role {
 	return dllModel.Role{
-		ID:    role.ID,
+		UID:   role.UID,
 		Label: role.Label,
 		Permissions: sharedUtils.Map(role.Permissions, func(p graphQLModel.Permission) dllModel.Permission {
 			return dllModel.Permission{

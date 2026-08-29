@@ -35,7 +35,7 @@ const wsLink = new GraphQLWsLink(
   createClient({
     url: apiEndpoints.graphqlWebSocket,
     connectionParams: {},
-  })
+  }),
 );
 
 const splitLink = split(
@@ -47,7 +47,7 @@ const splitLink = split(
     );
   },
   wsLink,
-  httpLink
+  httpLink,
 );
 
 const unauthorizedLink = new ApolloLink((operation, forward) => {

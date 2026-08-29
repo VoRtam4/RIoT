@@ -20,9 +20,9 @@ import (
 
 func ToGraphQLModelRawDataPoint(rawDataPoint dllModel.RawDataPoint) graphQLModel.RawDataPoint {
 	return graphQLModel.RawDataPoint{
-		SdTypeID:     rawDataPoint.SDTypeID,
-		SdInstanceID: rawDataPoint.SDInstanceID,
-		Payload:      string(rawDataPoint.Payload),
-		EventTime:    rawDataPoint.EventTime.Format(time.RFC3339Nano),
+		SdTypeUID:     rawDataPoint.SDTypeUID,
+		SdInstanceUID: rawDataPoint.SDInstanceUID,
+		Payload:       string(rawDataPoint.Payload),
+		EventTime:     rawDataPoint.EventTime.Format(time.RFC3339Nano),
 	}
 }

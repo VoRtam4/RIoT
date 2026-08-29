@@ -85,7 +85,10 @@ type Client interface {
 	PublishJSONMessage(exchangeNameOptional sharedUtils.Optional[string], routingKeyOptional sharedUtils.Optional[string], messagePayload []byte) error
 	PublishJSONMessageRPC(exchangeNameOptional sharedUtils.Optional[string], routingKeyOptional sharedUtils.Optional[string], messagePayload []byte, correlationId string, replyTo sharedUtils.Optional[string]) error
 	PublishJSONMessageWithReplyTo(exchangeNameOptional sharedUtils.Optional[string], routingKeyOptional sharedUtils.Optional[string], messagePayload []byte, correlationId string, replyToOptional sharedUtils.Optional[string]) error
+	DeclareExchange(exchangeName string, kind string) error
 	DeclareQueue(queueName string) error
+	BindQueue(queueName string, exchangeName string, routingKey string) error
+	Consume(queueName string, consumerName string) (<-chan amqp.Delivery, error)
 	SetupMessageConsumption(queueName string, messageConsumerFunction func(message amqp.Delivery) error) error
 	SetupMessageConsumptionWithCorrelationId(queueName string, correlationId string, messageConsumerFunction func(message amqp.Delivery) error) error
 	Dispose()
@@ -266,7 +269,47 @@ func ConsumeRPCStream[T any](msgs <-chan amqp091.Delivery, correlationID string,
 func (c *ClientImpl) DeclareQueue(queueName string) error {
 	c.ensureChannel()
 	_, err := c.channel.QueueDeclare(queueName, false, false, false, false, nil)
+	if c.retryAfterReconnect(err) {
+		c.ensureChannel()
+		_, err = c.channel.QueueDeclare(queueName, false, false, false, false, nil)
+	}
 	return err
+}
+
+func (c *ClientImpl) DeclareExchange(exchangeName string, kind string) error {
+	c.ensureChannel()
+	err := c.channel.ExchangeDeclare(exchangeName, kind, true, false, false, false, nil)
+	if c.retryAfterReconnect(err) {
+		c.ensureChannel()
+		err = c.channel.ExchangeDeclare(exchangeName, kind, true, false, false, false, nil)
+	}
+	return err
+}
+
+func (c *ClientImpl) BindQueue(queueName string, exchangeName string, routingKey string) error {
+	c.ensureChannel()
+	err := c.channel.QueueBind(queueName, routingKey, exchangeName, false, nil)
+	if c.retryAfterReconnect(err) {
+		c.ensureChannel()
+		err = c.channel.QueueBind(queueName, routingKey, exchangeName, false, nil)
+	}
+	return err
+}
+
+func (c *ClientImpl) Consume(queueName string, consumerName string) (<-chan amqp.Delivery, error) {
+	c.ensureChannel()
+	if err := c.channel.Qos(1, 0, false); err != nil {
+		return nil, err
+	}
+	messageChannel, err := c.channel.Consume(queueName, consumerName, false, false, false, false, nil)
+	if c.retryAfterReconnect(err) {
+		c.ensureChannel()
+		if err := c.channel.Qos(1, 0, false); err != nil {
+			return nil, err
+		}
+		messageChannel, err = c.channel.Consume(queueName, consumerName, false, false, false, false, nil)
+	}
+	return messageChannel, err
 }
 
 func (c *ClientImpl) SetupMessageConsumption(queueName string, messageConsumerFunction func(message amqp.Delivery) error) error {

@@ -24,12 +24,14 @@ func ToDLLModelAPIKey(e dbModel.APIKeyEntity) dllModel.APIKey {
 	}
 	return dllModel.APIKey{
 		ID:          sharedUtils.NewOptionalOf(e.ID),
+		UID:         e.UID,
 		UserID:      &e.UserID,
 		KeyHash:     &e.KeyHash,
 		Label:       e.Label,
 		ExpiresAt:   e.ExpiresAt,
 		Revoked:     e.Revoked,
 		RateLimit:   e.RateLimit,
+		LastUsedAt:  e.LastUsedAt,
 		Permissions: permissions,
 		IPRestrictions: sharedUtils.Map(
 			e.IPRestrictions,

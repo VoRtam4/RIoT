@@ -10,11 +10,16 @@
  * @ingroup riot_frontend
  */
 import type { PageStateCodec } from "../../../app/navigation/usePageState";
+import {
+  isSearchMode,
+  type SearchMode,
+} from "../../../utils/reactSelectSearch";
 
 export type SdInstanceDetailSidebarSort = "label_asc" | "label_desc";
 
 export type SdInstanceDetailQueryState = {
   kpiQ: string;
+  kpiQMode: SearchMode;
   kpiSort: SdInstanceDetailSidebarSort;
   kpi: string | null;
   from: string | null;
@@ -25,7 +30,6 @@ const sortValues = new Set<SdInstanceDetailSidebarSort>([
   "label_asc",
   "label_desc",
 ]);
-
 function nonEmpty(value: string | null) {
   return value && value.trim() ? value : null;
 }
@@ -36,9 +40,11 @@ export const sdInstanceDetailPageStateCodec: PageStateCodec<
 > = {
   decodeQuery(searchParams) {
     const kpiSort = searchParams.get("kpiSort");
+    const kpiQMode = searchParams.get("kpiQMode");
 
     return {
       kpiQ: searchParams.get("kpiQ") ?? "",
+      kpiQMode: kpiQMode && isSearchMode(kpiQMode) ? kpiQMode : "or",
       kpiSort:
         kpiSort && sortValues.has(kpiSort as SdInstanceDetailSidebarSort)
           ? (kpiSort as SdInstanceDetailSidebarSort)
@@ -52,6 +58,9 @@ export const sdInstanceDetailPageStateCodec: PageStateCodec<
     const searchParams = new URLSearchParams();
 
     if (query.kpiQ.trim()) searchParams.set("kpiQ", query.kpiQ);
+    if (query.kpiQMode !== "or") {
+      searchParams.set("kpiQMode", query.kpiQMode);
+    }
     if (query.kpiSort !== "label_asc") {
       searchParams.set("kpiSort", query.kpiSort);
     }

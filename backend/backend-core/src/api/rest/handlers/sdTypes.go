@@ -18,6 +18,7 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
+	"github.com/go-chi/chi/v5"
 )
 
 func GetSDTypes(w http.ResponseWriter, r *http.Request) {
@@ -36,11 +37,8 @@ func GetSDType(w http.ResponseWriter, r *http.Request) {
 	if principal := authorizeOperation(w, r, auth.ResourceSDTypes, auth.OperationRead); principal == nil {
 		return
 	}
-	id, ok := parseID(w, r)
-	if !ok {
-		return
-	}
-	result := domainLogicLayer.GetSDType(id)
+	uid := chi.URLParam(r, "uid")
+	result := domainLogicLayer.GetSDType(uid)
 	if result.IsFailure() {
 		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
 		return
@@ -71,11 +69,8 @@ func DeleteSDType(w http.ResponseWriter, r *http.Request) {
 	if principal := authorizeOperation(w, r, auth.ResourceSDTypes, auth.OperationDelete); principal == nil {
 		return
 	}
-	id, ok := parseID(w, r)
-	if !ok {
-		return
-	}
-	err := domainLogicLayer.DeleteSDType(id)
+	uid := chi.URLParam(r, "uid")
+	err := domainLogicLayer.DeleteSDType(uid)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

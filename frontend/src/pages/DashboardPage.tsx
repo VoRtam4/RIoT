@@ -19,7 +19,6 @@ import VirtualizedList from "../components/virtualization/VirtualizedList";
 import EmptyStateNotice from "../components/EmptyStateNotice";
 
 export default function DashboardPage() {
-
   const { config, loading } = useUserConfig();
 
   if (loading) {
@@ -50,9 +49,7 @@ export default function DashboardPage() {
                   description="Add devices to favourites to keep them here."
                 />
               }
-              renderItem={(id) => (
-                <SdInstanceItem key={id} id={id} />
-              )}
+              renderItem={(id) => <SdInstanceItem key={id} id={id} />}
             />
           </div>
         </div>
@@ -74,9 +71,7 @@ export default function DashboardPage() {
                   description="Add KPI definitions to favourites to keep them here."
                 />
               }
-              renderItem={(id) => (
-                <KpiItem key={id} id={id} />
-              )}
+              renderItem={(id) => <KpiItem key={id} id={id} />}
             />
           </div>
         </div>
@@ -85,11 +80,7 @@ export default function DashboardPage() {
   );
 }
 
-function KpiItem({
-  id,
-}: {
-  id: string;
-}) {
+function KpiItem({ id }: { id: string }) {
   const { kpi, loading } = useKpiDefinition(id);
 
   if (loading || !kpi) return null;

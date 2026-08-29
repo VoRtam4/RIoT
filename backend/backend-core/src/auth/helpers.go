@@ -95,6 +95,9 @@ func handleUserRecordUpsert(userData idTokenData, newRefreshToken string) shared
 		OAuth2Provider:         sharedUtils.NewOptionalOf("google"),
 		OAuth2ProviderIssuedID: sharedUtils.NewOptionalOf(userData.oauth2ProviderIssuedID),
 	})
+	if user.Disabled {
+		return sharedUtils.NewFailureResult[dllModel.User](fmt.Errorf("user disabled"))
+	}
 	user.Email = userData.email
 	user.Name = userData.name
 	user.ProfileImageURL = userData.profileImageURL
@@ -148,18 +151,18 @@ func generateRefreshToken() string {
 
 func resolveRoleID(email string) (uint32, error) {
 	if AdminRoleID == 0 {
-		adminRoleResult := domainLogicLayer.LoadRolesByUIDs([]string{RoleAdmin})
+		adminRoleResult := domainLogicLayer.LoadRoleIDByUID(RoleAdminUID)
 		if adminRoleResult.IsFailure() {
 			return 0, adminRoleResult.GetError()
 		}
-		AdminRoleID = adminRoleResult.GetPayload()[0].ID
+		AdminRoleID = adminRoleResult.GetPayload()
 	}
 	if UserRoleID == 0 {
-		userRoleResult := domainLogicLayer.LoadRolesByUIDs([]string{RoleUser})
+		userRoleResult := domainLogicLayer.LoadRoleIDByUID(RoleUserUID)
 		if userRoleResult.IsFailure() {
 			return 0, userRoleResult.GetError()
 		}
-		UserRoleID = userRoleResult.GetPayload()[0].ID
+		UserRoleID = userRoleResult.GetPayload()
 	}
 	if email == rootAdminEmail {
 		return AdminRoleID, nil

@@ -19,6 +19,7 @@ import (
 func ToDBModelAPIKey(k dllModel.APIKey) dbModel.APIKeyEntity {
 	model := dbModel.APIKeyEntity{
 		ID:             k.ID.GetPayloadOrDefault(0),
+		UID:            k.UID,
 		Label:          k.Label,
 		ExpiresAt:      k.ExpiresAt,
 		Revoked:        k.Revoked,

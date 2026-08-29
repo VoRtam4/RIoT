@@ -15,8 +15,11 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/db/dbClient"
+	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dllModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 )
 
@@ -26,6 +29,8 @@ type AuthenticatedRequest struct {
 	NewRefreshToken   string
 	RefreshTokenUntil time.Time
 	Refreshed         bool
+	SessionID         *uint
+	SessionUID        *string
 }
 
 func AuthenticateRequest(r *http.Request) sharedUtils.Result[AuthenticatedRequest] {
@@ -45,8 +50,11 @@ func AuthenticateRequest(r *http.Request) sharedUtils.Result[AuthenticatedReques
 			if subject.IsFailure() {
 				return sharedUtils.NewFailureResult[AuthenticatedRequest](subject.GetError())
 			}
+			sessionID, sessionUID := resolveCurrentSessionFromRequest(r, subject.GetPayload())
 			return sharedUtils.NewSuccessResult(AuthenticatedRequest{
-				UserID: subject.GetPayload(),
+				UserID:     subject.GetPayload(),
+				SessionID:  sessionID,
+				SessionUID: sessionUID,
 			})
 		}
 		timeUntilExpiry := getTimeUntilJWTExpiry(sessionJWT)
@@ -79,7 +87,35 @@ func AuthenticateRequest(r *http.Request) sharedUtils.Result[AuthenticatedReques
 		NewRefreshToken:   res.newRefreshToken,
 		RefreshTokenUntil: res.refreshTokenExpiresAt,
 		Refreshed:         true,
+		SessionID:         res.sessionID,
+		SessionUID:        res.sessionUID,
 	})
+}
+
+func resolveCurrentSessionFromRequest(r *http.Request, userID string) (*uint, *string) {
+	refreshToken := getRefreshTokenCookieValue(r).GetPayloadOrDefault("")
+	if refreshToken == "" {
+		return nil, nil
+	}
+	userIDUint, err := strconv.ParseUint(userID, 10, 0)
+	if err != nil {
+		return nil, nil
+	}
+	refreshTokenHash := sharedUtils.GenerateHexHash(refreshToken)
+	result := dbClient.GetRelationalDatabaseClientInstance().LoadUserSessionBasedOnRefreshTokenHash(refreshTokenHash)
+	if result.IsFailure() || result.GetPayload().IsEmpty() {
+		return nil, nil
+	}
+	return sessionIdentityFromDLL(result.GetPayload().GetPayload(), uint(userIDUint))
+}
+
+func sessionIdentityFromDLL(session dllModel.UserSession, userID uint) (*uint, *string) {
+	if session.UserID != userID || session.Revoked || time.Until(session.ExpiresAt) <= 0 || session.ID.IsEmpty() {
+		return nil, nil
+	}
+	sessionID := session.ID.GetPayload()
+	sessionUID := session.UID
+	return &sessionID, &sessionUID
 }
 
 func ApplyAuthenticationResult(w http.ResponseWriter, authResult AuthenticatedRequest) error {

@@ -20,7 +20,6 @@ import (
 
 func ToGraphQLModelSDInstance(sdInstance dllModel.SDInstance) graphQLModel.SDInstance {
 	return graphQLModel.SDInstance{
-		ID:              sdInstance.ID.GetPayload(),
 		UID:             sdInstance.UID,
 		Label:           sdInstance.Label,
 		ConfirmedByUser: sdInstance.ConfirmedByUser,

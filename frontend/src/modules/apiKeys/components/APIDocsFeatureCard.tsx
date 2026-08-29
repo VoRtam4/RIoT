@@ -33,13 +33,9 @@ export default function ApiDocsFeatureCard({
         flexShrink: 0,
         height: "100%",
         overflow: "hidden",
-        backgroundColor: selected
-          ? "var(--border-input)"
-          : "var(--bg-card)",
+        backgroundColor: selected ? "var(--border-input)" : "var(--bg-card)",
         "&:hover": {
-          backgroundColor: selected
-            ? "var(--border-input)"
-            : "var(--border)",
+          backgroundColor: selected ? "var(--border-input)" : "var(--border)",
         },
       }}
     >

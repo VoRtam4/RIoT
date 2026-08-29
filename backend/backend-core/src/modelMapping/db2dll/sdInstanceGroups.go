@@ -22,10 +22,14 @@ import (
 func ToDLLModelSDInstanceGroup(sdInstanceGroupEntity dbModel.SDInstanceGroupEntity) dllModel.SDInstanceGroup {
 	return dllModel.SDInstanceGroup{
 		ID:             sharedUtils.NewOptionalOf(sdInstanceGroupEntity.ID),
+		UID:            sdInstanceGroupEntity.UID,
 		Label:          sdInstanceGroupEntity.Label,
 		UserIdentifier: sdInstanceGroupEntity.UserIdentifier,
 		SDInstanceIDs: sharedUtils.Map(sdInstanceGroupEntity.GroupMembershipRecords, func(sdInstanceGroupMembershipEntity dbModel.SDInstanceGroupMembershipEntity) uint32 {
 			return sdInstanceGroupMembershipEntity.SDInstanceID
+		}),
+		SDInstanceUIDs: sharedUtils.Map(sdInstanceGroupEntity.GroupMembershipRecords, func(sdInstanceGroupMembershipEntity dbModel.SDInstanceGroupMembershipEntity) string {
+			return sdInstanceGroupMembershipEntity.SDInstance.UID
 		}),
 	}
 }

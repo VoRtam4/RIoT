@@ -20,9 +20,9 @@ import (
 
 func ToGraphQLModelSDInstanceGroup(sdInstanceGroup dllModel.SDInstanceGroup) graphQLModel.SDInstanceGroup {
 	return graphQLModel.SDInstanceGroup{
-		ID:             sdInstanceGroup.ID.GetPayload(),
+		UID:            sdInstanceGroup.UID,
 		Label:          sdInstanceGroup.Label,
 		UserIdentifier: sdInstanceGroup.UserIdentifier,
-		SdInstanceIDs:  sdInstanceGroup.SDInstanceIDs,
+		SdInstanceUIDs: sdInstanceGroup.SDInstanceUIDs,
 	}
 }

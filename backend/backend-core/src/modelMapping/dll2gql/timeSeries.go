@@ -31,9 +31,9 @@ func ToGraphQLTimeSeriesResponse(resp sharedModel.TimeSeriesReadResponse, params
 	var cursor *graphQLModel.TimeSeriesCursor
 	if resp.NextCursor != nil {
 		cursor = &graphQLModel.TimeSeriesCursor{
-			Time:            resp.NextCursor.Time.Format(time.RFC3339Nano),
-			SdInstanceUID:   resp.NextCursor.SDInstanceUID,
-			KpiDefinitionID: resp.NextCursor.KPIDefinitionID,
+			Time:             resp.NextCursor.Time.Format(time.RFC3339Nano),
+			SdInstanceUID:    resp.NextCursor.SDInstanceUID,
+			KpiDefinitionUID: resp.NextCursor.KPIDefinitionUID,
 		}
 	}
 	return graphQLModel.TimeSeriesReadResponse{

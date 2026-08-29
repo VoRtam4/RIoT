@@ -43,8 +43,8 @@ export const useTimeSeries = (input: TimeSeriesReadInput, enabled: boolean) => {
         cursor = {
           time: pageParam.time,
           sdInstanceUID: pageParam.sdInstanceUID,
-          ...(pageParam.kpiDefinitionID
-            ? { kpiDefinitionID: pageParam.kpiDefinitionID }
+          ...(pageParam.kpiDefinitionUID
+            ? { kpiDefinitionUID: pageParam.kpiDefinitionUID }
             : {}),
         };
       }

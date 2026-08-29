@@ -107,12 +107,12 @@ func CancelTimeSeriesExport(c *connection.Client, msg sharedModel.WebSocketMessa
 		sendError(c, msg.ID, "invalid payload")
 		return
 	}
-	id, ok := parseID(payload)
-	if !ok {
-		sendError(c, msg.ID, "invalid id")
+	uid, ok := payload["uid"].(string)
+	if !ok || uid == "" {
+		sendError(c, msg.ID, "invalid uid")
 		return
 	}
-	exportJob, err := domainLogicLayer.CancelTimeSeriesExport(principal.UserID, id)
+	exportJob, err := domainLogicLayer.CancelTimeSeriesExport(principal.UserID, uid)
 	if err != nil {
 		sendError(c, msg.ID, err.Error())
 		return
@@ -130,12 +130,12 @@ func GetTimeSeriesExport(c *connection.Client, msg sharedModel.WebSocketMessage)
 		sendError(c, msg.ID, "invalid payload")
 		return
 	}
-	id, ok := parseID(payload)
-	if !ok {
-		sendError(c, msg.ID, "invalid id")
+	uid, ok := payload["uid"].(string)
+	if !ok || uid == "" {
+		sendError(c, msg.ID, "invalid uid")
 		return
 	}
-	exportJob, err := domainLogicLayer.GetTimeSeriesExport(principal.UserID, id)
+	exportJob, err := domainLogicLayer.GetTimeSeriesExport(principal.UserID, uid)
 	if err != nil {
 		sendError(c, msg.ID, err.Error())
 		return

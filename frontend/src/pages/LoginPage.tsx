@@ -46,7 +46,9 @@ export default function LoginPage() {
 
   return (
     <div className="d-flex vh-100 justify-content-center align-items-center flex-column">
-      <h1 className="mb-4" style={{ color: colors.textMain }}>RIoT</h1>
+      <h1 className="mb-4" style={{ color: colors.textMain }}>
+        RIoT
+      </h1>
       <button className="btn btn-primary btn-lg" onClick={handleLogin}>
         <i className="fab fa-google me-2"></i>
         Sign in with Google

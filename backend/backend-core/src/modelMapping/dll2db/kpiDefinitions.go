@@ -14,15 +14,66 @@
 package dll2db
 
 import (
+	"fmt"
+
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/dbModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedModel"
 )
 
-func ToDBModelEntitiesKPIDefinition(kpiDefinition sharedModel.KPIDefinition) (*dbModel.KPINodeEntity, []*dbModel.KPINodeEntity, []dbModel.LogicalOperationKPINodeEntity, []dbModel.AtomKPINodeEntity) {
-	return transformKPIDefinitionTree(kpiDefinition.RootNode, nil, make([]*dbModel.KPINodeEntity, 0), make([]dbModel.LogicalOperationKPINodeEntity, 0), make([]dbModel.AtomKPINodeEntity, 0))
+func ToDBModelEntitiesKPIDefinition(kpiDefinition sharedModel.KPIDefinition, sdParameterIDsBySpecification map[string]uint32) (*dbModel.KPINodeEntity, []*dbModel.KPINodeEntity, []dbModel.LogicalOperationKPINodeEntity, []dbModel.AtomKPINodeEntity, error) {
+	return transformKPIDefinitionTree(kpiDefinition.RootNode, nil, make([]*dbModel.KPINodeEntity, 0), make([]dbModel.LogicalOperationKPINodeEntity, 0), make([]dbModel.AtomKPINodeEntity, 0), sdParameterIDsBySpecification)
 }
 
-func transformKPIDefinitionTree(node sharedModel.KPINode, parentKPINodeEntity *dbModel.KPINodeEntity, kpiNodeEntities []*dbModel.KPINodeEntity, logicalOperationNodeEntities []dbModel.LogicalOperationKPINodeEntity, atomNodeEntities []dbModel.AtomKPINodeEntity) (*dbModel.KPINodeEntity, []*dbModel.KPINodeEntity, []dbModel.LogicalOperationKPINodeEntity, []dbModel.AtomKPINodeEntity) {
+func atomNodeEntity(node *dbModel.KPINodeEntity, sdParameterID uint32, atomType string, referenceModeValue sharedModel.KPIReferenceMode, comparedSDParameterID *uint32, comparedRecordOffset *int) dbModel.AtomKPINodeEntity {
+	referenceMode := string(referenceModeValue)
+	if referenceMode == "" {
+		referenceMode = string(sharedModel.KPIReferenceModeLiteral)
+	}
+	return dbModel.AtomKPINodeEntity{
+		Node:                  node,
+		SDParameterID:         sdParameterID,
+		Type:                  atomType,
+		ReferenceMode:         referenceMode,
+		ComparedSDParameterID: comparedSDParameterID,
+		ComparedRecordOffset:  comparedRecordOffset,
+	}
+}
+
+func resolveSDParameterID(sdParameterSpecification string, sdParameterIDsBySpecification map[string]uint32) (uint32, error) {
+	sdParameterID, exists := sdParameterIDsBySpecification[sdParameterSpecification]
+	if !exists {
+		return 0, fmt.Errorf("unknown SD parameter specification in KPI definition: %s", sdParameterSpecification)
+	}
+	return sdParameterID, nil
+}
+
+func resolveComparedSDParameterID(referenceMode sharedModel.KPIReferenceMode, comparedSDParameterSpecification string, sdParameterIDsBySpecification map[string]uint32) (*uint32, error) {
+	if referenceMode == "" || referenceMode == sharedModel.KPIReferenceModeLiteral {
+		return nil, nil
+	}
+	if referenceMode != sharedModel.KPIReferenceModeParameter {
+		return nil, fmt.Errorf("unsupported KPI reference mode: %s", referenceMode)
+	}
+	sdParameterID, err := resolveSDParameterID(comparedSDParameterSpecification, sdParameterIDsBySpecification)
+	if err != nil {
+		return nil, err
+	}
+	return &sdParameterID, nil
+}
+
+func atomNodeEntityFromSpecification(node *dbModel.KPINodeEntity, sdParameterSpecification string, atomType string, referenceModeValue sharedModel.KPIReferenceMode, comparedSDParameterSpecification string, comparedRecordOffset *int, sdParameterIDsBySpecification map[string]uint32) (dbModel.AtomKPINodeEntity, error) {
+	sdParameterID, err := resolveSDParameterID(sdParameterSpecification, sdParameterIDsBySpecification)
+	if err != nil {
+		return dbModel.AtomKPINodeEntity{}, err
+	}
+	comparedSDParameterID, err := resolveComparedSDParameterID(referenceModeValue, comparedSDParameterSpecification, sdParameterIDsBySpecification)
+	if err != nil {
+		return dbModel.AtomKPINodeEntity{}, err
+	}
+	return atomNodeEntity(node, sdParameterID, atomType, referenceModeValue, comparedSDParameterID, comparedRecordOffset), nil
+}
+
+func transformKPIDefinitionTree(node sharedModel.KPINode, parentKPINodeEntity *dbModel.KPINodeEntity, kpiNodeEntities []*dbModel.KPINodeEntity, logicalOperationNodeEntities []dbModel.LogicalOperationKPINodeEntity, atomNodeEntities []dbModel.AtomKPINodeEntity, sdParameterIDsBySpecification map[string]uint32) (*dbModel.KPINodeEntity, []*dbModel.KPINodeEntity, []dbModel.LogicalOperationKPINodeEntity, []dbModel.AtomKPINodeEntity, error) {
 	currentNodeEntity := &dbModel.KPINodeEntity{
 		ParentNode: parentKPINodeEntity,
 	}
@@ -34,114 +85,118 @@ func transformKPIDefinitionTree(node sharedModel.KPINode, parentKPINodeEntity *d
 			Type: string(typedNode.Type),
 		})
 		for _, childNode := range typedNode.ChildNodes {
-			_, kpiNodeEntities, logicalOperationNodeEntities, atomNodeEntities = transformKPIDefinitionTree(childNode, currentNodeEntity, kpiNodeEntities, logicalOperationNodeEntities, atomNodeEntities)
+			var err error
+			_, kpiNodeEntities, logicalOperationNodeEntities, atomNodeEntities, err = transformKPIDefinitionTree(childNode, currentNodeEntity, kpiNodeEntities, logicalOperationNodeEntities, atomNodeEntities, sdParameterIDsBySpecification)
+			if err != nil {
+				return nil, nil, nil, nil, err
+			}
 		}
 	case *sharedModel.StringEQAtomKPINode:
-		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
-			Node:                 currentNodeEntity,
-			SDParameterID:        typedNode.SDParameterID,
-			Type:                 "string_eq",
-			StringReferenceValue: &typedNode.ReferenceValue,
-		})
+		entity, err := atomNodeEntityFromSpecification(currentNodeEntity, typedNode.SDParameterSpecification, "string_eq", typedNode.ReferenceMode, typedNode.ComparedSDParameterSpecification, typedNode.ComparedRecordOffset, sdParameterIDsBySpecification)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		entity.StringReferenceValue = &typedNode.ReferenceValue
+		atomNodeEntities = append(atomNodeEntities, entity)
 	case *sharedModel.StringNEQAtomKPINode:
-		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
-			Node:                 currentNodeEntity,
-			SDParameterID:        typedNode.SDParameterID,
-			Type:                 "string_neq",
-			StringReferenceValue: &typedNode.ReferenceValue,
-		})
+		entity, err := atomNodeEntityFromSpecification(currentNodeEntity, typedNode.SDParameterSpecification, "string_neq", typedNode.ReferenceMode, typedNode.ComparedSDParameterSpecification, typedNode.ComparedRecordOffset, sdParameterIDsBySpecification)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		entity.StringReferenceValue = &typedNode.ReferenceValue
+		atomNodeEntities = append(atomNodeEntities, entity)
 	case *sharedModel.StringExistsAtomKPINode:
-		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
-			Node:          currentNodeEntity,
-			SDParameterID: typedNode.SDParameterID,
-			Type:          "string_exists",
-		})
+		entity, err := atomNodeEntityFromSpecification(currentNodeEntity, typedNode.SDParameterSpecification, "string_exists", sharedModel.KPIReferenceModeLiteral, "", nil, sdParameterIDsBySpecification)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		atomNodeEntities = append(atomNodeEntities, entity)
 	case *sharedModel.StringNotExistsAtomKPINode:
-		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
-			Node:          currentNodeEntity,
-			SDParameterID: typedNode.SDParameterID,
-			Type:          "string_not_exists",
-		})
+		entity, err := atomNodeEntityFromSpecification(currentNodeEntity, typedNode.SDParameterSpecification, "string_not_exists", sharedModel.KPIReferenceModeLiteral, "", nil, sdParameterIDsBySpecification)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		atomNodeEntities = append(atomNodeEntities, entity)
 	case *sharedModel.BooleanEQAtomKPINode:
-		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
-			Node:                  currentNodeEntity,
-			SDParameterID:         typedNode.SDParameterID,
-			Type:                  "boolean_eq",
-			BooleanReferenceValue: &typedNode.ReferenceValue,
-		})
+		entity, err := atomNodeEntityFromSpecification(currentNodeEntity, typedNode.SDParameterSpecification, "boolean_eq", typedNode.ReferenceMode, typedNode.ComparedSDParameterSpecification, typedNode.ComparedRecordOffset, sdParameterIDsBySpecification)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		entity.BooleanReferenceValue = &typedNode.ReferenceValue
+		atomNodeEntities = append(atomNodeEntities, entity)
 	case *sharedModel.BooleanNEQAtomKPINode:
-		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
-			Node:                  currentNodeEntity,
-			SDParameterID:         typedNode.SDParameterID,
-			Type:                  "boolean_neq",
-			BooleanReferenceValue: &typedNode.ReferenceValue,
-		})
+		entity, err := atomNodeEntityFromSpecification(currentNodeEntity, typedNode.SDParameterSpecification, "boolean_neq", typedNode.ReferenceMode, typedNode.ComparedSDParameterSpecification, typedNode.ComparedRecordOffset, sdParameterIDsBySpecification)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		entity.BooleanReferenceValue = &typedNode.ReferenceValue
+		atomNodeEntities = append(atomNodeEntities, entity)
 	case *sharedModel.BooleanExistsAtomKPINode:
-		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
-			Node:          currentNodeEntity,
-			SDParameterID: typedNode.SDParameterID,
-			Type:          "boolean_exists",
-		})
+		entity, err := atomNodeEntityFromSpecification(currentNodeEntity, typedNode.SDParameterSpecification, "boolean_exists", sharedModel.KPIReferenceModeLiteral, "", nil, sdParameterIDsBySpecification)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		atomNodeEntities = append(atomNodeEntities, entity)
 	case *sharedModel.BooleanNotExistsAtomKPINode:
-		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
-			Node:          currentNodeEntity,
-			SDParameterID: typedNode.SDParameterID,
-			Type:          "boolean_not_exists",
-		})
+		entity, err := atomNodeEntityFromSpecification(currentNodeEntity, typedNode.SDParameterSpecification, "boolean_not_exists", sharedModel.KPIReferenceModeLiteral, "", nil, sdParameterIDsBySpecification)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		atomNodeEntities = append(atomNodeEntities, entity)
 	case *sharedModel.NumericEQAtomKPINode:
-		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
-			Node:                  currentNodeEntity,
-			SDParameterID:         typedNode.SDParameterID,
-			Type:                  "numeric_eq",
-			NumericReferenceValue: &typedNode.ReferenceValue,
-		})
+		entity, err := atomNodeEntityFromSpecification(currentNodeEntity, typedNode.SDParameterSpecification, "numeric_eq", typedNode.ReferenceMode, typedNode.ComparedSDParameterSpecification, typedNode.ComparedRecordOffset, sdParameterIDsBySpecification)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		entity.NumericReferenceValue = &typedNode.ReferenceValue
+		atomNodeEntities = append(atomNodeEntities, entity)
 	case *sharedModel.NumericNEQAtomKPINode:
-		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
-			Node:                  currentNodeEntity,
-			SDParameterID:         typedNode.SDParameterID,
-			Type:                  "numeric_neq",
-			NumericReferenceValue: &typedNode.ReferenceValue,
-		})
+		entity, err := atomNodeEntityFromSpecification(currentNodeEntity, typedNode.SDParameterSpecification, "numeric_neq", typedNode.ReferenceMode, typedNode.ComparedSDParameterSpecification, typedNode.ComparedRecordOffset, sdParameterIDsBySpecification)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		entity.NumericReferenceValue = &typedNode.ReferenceValue
+		atomNodeEntities = append(atomNodeEntities, entity)
 	case *sharedModel.NumericLTAtomKPINode:
-		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
-			Node:                  currentNodeEntity,
-			SDParameterID:         typedNode.SDParameterID,
-			Type:                  "numeric_lt",
-			NumericReferenceValue: &typedNode.ReferenceValue,
-		})
+		entity, err := atomNodeEntityFromSpecification(currentNodeEntity, typedNode.SDParameterSpecification, "numeric_lt", typedNode.ReferenceMode, typedNode.ComparedSDParameterSpecification, typedNode.ComparedRecordOffset, sdParameterIDsBySpecification)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		entity.NumericReferenceValue = &typedNode.ReferenceValue
+		atomNodeEntities = append(atomNodeEntities, entity)
 	case *sharedModel.NumericLEQAtomKPINode:
-		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
-			Node:                  currentNodeEntity,
-			SDParameterID:         typedNode.SDParameterID,
-			Type:                  "numeric_leq",
-			NumericReferenceValue: &typedNode.ReferenceValue,
-		})
+		entity, err := atomNodeEntityFromSpecification(currentNodeEntity, typedNode.SDParameterSpecification, "numeric_leq", typedNode.ReferenceMode, typedNode.ComparedSDParameterSpecification, typedNode.ComparedRecordOffset, sdParameterIDsBySpecification)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		entity.NumericReferenceValue = &typedNode.ReferenceValue
+		atomNodeEntities = append(atomNodeEntities, entity)
 	case *sharedModel.NumericGTAtomKPINode:
-		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
-			Node:                  currentNodeEntity,
-			SDParameterID:         typedNode.SDParameterID,
-			Type:                  "numeric_gt",
-			NumericReferenceValue: &typedNode.ReferenceValue,
-		})
+		entity, err := atomNodeEntityFromSpecification(currentNodeEntity, typedNode.SDParameterSpecification, "numeric_gt", typedNode.ReferenceMode, typedNode.ComparedSDParameterSpecification, typedNode.ComparedRecordOffset, sdParameterIDsBySpecification)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		entity.NumericReferenceValue = &typedNode.ReferenceValue
+		atomNodeEntities = append(atomNodeEntities, entity)
 	case *sharedModel.NumericGEQAtomKPINode:
-		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
-			Node:                  currentNodeEntity,
-			SDParameterID:         typedNode.SDParameterID,
-			Type:                  "numeric_geq",
-			NumericReferenceValue: &typedNode.ReferenceValue,
-		})
+		entity, err := atomNodeEntityFromSpecification(currentNodeEntity, typedNode.SDParameterSpecification, "numeric_geq", typedNode.ReferenceMode, typedNode.ComparedSDParameterSpecification, typedNode.ComparedRecordOffset, sdParameterIDsBySpecification)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		entity.NumericReferenceValue = &typedNode.ReferenceValue
+		atomNodeEntities = append(atomNodeEntities, entity)
 	case *sharedModel.NumericExistsAtomKPINode:
-		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
-			Node:          currentNodeEntity,
-			SDParameterID: typedNode.SDParameterID,
-			Type:          "numeric_exists",
-		})
+		entity, err := atomNodeEntityFromSpecification(currentNodeEntity, typedNode.SDParameterSpecification, "numeric_exists", sharedModel.KPIReferenceModeLiteral, "", nil, sdParameterIDsBySpecification)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		atomNodeEntities = append(atomNodeEntities, entity)
 	case *sharedModel.NumericNotExistsAtomKPINode:
-		atomNodeEntities = append(atomNodeEntities, dbModel.AtomKPINodeEntity{
-			Node:          currentNodeEntity,
-			SDParameterID: typedNode.SDParameterID,
-			Type:          "numeric_not_exists",
-		})
+		entity, err := atomNodeEntityFromSpecification(currentNodeEntity, typedNode.SDParameterSpecification, "numeric_not_exists", sharedModel.KPIReferenceModeLiteral, "", nil, sdParameterIDsBySpecification)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		atomNodeEntities = append(atomNodeEntities, entity)
 	}
-	return currentNodeEntity, kpiNodeEntities, logicalOperationNodeEntities, atomNodeEntities
+	return currentNodeEntity, kpiNodeEntities, logicalOperationNodeEntities, atomNodeEntities, nil
 }

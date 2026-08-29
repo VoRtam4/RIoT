@@ -13,12 +13,12 @@ import Select, { type SingleValue } from "react-select";
 import {
   buildOptionSearchText,
   filterSelectOption,
+  type SearchMode,
 } from "../../../utils/reactSelectSearch";
 import { virtualizedSelectProps } from "../../../utils/reactSelectVirtualized";
 import UrlSyncedSearchInput from "../../../components/UrlSyncedSearchInput";
 
 type SdType = {
-  id: string;
   label?: string | null;
   uid?: string | null;
 };
@@ -31,7 +31,9 @@ type Props = {
   onSdTypeChange: (id: string | null) => void;
 
   search: string;
+  searchMode: SearchMode;
   onSearchChange: (v: string) => void;
+  onSearchModeChange: (v: SearchMode) => void;
 
   sort: SortOption;
   onSortChange: (v: SortOption) => void;
@@ -48,14 +50,16 @@ export default function SdInstanceFilters({
   selectedSdType,
   onSdTypeChange,
   search,
+  searchMode,
   onSearchChange,
+  onSearchModeChange,
   sort,
   onSortChange,
 }: Props) {
   const sdTypeOptions: Option[] = sdTypes.map((t) => ({
-    value: String(t.id),
+    value: String(t.uid ?? ""),
     label: t.label ?? t.uid ?? "",
-    searchText: buildOptionSearchText(t.label, t.uid, String(t.id)),
+    searchText: buildOptionSearchText(t.label, t.uid),
   }));
 
   const sortOptions: Option[] = [
@@ -73,6 +77,8 @@ export default function SdInstanceFilters({
             placeholder="Name or UID..."
             value={search}
             onChange={onSearchChange}
+            mode={searchMode}
+            onModeChange={onSearchModeChange}
           />
         </div>
 

@@ -18,9 +18,11 @@ import (
 
 func ToDLLModelRawDataPoint(rawDataPointEntity dbModel.RawDataPointEntity) dllModel.RawDataPoint {
 	return dllModel.RawDataPoint{
-		SDTypeID:     rawDataPointEntity.SDInstance.SDTypeID,
-		SDInstanceID: rawDataPointEntity.SDInstanceID,
-		EventTime:    rawDataPointEntity.EventTime,
-		Payload:      rawDataPointEntity.Payload,
+		SDTypeID:      rawDataPointEntity.SDInstance.SDTypeID,
+		SDTypeUID:     rawDataPointEntity.SDInstance.SDType.UID,
+		SDInstanceID:  rawDataPointEntity.SDInstanceID,
+		SDInstanceUID: rawDataPointEntity.SDInstance.UID,
+		EventTime:     rawDataPointEntity.EventTime,
+		Payload:       rawDataPointEntity.Payload,
 	}
 }

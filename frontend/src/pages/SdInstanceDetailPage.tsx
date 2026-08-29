@@ -21,13 +21,10 @@ import KpiSdTypeDataPanel from "../modules/kpi/components/KpiSdTypeDataPanel";
 import KpiResultHistoryPanel from "../modules/kpi/components/KpiResultHistoryPanel";
 import { usePageState } from "../app/navigation/usePageState";
 import { sdInstanceDetailPageStateCodec } from "../modules/sdInstances/state/sdInstanceDetailPageState";
-import {
-  minusDaysLocal,
-  nowLocal,
-} from "../modules/kpi/utils/dateTimeUtils";
+import { minusDaysLocal, nowLocal } from "../modules/kpi/utils/dateTimeUtils";
 
 export default function SdInstanceDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const { uid } = useParams<{ uid: string }>();
   const navigate = useNavigate();
   const defaultRangeRef = useRef({
     from: minusDaysLocal(1),
@@ -36,17 +33,22 @@ export default function SdInstanceDetailPage() {
 
   const { config, toggleSdInstance } = useUserConfig();
 
-  const isFavorite =
-    id && config.favoriteSdInstances.includes(String(id));
+  const isFavorite = uid && config.favoriteSdInstances.includes(String(uid));
 
-  const { sdInstance: instance, loading: instanceLoading } =
-    useSdInstance(id ?? null);
+  const { sdInstance: instance, loading: instanceLoading } = useSdInstance(
+    uid ?? null,
+  );
 
-  const { kpiDefinitions, loading: kpiLoading } = useKpiDefinitionsBySdInstance(id ?? null);
+  const { kpiDefinitions, loading: kpiLoading } = useKpiDefinitionsBySdInstance(
+    uid ?? null,
+  );
   const { query, setPageState } = usePageState(sdInstanceDetailPageStateCodec);
 
-  const { sdType } = useSdType(instance?.type?.id);
-  const selectedKpiId = query.kpi;
+  const { sdType } = useSdType(instance?.type?.uid);
+  const selectedKpiUID = query.kpi;
+  const selectedKpi =
+    kpiDefinitions.find((kpi) => String(kpi.uid) === String(selectedKpiUID)) ??
+    null;
   const from = query.from ?? defaultRangeRef.current.from;
   const to = query.to ?? defaultRangeRef.current.to;
 
@@ -56,7 +58,9 @@ export default function SdInstanceDetailPage() {
     if (
       !loading &&
       query.kpi &&
-      !(kpiDefinitions ?? []).some((kpi) => String(kpi.id) === String(query.kpi))
+      !(kpiDefinitions ?? []).some(
+        (kpi) => String(kpi.uid) === String(query.kpi),
+      )
     ) {
       setPageState(
         {
@@ -133,15 +137,13 @@ export default function SdInstanceDetailPage() {
                 isFavorite ? "btn-danger" : "btn-outline-light"
               }`}
               onClick={() => {
-                if (!id) return;
-                toggleSdInstance(String(id));
+                if (!uid) return;
+                toggleSdInstance(String(uid));
               }}
             >
               <i
                 className={
-                  isFavorite
-                    ? "fa-solid fa-heart"
-                    : "fa-regular fa-heart"
+                  isFavorite ? "fa-solid fa-heart" : "fa-regular fa-heart"
                 }
               />
             </button>
@@ -149,30 +151,30 @@ export default function SdInstanceDetailPage() {
             {/* HISTORY */}
             <button
               className="btn btn-outline-light"
-              onClick={() =>
-                {
-                  const searchParams = new URLSearchParams();
-                  searchParams.set("type", "raw");
-                  searchParams.set("auto", "1");
-                  if (instance.type?.id) {
-                    searchParams.set("sdType", String(instance.type.id));
-                  }
-
-                  navigate(
-                    {
-                      pathname: "/history",
-                      search: `?${searchParams.toString()}`,
-                    },
-                    {
-                      state: {
-                        v: 1,
-                        sdInstanceIDs: id ? [String(id)] : [],
-                        kpiDefinitionIDs: [],
-                      },
-                    },
-                  );
+              onClick={() => {
+                const searchParams = new URLSearchParams();
+                searchParams.set("type", "raw");
+                searchParams.set("auto", "1");
+                if (instance.type?.uid) {
+                  searchParams.set("sdType", String(instance.type.uid));
                 }
-              }
+
+                navigate(
+                  {
+                    pathname: "/history",
+                    search: `?${searchParams.toString()}`,
+                  },
+                  {
+                    state: {
+                      v: 1,
+                      sdInstanceUIDs: instance.uid
+                        ? [String(instance.uid)]
+                        : [],
+                      kpiDefinitionUIDs: [],
+                    },
+                  },
+                );
+              }}
             >
               History
             </button>
@@ -200,9 +202,10 @@ export default function SdInstanceDetailPage() {
           <div style={{ height: "100%", overflow: "auto" }}>
             <SdInstanceKpiSidebar
               kpis={kpiDefinitions}
-              selectedKpiId={selectedKpiId}
+              selectedKpiUID={selectedKpiUID}
               loading={loading}
               search={query.kpiQ}
+              searchMode={query.kpiQMode}
               sort={query.kpiSort}
               onSearchChange={(kpiQ) =>
                 setPageState(
@@ -210,6 +213,18 @@ export default function SdInstanceDetailPage() {
                     query: {
                       ...query,
                       kpiQ,
+                    },
+                    entry: null,
+                  },
+                  { replace: true },
+                )
+              }
+              onSearchModeChange={(kpiQMode) =>
+                setPageState(
+                  {
+                    query: {
+                      ...query,
+                      kpiQMode,
                     },
                     entry: null,
                   },
@@ -228,15 +243,15 @@ export default function SdInstanceDetailPage() {
                   { replace: true },
                 )
               }
-              onSelect={(nextKpiId) =>
+              onSelect={(nextKpiUID) =>
                 setPageState(
                   {
                     query: {
                       ...query,
                       kpi:
-                        String(selectedKpiId) === String(nextKpiId)
+                        String(selectedKpiUID) === String(nextKpiUID)
                           ? null
-                          : String(nextKpiId),
+                          : String(nextKpiUID),
                     },
                     entry: null,
                   },
@@ -244,8 +259,8 @@ export default function SdInstanceDetailPage() {
                 )
               }
               onOpenDetail={() => {
-                if (!selectedKpiId) return;
-                navigate(`/kpi/${selectedKpiId}`);
+                if (!selectedKpiUID) return;
+                navigate(`/kpi/${selectedKpiUID}`);
               }}
             />
           </div>
@@ -256,18 +271,18 @@ export default function SdInstanceDetailPage() {
           className="me-3"
           style={{
             display: "grid",
-            gridTemplateRows: selectedKpiId ? "auto auto auto" : "auto auto",
+            gridTemplateRows: selectedKpiUID ? "auto auto auto" : "auto auto",
             gap: 16,
             alignContent: "start",
           }}
         >
-
           {/* KPI HISTORY */}
-          {selectedKpiId ? (
+          {selectedKpiUID ? (
             <div className="card p-3">
               <KpiResultHistoryPanel
-                kpiDefinitionID={selectedKpiId ?? undefined}
-                sdInstanceID={id}
+                kpiDefinitionUID={selectedKpi?.uid}
+                sdInstanceUID={instance.uid}
+                sdTypeUID={instance.type?.uid}
                 from={from}
                 to={to}
                 onFromChange={(nextFrom) =>
@@ -301,7 +316,7 @@ export default function SdInstanceDetailPage() {
           {/* RAW DATA */}
           <div className="card p-0">
             <KpiSdTypeDataPanel
-              sdInstanceID={id ?? null}
+              sdInstanceUID={instance.uid ?? null}
               sdType={sdType}
             />
           </div>

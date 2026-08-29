@@ -11,10 +11,7 @@
  */
 import { create } from "zustand";
 import { apolloClient } from "../../../app/apollo";
-import {
-  ApiKeysDocument,
-  type ApiKeysQuery,
-} from "../../../generated/graphql";
+import { ApiKeysDocument, type ApiKeysQuery } from "../../../generated/graphql";
 
 const TTL = 5 * 60_000;
 const ERROR_RETRY_COOLDOWN = 5_000;
@@ -46,7 +43,11 @@ export const useApiKeysStore = create<Store>((set, get) => ({
       return;
     }
 
-    if (entry?.error && entry.lastAttemptAt && now - entry.lastAttemptAt < ERROR_RETRY_COOLDOWN) {
+    if (
+      entry?.error &&
+      entry.lastAttemptAt &&
+      now - entry.lastAttemptAt < ERROR_RETRY_COOLDOWN
+    ) {
       return;
     }
 

@@ -37,17 +37,12 @@ func GetKPIResultsByKPI(c *connection.Client, msg sharedModel.WebSocketMessage) 
 	if principal == nil {
 		return
 	}
-	payload, ok := msg.Payload.(map[string]any)
+	uid, ok := parseUIDPayload(msg.Payload)
 	if !ok {
-		sendError(c, msg.ID, "invalid payload")
+		sendError(c, msg.ID, "invalid kpiDefinitionUID")
 		return
 	}
-	kpiID, ok := parseID(payload)
-	if !ok {
-		sendError(c, msg.ID, "invalid kpiDefinitionID")
-		return
-	}
-	result := domainLogicLayer.GetKPIFulfillmentCheckResultsByKPI(principal.UserID, kpiID)
+	result := domainLogicLayer.GetKPIFulfillmentCheckResultsByKPIUID(principal.UserID, uid)
 	if result.IsFailure() {
 		sendError(c, msg.ID, result.GetError().Error())
 		return

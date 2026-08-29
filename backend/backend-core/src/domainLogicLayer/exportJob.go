@@ -33,6 +33,7 @@ import (
 
 type ExportJob struct {
 	ID               uint32
+	UID              string
 	UserID           uint32
 	FilePath         string
 	Done             chan struct{}
@@ -50,6 +51,7 @@ type ExportJob struct {
 
 var (
 	exportJobs      = map[uint32]*ExportJob{}
+	exportJobsByUID = map[string]*ExportJob{}
 	exportJobsMu    sync.RWMutex
 	nextExportJobID atomic.Uint32
 )
@@ -61,7 +63,7 @@ func StartTimeSeriesExportAggregateKPI(userID uint32, input graphQLModel.TimeSer
 	if err != nil {
 		return graphQLModel.TimeSeriesExport{}, err
 	}
-	return StartTimeSeriesExportBase(userID, req, input.SdTypeID)
+	return StartTimeSeriesExportBase(userID, req)
 }
 
 func StartTimeSeriesExport(userID uint32, input graphQLModel.TimeSeriesReadInput) (graphQLModel.TimeSeriesExport, error) {
@@ -69,39 +71,51 @@ func StartTimeSeriesExport(userID uint32, input graphQLModel.TimeSeriesReadInput
 	if err != nil {
 		return graphQLModel.TimeSeriesExport{}, err
 	}
-	return StartTimeSeriesExportBase(userID, req, input.SdTypeID)
+	return StartTimeSeriesExportBase(userID, req)
 }
 
-func StartTimeSeriesExportBase(userID uint32, req sharedModel.TimeSeriesReadRequest, sdTypeID *uint32) (graphQLModel.TimeSeriesExport, error) {
+func StartTimeSeriesExportBase(userID uint32, req sharedModel.TimeSeriesReadRequest) (graphQLModel.TimeSeriesExport, error) {
 	id := nextExportJobID.Add(1)
 	createdAt := time.Now().UTC()
 	req.JobID = id
+	exportJobsMu.Lock()
+	uid := newExportJobUIDLocked()
 	job := &ExportJob{
 		ID:        id,
+		UID:       uid,
 		UserID:    userID,
 		FilePath:  fmt.Sprintf("/tmp/export_%d.csv", id),
 		Done:      make(chan struct{}),
 		Status:    graphQLModel.ExportStatusPending,
 		CreatedAt: createdAt,
 	}
-	exportJobsMu.Lock()
 	exportJobs[id] = job
+	exportJobsByUID[uid] = job
 	exportJobsMu.Unlock()
 	publishExportJobUpdate(job)
-	go runExportJob(job, req, sdTypeID)
+	go runExportJob(job, req)
 	return snapshotExportJob(job), nil
 }
 
-func GetTimeSeriesExport(userID uint32, id uint32) (graphQLModel.TimeSeriesExport, error) {
-	job, err := getOwnedExportJob(userID, id)
+func newExportJobUIDLocked() string {
+	for {
+		uid := sharedUtils.GeneratePublicUID("exp")
+		if _, exists := exportJobsByUID[uid]; !exists {
+			return uid
+		}
+	}
+}
+
+func GetTimeSeriesExport(userID uint32, uid string) (graphQLModel.TimeSeriesExport, error) {
+	job, err := getOwnedExportJob(userID, uid)
 	if err != nil {
 		return graphQLModel.TimeSeriesExport{}, err
 	}
 	return snapshotExportJob(job), nil
 }
 
-func CancelTimeSeriesExport(userID uint32, id uint32) (graphQLModel.TimeSeriesExport, error) {
-	job, err := getOwnedExportJob(userID, id)
+func CancelTimeSeriesExport(userID uint32, uid string) (graphQLModel.TimeSeriesExport, error) {
+	job, err := getOwnedExportJob(userID, uid)
 	if err != nil {
 		return graphQLModel.TimeSeriesExport{}, err
 	}
@@ -123,14 +137,14 @@ func CancelTimeSeriesExport(userID uint32, id uint32) (graphQLModel.TimeSeriesEx
 	snapshot := snapshotExportJobLocked(job)
 	exportJobsMu.Unlock()
 	if shouldSignalCancel {
-		logExportJobCancelSignalFailure(id, publishTimeSeriesReadCancel(id))
+		logExportJobCancelSignalFailure(job.ID, publishTimeSeriesReadCancel(job.ID))
 	}
 	publishExportJobUpdate(job)
 	scheduleCleanup(job)
 	return snapshot, nil
 }
 
-func runExportJob(job *ExportJob, req sharedModel.TimeSeriesReadRequest, sdTypeID *uint32) {
+func runExportJob(job *ExportJob, req sharedModel.TimeSeriesReadRequest) {
 	defer close(job.Done)
 	req.Limit = nil
 	req.Batch = nil
@@ -144,7 +158,7 @@ func runExportJob(job *ExportJob, req sharedModel.TimeSeriesReadRequest, sdTypeI
 		return
 	}
 	defer session.Close()
-	handler, closeHandler := buildExportHandler(job, req, sdTypeID)
+	handler, closeHandler := buildExportHandler(job, req)
 	if handler == nil {
 		return
 	}
@@ -167,7 +181,7 @@ func runExportJob(job *ExportJob, req sharedModel.TimeSeriesReadRequest, sdTypeI
 			return true, err
 		}
 		if !resp.HasMoreBatches {
-			downloadURL := fmt.Sprintf("/rest/time-series/export/%d", job.ID)
+			downloadURL := fmt.Sprintf("/rest/time-series/export/%s", job.UID)
 			setExportJobState(job, graphQLModel.ExportStatusDone, &downloadURL, nil)
 			scheduleCleanup(job)
 			return true, nil
@@ -179,14 +193,14 @@ func runExportJob(job *ExportJob, req sharedModel.TimeSeriesReadRequest, sdTypeI
 	}
 }
 
-func buildExportHandler(job *ExportJob, req sharedModel.TimeSeriesReadRequest, sdTypeID *uint32) (func(resp sharedModel.TimeSeriesReadResponse, _ amqp091.Delivery) error, func()) {
+func buildExportHandler(job *ExportJob, req sharedModel.TimeSeriesReadRequest) (func(resp sharedModel.TimeSeriesReadResponse, _ amqp091.Delivery) error, func()) {
 	file, err := os.Create(job.FilePath)
 	if err != nil {
 		failExportJob(job, err)
 		return nil, func() {}
 	}
 	writer := csv.NewWriter(file)
-	params := loadParametersFromDB(graphQLModel.TimeSeriesType(req.Type), sdTypeID)
+	params := loadParametersFromDB(graphQLModel.TimeSeriesType(req.Type), &req.SDTypeUID)
 	headerWritten := false
 	closed := false
 	closeResources := func() {
@@ -237,8 +251,8 @@ func buildExportHandler(job *ExportJob, req sharedModel.TimeSeriesReadRequest, s
 							val = v
 						}
 					}
-					if val == "" && param.Denotation == "kpiDefinitionID" && len(req.KPIDefinitionIDs) > 0 {
-						val = fmt.Sprint(req.KPIDefinitionIDs[0])
+					if val == "" && param.Denotation == "kpiDefinitionUID" && len(req.KPIDefinitionUIDs) > 0 {
+						val = req.KPIDefinitionUIDs[0]
 					}
 					row = append(row, val)
 
@@ -266,10 +280,14 @@ func buildExportHandler(job *ExportJob, req sharedModel.TimeSeriesReadRequest, s
 	}, closeResources
 }
 
-func GetExportJob(id uint32) (*ExportJob, bool) {
+func GetExportJob(uid string) (*ExportJob, bool) {
+	normalizedUID, normalizeErr := normalizeExportUID(uid)
+	if normalizeErr != nil {
+		return nil, false
+	}
 	exportJobsMu.RLock()
 	defer exportJobsMu.RUnlock()
-	job, ok := exportJobs[id]
+	job, ok := exportJobsByUID[normalizedUID]
 	return job, ok
 }
 
@@ -290,7 +308,7 @@ func snapshotExportJobLocked(job *ExportJob) graphQLModel.TimeSeriesExport {
 		expiresAt = &value
 	}
 	return graphQLModel.TimeSeriesExport{
-		ID:          job.ID,
+		UID:         job.UID,
 		Status:      job.Status,
 		DownloadURL: job.DownloadURL,
 		CreatedAt:   job.CreatedAt.UTC().Format(time.RFC3339Nano),
@@ -326,10 +344,14 @@ func failExportJob(job *ExportJob, err error) {
 	scheduleCleanup(job)
 }
 
-func getOwnedExportJob(userID uint32, id uint32) (*ExportJob, error) {
+func getOwnedExportJob(userID uint32, uid string) (*ExportJob, error) {
+	normalizedUID, normalizeErr := normalizeExportUID(uid)
+	if normalizeErr != nil {
+		return nil, normalizeErr
+	}
 	exportJobsMu.RLock()
 	defer exportJobsMu.RUnlock()
-	job, ok := exportJobs[id]
+	job, ok := exportJobsByUID[normalizedUID]
 	if !ok {
 		return nil, fmt.Errorf("export not found")
 	}
@@ -375,6 +397,9 @@ func cleanupJob(id uint32) {
 	exportJobsMu.Lock()
 	job := exportJobs[id]
 	delete(exportJobs, id)
+	if job != nil {
+		delete(exportJobsByUID, job.UID)
+	}
 	exportJobsMu.Unlock()
 	if job != nil {
 		_ = os.Remove(job.FilePath)

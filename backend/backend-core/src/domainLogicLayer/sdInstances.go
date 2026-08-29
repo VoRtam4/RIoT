@@ -14,6 +14,9 @@
 package domainLogicLayer
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/db/dbClient"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/isc"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
@@ -21,12 +24,16 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 )
 
-func GetSDInstance(id uint32) sharedUtils.Result[graphQLModel.SDInstance] {
-	loadResult := dbClient.GetRelationalDatabaseClientInstance().LoadSDInstance(id)
+func GetSDInstance(uid string) sharedUtils.Result[graphQLModel.SDInstance] {
+	loadResult := dbClient.GetRelationalDatabaseClientInstance().LoadSDInstanceBasedOnUID(strings.TrimSpace(uid))
 	if loadResult.IsFailure() {
 		return sharedUtils.NewFailureResult[graphQLModel.SDInstance](loadResult.GetError())
 	}
-	return sharedUtils.NewSuccessResult(dll2gql.ToGraphQLModelSDInstance(loadResult.GetPayload()))
+	sdInstanceOptional := loadResult.GetPayload()
+	if sdInstanceOptional.IsEmpty() {
+		return sharedUtils.NewFailureResult[graphQLModel.SDInstance](fmt.Errorf("couldn't find SD instance for UID: %s", uid))
+	}
+	return sharedUtils.NewSuccessResult(dll2gql.ToGraphQLModelSDInstance(sdInstanceOptional.GetPayload()))
 }
 
 func GetSDInstances() sharedUtils.Result[[]graphQLModel.SDInstance] {
@@ -37,7 +44,20 @@ func GetSDInstances() sharedUtils.Result[[]graphQLModel.SDInstance] {
 	return sharedUtils.NewSuccessResult[[]graphQLModel.SDInstance](sharedUtils.Map(loadResult.GetPayload(), dll2gql.ToGraphQLModelSDInstance))
 }
 
-func GetSDInstancesByType(sdTypeID uint32) sharedUtils.Result[[]graphQLModel.SDInstance] {
+func GetSDInstancesByType(sdTypeUID string) sharedUtils.Result[[]graphQLModel.SDInstance] {
+	normalizedSDTypeUID, normalizeErr := normalizeSDTypeUID(sdTypeUID)
+	if normalizeErr != nil {
+		return sharedUtils.NewFailureResult[[]graphQLModel.SDInstance](normalizeErr)
+	}
+	sdTypeResult := dbClient.GetRelationalDatabaseClientInstance().LoadSDTypeBasedOnUID(normalizedSDTypeUID)
+	if sdTypeResult.IsFailure() {
+		return sharedUtils.NewFailureResult[[]graphQLModel.SDInstance](sdTypeResult.GetError())
+	}
+	sdTypeIDOptional := sdTypeResult.GetPayload().ID
+	if sdTypeIDOptional.IsEmpty() {
+		return sharedUtils.NewFailureResult[[]graphQLModel.SDInstance](fmt.Errorf("SD type loaded by UID has no internal ID: %s", sdTypeUID))
+	}
+	sdTypeID := sdTypeIDOptional.GetPayload()
 	loadResult := dbClient.GetRelationalDatabaseClientInstance().LoadSDInstancesByType(sdTypeID)
 	if loadResult.IsFailure() {
 		return sharedUtils.NewFailureResult[[]graphQLModel.SDInstance](loadResult.GetError())
@@ -45,20 +65,32 @@ func GetSDInstancesByType(sdTypeID uint32) sharedUtils.Result[[]graphQLModel.SDI
 	return sharedUtils.NewSuccessResult(sharedUtils.Map(loadResult.GetPayload(), dll2gql.ToGraphQLModelSDInstance))
 }
 
-func GetSDInstancesByKpiDefinition(kpiDefinitionID uint32) sharedUtils.Result[[]graphQLModel.SDInstance] {
-	result := dbClient.GetRelationalDatabaseClientInstance().LoadSDInstancesByKpiDefinition(kpiDefinitionID)
+func GetSDInstancesByKpiDefinition(userID uint32, kpiDefinitionUID string) sharedUtils.Result[[]graphQLModel.SDInstance] {
+	kpiDefinitionResult := dbClient.GetRelationalDatabaseClientInstance().LoadKPIDefinitionByUID(userID, strings.TrimSpace(kpiDefinitionUID))
+	if kpiDefinitionResult.IsFailure() {
+		return sharedUtils.NewFailureResult[[]graphQLModel.SDInstance](kpiDefinitionResult.GetError())
+	}
+	kpiDefinitionID := kpiDefinitionResult.GetPayload().ID
+	if kpiDefinitionID == nil {
+		return sharedUtils.NewFailureResult[[]graphQLModel.SDInstance](fmt.Errorf("KPI definition loaded by UID has no internal ID: %s", kpiDefinitionUID))
+	}
+	result := dbClient.GetRelationalDatabaseClientInstance().LoadSDInstancesByKpiDefinition(*kpiDefinitionID)
 	if result.IsFailure() {
 		return sharedUtils.NewFailureResult[[]graphQLModel.SDInstance](result.GetError())
 	}
 	return sharedUtils.NewSuccessResult(sharedUtils.Map(result.GetPayload(), dll2gql.ToGraphQLModelSDInstance))
 }
 
-func UpdateSDInstance(id uint32, sdInstanceUpdateInput graphQLModel.SDInstanceUpdateInput) sharedUtils.Result[graphQLModel.SDInstance] {
-	loadResult := dbClient.GetRelationalDatabaseClientInstance().LoadSDInstance(id)
+func UpdateSDInstance(uid string, sdInstanceUpdateInput graphQLModel.SDInstanceUpdateInput) sharedUtils.Result[graphQLModel.SDInstance] {
+	loadResult := dbClient.GetRelationalDatabaseClientInstance().LoadSDInstanceBasedOnUID(strings.TrimSpace(uid))
 	if loadResult.IsFailure() {
 		return sharedUtils.NewFailureResult[graphQLModel.SDInstance](loadResult.GetError())
 	}
-	sdInstance := loadResult.GetPayload()
+	sdInstanceOptional := loadResult.GetPayload()
+	if sdInstanceOptional.IsEmpty() {
+		return sharedUtils.NewFailureResult[graphQLModel.SDInstance](fmt.Errorf("couldn't find SD instance for UID: %s", uid))
+	}
+	sdInstance := sdInstanceOptional.GetPayload()
 	sharedUtils.NewOptionalFromPointer(sdInstanceUpdateInput.UserIdentifier).DoIfPresent(func(userIdentifier string) {
 		sdInstance.UserIdentifier = userIdentifier
 	})

@@ -24,12 +24,18 @@ func ToGraphQLModelAPIKey(k dllModel.APIKey) graphQLModel.APIKey {
 		s := k.ExpiresAt.Format(time.RFC3339Nano)
 		expiresAt = &s
 	}
+	var lastUsedAt *string
+	if k.LastUsedAt != nil {
+		s := k.LastUsedAt.Format(time.RFC3339Nano)
+		lastUsedAt = &s
+	}
 	return graphQLModel.APIKey{
-		ID:             k.ID.GetPayload(),
+		UID:            k.UID,
 		Label:          k.Label,
 		ExpiresAt:      expiresAt,
 		Revoked:        k.Revoked,
 		RateLimit:      k.RateLimit,
+		LastUsedAt:     lastUsedAt,
 		Permissions:    k.Permissions,
 		IPRestrictions: k.IPRestrictions,
 	}

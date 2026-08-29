@@ -61,7 +61,7 @@ export const mapToRows = (
       if (
         role === "meta" &&
         p.denotation !== "sdInstanceUID" &&
-        p.denotation !== "kpiDefinitionID"
+        p.denotation !== "kpiDefinitionUID"
       ) {
         continue;
       }

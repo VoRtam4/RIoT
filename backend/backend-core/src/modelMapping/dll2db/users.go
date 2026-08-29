@@ -24,6 +24,7 @@ func ToDBModelEntityUser(user dllModel.User) dbModel.UserEntity {
 		Model: gorm.Model{
 			ID: id,
 		},
+		UID:                    user.UID,
 		Username:               user.Username,
 		Email:                  user.Email,
 		Name:                   user.Name.ToPointer(),
@@ -31,6 +32,9 @@ func ToDBModelEntityUser(user dllModel.User) dbModel.UserEntity {
 		OAuth2Provider:         user.OAuth2Provider.ToPointer(),
 		OAuth2ProviderIssuedID: user.OAuth2ProviderIssuedID.ToPointer(),
 		LastLoginAt:            user.LastLoginAt.ToPointer(),
+		Disabled:               user.Disabled,
+		DisabledAt:             user.DisabledAt.ToPointer(),
+		DisabledReason:         user.DisabledReason.ToPointer(),
 		Sessions:               sharedUtils.Map(user.Sessions, ToDBModelEntityUserSession),
 		Invocations:            sharedUtils.EmptySlice[dbModel.SDCommandInvocationEntity](), // TODO: Implement 'Invocations' as needed
 		UserConfig: dbModel.UserConfigEntity{ // TODO: Implement 'UserConfig' as needed
@@ -47,8 +51,11 @@ func ToDBModelEntityUser(user dllModel.User) dbModel.UserEntity {
 func ToDBModelEntityUserSession(userSession dllModel.UserSession) dbModel.UserSessionEntity {
 	return dbModel.UserSessionEntity{
 		Model: gorm.Model{
-			ID: userSession.ID.GetPayloadOrDefault(0),
+			ID:        userSession.ID.GetPayloadOrDefault(0),
+			CreatedAt: userSession.CreatedAt,
+			UpdatedAt: userSession.UpdatedAt,
 		},
+		UID:              userSession.UID,
 		UserID:           userSession.UserID,
 		RefreshTokenHash: userSession.RefreshTokenHash,
 		ExpiresAt:        userSession.ExpiresAt,

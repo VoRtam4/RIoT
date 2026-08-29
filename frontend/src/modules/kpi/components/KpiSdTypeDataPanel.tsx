@@ -19,21 +19,19 @@ import { useRawDataPoint } from "../../sdInstances/hooks/useRawDataPoint";
 import { useRawDataSubscription } from "../../sdInstances/hooks/useRawDataSubscription";
 
 type SDParameter = {
-  id: string;
   label: string;
   denotation: string;
   type: string;
 };
 
 type SDType = {
-  id: string;
   label: string;
   uid: string;
   parameters: SDParameter[];
 };
 
 type Props = {
-  sdInstanceID?: string | null;
+  sdInstanceUID?: string | null;
   sdType?: SDType | null;
 };
 
@@ -67,10 +65,10 @@ function formatDate(value: string): string {
   }
 }
 
-export default function KpiSdTypeDataPanel({ sdInstanceID, sdType }: Props) {
-  const { rawDataPoint } = useRawDataPoint(sdInstanceID);
+export default function KpiSdTypeDataPanel({ sdInstanceUID, sdType }: Props) {
+  const { rawDataPoint } = useRawDataPoint(sdInstanceUID);
 
-  const { latest } = useRawDataSubscription(sdType?.id, sdInstanceID);
+  const { latest } = useRawDataSubscription(sdType?.uid, sdInstanceUID);
 
   const effectiveData = latest ?? rawDataPoint;
   const effectiveEventTime =
@@ -79,9 +77,11 @@ export default function KpiSdTypeDataPanel({ sdInstanceID, sdType }: Props) {
     (typeof effectiveData?.payload === "object" &&
     effectiveData?.payload !== null &&
     "eventTime" in effectiveData.payload
-      ? String((effectiveData.payload as Record<string, unknown>).eventTime ?? "")
+      ? String(
+          (effectiveData.payload as Record<string, unknown>).eventTime ?? "",
+        )
       : "");
-  
+
   const parsed = useMemo(() => {
     if (!effectiveData?.payload) return {};
 
@@ -93,7 +93,7 @@ export default function KpiSdTypeDataPanel({ sdInstanceID, sdType }: Props) {
       return {};
     }
   }, [effectiveData]);
-  
+
   const rows: Row[] = useMemo(() => {
     const dataRows = (sdType?.parameters ?? []).map((p) => {
       const val = parsed[p.denotation];

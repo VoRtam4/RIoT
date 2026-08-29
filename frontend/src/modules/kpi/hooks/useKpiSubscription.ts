@@ -16,17 +16,17 @@ import {
 } from "../../../generated/graphql";
 
 export const useKpiSubscription = (
-  kpiDefinitionID?: string,
-  sdInstanceID?: string | null,
+  kpiDefinitionUID?: string,
+  sdInstanceUID?: string | null,
 ) => {
   const { data } = useSubscription(OnKpiFulfillmentCheckedDocument, {
     variables: {
       filter: {
-        kpiDefinitions: kpiDefinitionID ? [kpiDefinitionID] : undefined,
-        sdInstanceIDs: sdInstanceID ? [sdInstanceID] : undefined,
+        kpiDefinitionUIDs: kpiDefinitionUID ? [kpiDefinitionUID] : undefined,
+        sdInstanceUIDs: sdInstanceUID ? [sdInstanceUID] : undefined,
       },
     },
-    skip: !kpiDefinitionID || !sdInstanceID,
+    skip: !kpiDefinitionUID || !sdInstanceUID,
   });
 
   const latest: KpiFulfillmentCheckResult | undefined =

@@ -75,6 +75,18 @@ func parseID(payload map[string]any) (uint32, bool) {
 	return uint32(idFloat), true
 }
 
+func payloadString(msg sharedModel.WebSocketMessage, key string) (string, bool) {
+	payload, ok := msg.Payload.(map[string]any)
+	if !ok {
+		return "", false
+	}
+	value, ok := payload[key].(string)
+	if !ok || value == "" {
+		return "", false
+	}
+	return value, true
+}
+
 func streamToClient[T any](c *connection.Client, topic string, subID string, ch <-chan T) {
 	go func() {
 		for payload := range ch {

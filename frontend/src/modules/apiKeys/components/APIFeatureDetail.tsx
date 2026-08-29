@@ -46,7 +46,9 @@ export default function FeatureDetail({
   );
 
   const actionsForTechnology = feature.actions.filter((action) =>
-    action.variants.some((variant) => variant.technology === selectedTechnology),
+    action.variants.some(
+      (variant) => variant.technology === selectedTechnology,
+    ),
   );
 
   const activeAction =

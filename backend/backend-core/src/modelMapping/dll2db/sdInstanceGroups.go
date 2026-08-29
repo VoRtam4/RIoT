@@ -23,6 +23,7 @@ func ToDBModelEntitySDInstanceGroup(sdInstanceGroup dllModel.SDInstanceGroup) db
 	sdInstanceGroupID := sdInstanceGroup.ID.GetPayloadOrDefault(0)
 	return dbModel.SDInstanceGroupEntity{
 		ID:             sdInstanceGroupID,
+		UID:            sdInstanceGroup.UID,
 		Label:          sdInstanceGroup.Label,
 		UserIdentifier: sdInstanceGroup.UserIdentifier,
 		GroupMembershipRecords: sharedUtils.Map[uint32, dbModel.SDInstanceGroupMembershipEntity](sdInstanceGroup.SDInstanceIDs, func(sdInstanceID uint32) dbModel.SDInstanceGroupMembershipEntity {

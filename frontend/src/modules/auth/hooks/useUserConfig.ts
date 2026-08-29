@@ -44,8 +44,7 @@ export const useUserConfig = () => {
 
       if (!raw) return DEFAULT_CONFIG;
 
-      const parsed =
-        typeof raw === "string" ? JSON.parse(raw) : raw;
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
 
       return {
         ...DEFAULT_CONFIG,
@@ -53,7 +52,7 @@ export const useUserConfig = () => {
       };
     } catch {
       return DEFAULT_CONFIG;
-    } 
+    }
   }, [data]);
 
   const save = async (newConfig: Config) => {

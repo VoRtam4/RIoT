@@ -23,17 +23,12 @@ func GetSDInstance(c *connection.Client, msg sharedModel.WebSocketMessage) {
 	if principal := AuthorizeOperation(c, msg, auth.ResourceSDInstances, auth.OperationRead); principal == nil {
 		return
 	}
-	payload, ok := msg.Payload.(map[string]any)
+	uid, ok := parseUIDPayload(msg.Payload)
 	if !ok {
-		sendError(c, msg.ID, "invalid payload")
+		sendError(c, msg.ID, "invalid uid")
 		return
 	}
-	id, ok := parseID(payload)
-	if !ok {
-		sendError(c, msg.ID, "invalid id")
-		return
-	}
-	result := domainLogicLayer.GetSDInstance(id)
+	result := domainLogicLayer.GetSDInstance(uid)
 	if result.IsFailure() {
 		sendError(c, msg.ID, result.GetError().Error())
 		return
@@ -57,17 +52,12 @@ func GetSDInstancesByType(c *connection.Client, msg sharedModel.WebSocketMessage
 	if principal := AuthorizeOperation(c, msg, auth.ResourceSDInstances, auth.OperationRead); principal == nil {
 		return
 	}
-	payload, ok := msg.Payload.(map[string]any)
+	uid, ok := parseUIDPayload(msg.Payload)
 	if !ok {
-		sendError(c, msg.ID, "invalid payload")
+		sendError(c, msg.ID, "invalid uid")
 		return
 	}
-	id, ok := parseID(payload)
-	if !ok {
-		sendError(c, msg.ID, "invalid id")
-		return
-	}
-	result := domainLogicLayer.GetSDInstancesByType(id)
+	result := domainLogicLayer.GetSDInstancesByType(uid)
 	if result.IsFailure() {
 		sendError(c, msg.ID, result.GetError().Error())
 		return
@@ -76,20 +66,16 @@ func GetSDInstancesByType(c *connection.Client, msg sharedModel.WebSocketMessage
 }
 
 func GetSDInstancesByKpiDefinition(c *connection.Client, msg sharedModel.WebSocketMessage) {
-	if principal := AuthorizeOperation(c, msg, auth.ResourceSDInstances, auth.OperationRead); principal == nil {
+	principal := AuthorizeOperation(c, msg, auth.ResourceSDInstances, auth.OperationRead)
+	if principal == nil {
 		return
 	}
-	payload, ok := msg.Payload.(map[string]any)
+	uid, ok := parseUIDPayload(msg.Payload)
 	if !ok {
-		sendError(c, msg.ID, "invalid payload")
+		sendError(c, msg.ID, "invalid uid")
 		return
 	}
-	id, ok := parseID(payload)
-	if !ok {
-		sendError(c, msg.ID, "invalid id")
-		return
-	}
-	result := domainLogicLayer.GetSDInstancesByKpiDefinition(id)
+	result := domainLogicLayer.GetSDInstancesByKpiDefinition(principal.UserID, uid)
 	if result.IsFailure() {
 		sendError(c, msg.ID, result.GetError().Error())
 		return
@@ -106,9 +92,9 @@ func UpdateSDInstance(c *connection.Client, msg sharedModel.WebSocketMessage) {
 		sendError(c, msg.ID, "invalid payload")
 		return
 	}
-	id, ok := parseID(payload)
+	uid, ok := parseUIDPayload(payload)
 	if !ok {
-		sendError(c, msg.ID, "invalid id")
+		sendError(c, msg.ID, "invalid uid")
 		return
 	}
 	inputRaw, ok := payload["input"]
@@ -122,7 +108,7 @@ func UpdateSDInstance(c *connection.Client, msg sharedModel.WebSocketMessage) {
 		sendError(c, msg.ID, "invalid input")
 		return
 	}
-	result := domainLogicLayer.UpdateSDInstance(id, input)
+	result := domainLogicLayer.UpdateSDInstance(uid, input)
 	if result.IsFailure() {
 		sendError(c, msg.ID, result.GetError().Error())
 		return

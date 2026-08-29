@@ -18,7 +18,7 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedModel"
 )
 
-func ToDLLTimeSeriesReadKPIRequest(input graphQLModel.TimeSeriesReadAggregateKPIInput, sdTypeUID string, sdInstanceUIDs []string) sharedModel.TimeSeriesReadRequest {
+func ToDLLTimeSeriesReadKPIRequest(input graphQLModel.TimeSeriesReadAggregateKPIInput, sdTypeUID string, kpiDefinitionUIDs []string) sharedModel.TimeSeriesReadRequest {
 	var from *time.Time
 	if input.From != nil {
 		if t, err := time.Parse(time.RFC3339Nano, *input.From); err == nil {
@@ -44,29 +44,29 @@ func ToDLLTimeSeriesReadKPIRequest(input graphQLModel.TimeSeriesReadAggregateKPI
 			t = parsed
 		}
 		cursor = &sharedModel.TimeSeriesCursor{
-			Time:            t,
-			SDInstanceUID:   input.Cursor.SdInstanceUID,
-			KPIDefinitionID: input.Cursor.KpiDefinitionID,
+			Time:             t,
+			SDInstanceUID:    input.Cursor.SdInstanceUID,
+			KPIDefinitionUID: input.Cursor.KpiDefinitionUID,
 		}
 	}
 	sortDesc := false
 	return sharedModel.TimeSeriesReadRequest{
-		Type:             sharedModel.TimeSeriesTypeKPIResult,
-		SDTypeUID:        sdTypeUID,
-		SDInstanceUIDs:   sdInstanceUIDs,
-		KPIDefinitionIDs: input.KpiDefinitionIDs,
-		From:             from,
-		To:               to,
-		AggregateSeconds: &input.AggregateSeconds,
-		SortDesc:         &sortDesc,
-		Limit:            input.Limit,
-		Batch:            input.Batch,
-		Filters:          toDLLFilterNode(input.Filters),
-		Cursor:           cursor,
+		Type:              sharedModel.TimeSeriesTypeKPIResult,
+		SDTypeUID:         sdTypeUID,
+		SDInstanceUIDs:    input.SdInstanceUIDs,
+		KPIDefinitionUIDs: kpiDefinitionUIDs,
+		From:              from,
+		To:                to,
+		AggregateSeconds:  &input.AggregateSeconds,
+		SortDesc:          &sortDesc,
+		Limit:             input.Limit,
+		Batch:             input.Batch,
+		Filters:           toDLLFilterNode(input.Filters),
+		Cursor:            cursor,
 	}
 }
 
-func ToDLLTimeSeriesReadRequest(input graphQLModel.TimeSeriesReadInput, sdTypeUID string, sdInstanceUIDs []string) sharedModel.TimeSeriesReadRequest {
+func ToDLLTimeSeriesReadRequest(input graphQLModel.TimeSeriesReadInput, sdTypeUID string, kpiDefinitionUIDs []string) sharedModel.TimeSeriesReadRequest {
 	var from *time.Time
 	if input.From != nil {
 		if t, err := time.Parse(time.RFC3339Nano, *input.From); err == nil {
@@ -92,27 +92,27 @@ func ToDLLTimeSeriesReadRequest(input graphQLModel.TimeSeriesReadInput, sdTypeUI
 			t = parsed
 		}
 		cursor = &sharedModel.TimeSeriesCursor{
-			Time:            t,
-			SDInstanceUID:   input.Cursor.SdInstanceUID,
-			KPIDefinitionID: input.Cursor.KpiDefinitionID,
+			Time:             t,
+			SDInstanceUID:    input.Cursor.SdInstanceUID,
+			KPIDefinitionUID: input.Cursor.KpiDefinitionUID,
 		}
 	}
 	return sharedModel.TimeSeriesReadRequest{
-		Type:             sharedModel.TimeSeriesType(input.Type),
-		SDTypeUID:        sdTypeUID,
-		SDInstanceUIDs:   sdInstanceUIDs,
-		KPIDefinitionIDs: input.KpiDefinitionIDs,
-		From:             from,
-		To:               to,
-		Limit:            input.Limit,
-		SortDesc:         input.SortDesc,
-		Batch:            input.Batch,
-		Filters:          toDLLFilterNode(input.Filters),
-		Cursor:           cursor,
+		Type:              sharedModel.TimeSeriesType(input.Type),
+		SDTypeUID:         sdTypeUID,
+		SDInstanceUIDs:    input.SdInstanceUIDs,
+		KPIDefinitionUIDs: kpiDefinitionUIDs,
+		From:              from,
+		To:                to,
+		Limit:             input.Limit,
+		SortDesc:          input.SortDesc,
+		Batch:             input.Batch,
+		Filters:           toDLLFilterNode(input.Filters),
+		Cursor:            cursor,
 	}
 }
 
-func ToDLLTimeSeriesDistinctTagValuesRequest(input graphQLModel.TimeSeriesDistinctTagValuesInput, sdTypeUID string, sdInstanceUIDs []string) sharedModel.TimeSeriesDistinctTagValuesRequest {
+func ToDLLTimeSeriesDistinctTagValuesRequest(input graphQLModel.TimeSeriesDistinctTagValuesInput, sdTypeUID string, kpiDefinitionUIDs []string) sharedModel.TimeSeriesDistinctTagValuesRequest {
 	var from *time.Time
 	if input.From != nil {
 		if t, err := time.Parse(time.RFC3339Nano, *input.From); err == nil {
@@ -130,14 +130,14 @@ func ToDLLTimeSeriesDistinctTagValuesRequest(input graphQLModel.TimeSeriesDistin
 		}
 	}
 	return sharedModel.TimeSeriesDistinctTagValuesRequest{
-		Type:             sharedModel.TimeSeriesType(input.Type),
-		SDTypeUID:        sdTypeUID,
-		SDInstanceUIDs:   sdInstanceUIDs,
-		KPIDefinitionIDs: input.KpiDefinitionIDs,
-		From:             from,
-		To:               to,
-		Tag:              input.Tag,
-		Filters:          toDLLFilterNode(input.Filters),
+		Type:              sharedModel.TimeSeriesType(input.Type),
+		SDTypeUID:         sdTypeUID,
+		SDInstanceUIDs:    input.SdInstanceUIDs,
+		KPIDefinitionUIDs: kpiDefinitionUIDs,
+		From:              from,
+		To:                to,
+		Tag:               input.Tag,
+		Filters:           toDLLFilterNode(input.Filters),
 	}
 }
 

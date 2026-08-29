@@ -33,7 +33,7 @@ export default function APIKeysPage() {
   const [mode, setMode] = useState<"empty" | "create" | "created">("empty");
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const selected = apiKeys.find(
-    (k: any) => String(k.id) === String(query.selected),
+    (k: any) => String(k.uid) === String(query.selected),
   );
   const effectiveMode =
     mode === "create" || mode === "created"
@@ -68,12 +68,25 @@ export default function APIKeysPage() {
               search={query.q}
               filter={query.filter}
               sort={query.sort}
+              searchMode={query.qMode}
               onSearchChange={(q) =>
                 setPageState(
                   {
                     query: {
                       ...query,
                       q,
+                    },
+                    entry: null,
+                  },
+                  { replace: true },
+                )
+              }
+              onSearchModeChange={(qMode) =>
+                setPageState(
+                  {
+                    query: {
+                      ...query,
+                      qMode,
                     },
                     entry: null,
                   },
@@ -181,7 +194,7 @@ export default function APIKeysPage() {
                 onSubmit={async (data) => {
                   try {
                     await updateApiKey({
-                      variables: { id: selected.id, input: data },
+                      variables: { uid: selected.uid, input: data },
                     });
 
                     toast.success("Saved");
@@ -192,7 +205,7 @@ export default function APIKeysPage() {
                 onDelete={async () => {
                   try {
                     await deleteApiKey({
-                      variables: { id: selected.id },
+                      variables: { uid: selected.uid },
                     });
 
                     setMode("empty");

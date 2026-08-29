@@ -10,11 +10,9 @@
 
 query SdTypes {
   sdTypes {
-    id
     uid
     label
     parameters {
-      id
       label
       denotation
       type
@@ -23,13 +21,11 @@ query SdTypes {
   }
 }
 
-query SdTypeById($id: ID!) {
-  sdType(id: $id) {
-    id
+query SdTypeByUID($uid: String!) {
+  sdType(uid: $uid) {
     uid
     label
     parameters {
-      id
       label
       denotation
       type

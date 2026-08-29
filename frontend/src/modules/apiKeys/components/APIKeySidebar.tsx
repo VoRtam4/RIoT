@@ -11,15 +11,15 @@
  */
 import { useMemo } from "react";
 import Select from "react-select";
-import { matchesSearchText } from "../../../utils/reactSelectSearch";
+import {
+  matchesSearchText,
+  type SearchMode,
+} from "../../../utils/reactSelectSearch";
 import { virtualizedSelectProps } from "../../../utils/reactSelectVirtualized";
 import VirtualizedList from "../../../components/virtualization/VirtualizedList";
 import EmptyStateNotice from "../../../components/EmptyStateNotice";
 import UrlSyncedSearchInput from "../../../components/UrlSyncedSearchInput";
-import type {
-  ApiKeysFilter,
-  ApiKeysSort,
-} from "../state/apiKeysPageState";
+import type { ApiKeysFilter, ApiKeysSort } from "../state/apiKeysPageState";
 
 import APIKeyCard from "./APIKeyCard";
 
@@ -28,9 +28,11 @@ type Props = {
   selectedId: string | null;
   loading?: any;
   search: string;
+  searchMode: SearchMode;
   filter: ApiKeysFilter;
   sort: ApiKeysSort;
   onSearchChange: (value: string) => void;
+  onSearchModeChange: (value: SearchMode) => void;
   onFilterChange: (value: ApiKeysFilter) => void;
   onSortChange: (value: ApiKeysSort) => void;
   onSelect: (id: string) => void;
@@ -51,9 +53,11 @@ export default function APIKeySidebar({
   selectedId,
   loading,
   search,
+  searchMode,
   filter,
   sort,
   onSearchChange,
+  onSearchModeChange,
   onFilterChange,
   onSortChange,
   onSelect,
@@ -77,7 +81,7 @@ export default function APIKeySidebar({
 
     if (search.trim()) {
       result = result.filter((k) =>
-        matchesSearchText(search, k.label),
+        matchesSearchText(search, searchMode, k.label),
       );
     }
 
@@ -100,10 +104,10 @@ export default function APIKeySidebar({
     });
 
     return result;
-  }, [apiKeys, search, filter, sort]);
+  }, [apiKeys, search, searchMode, filter, sort]);
 
   const selectedIndex = useMemo(
-    () => filtered.findIndex((k) => String(k.id) === String(selectedId)),
+    () => filtered.findIndex((k) => String(k.uid) === String(selectedId)),
     [filtered, selectedId],
   );
 
@@ -140,7 +144,7 @@ export default function APIKeySidebar({
       </div>
 
       {/* SORT */}
-      <div className="mb-3">
+      <div className="mb-2">
         <label className="form-label">Sort</label>
         <Select
           classNamePrefix="react-select"
@@ -156,9 +160,11 @@ export default function APIKeySidebar({
       <div className="mb-2">
         <label className="form-label">Search</label>
         <UrlSyncedSearchInput
-          placeholder="Hledat..."
+          placeholder="Search..."
           value={search}
           onChange={onSearchChange}
+          mode={searchMode}
+          onModeChange={onSearchModeChange}
         />
       </div>
 
@@ -179,10 +185,10 @@ export default function APIKeySidebar({
         }
         renderItem={(k) => (
           <APIKeyCard
-            key={k.id}
+            key={k.uid}
             apiKey={k}
-            selected={String(selectedId) === String(k.id)}
-            onClick={() => onSelect(String(k.id))}
+            selected={String(selectedId) === String(k.uid)}
+            onClick={() => onSelect(String(k.uid))}
           />
         )}
       />

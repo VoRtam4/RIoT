@@ -16,15 +16,15 @@ import {
   type KpiDefinitionQueryVariables,
 } from "../../../generated/graphql";
 
-export const useKpiDefinition = (id?: string) => {
+export const useKpiDefinition = (uid?: string) => {
   const { data, loading, error, refetch } = useQuery<
     KpiDefinitionQuery,
     KpiDefinitionQueryVariables
   >(KpiDefinitionDocument, {
     variables: {
-      id: id ?? "",
+      uid: uid ?? "",
     },
-    skip: !id,
+    skip: !uid,
     fetchPolicy: "cache-and-network",
   });
 

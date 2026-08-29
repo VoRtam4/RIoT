@@ -40,7 +40,7 @@ export default function APIKeyCreatedBox({ value, onNew }: Props) {
               className="btn btn-outline-light flex-shrink-0"
               onClick={async () => {
                 await navigator.clipboard.writeText(value);
-                toast.success("Zkopírováno");
+                toast.success("Copied");
               }}
             >
               Copy

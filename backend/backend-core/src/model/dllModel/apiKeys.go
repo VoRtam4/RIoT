@@ -19,12 +19,14 @@ import (
 
 type APIKey struct {
 	ID             sharedUtils.Optional[uint32]
+	UID            string
 	UserID         *uint32
 	KeyHash        *string
 	Label          string
 	ExpiresAt      *time.Time
 	Revoked        bool
 	RateLimit      *uint32
+	LastUsedAt     *time.Time
 	Permissions    []string
 	IPRestrictions []string
 }

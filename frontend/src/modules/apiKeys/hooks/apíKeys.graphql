@@ -10,7 +10,7 @@
 
 query ApiKeys {
   apiKeys {
-    id
+    uid
     label
     revoked
     expiresAt
@@ -23,10 +23,10 @@ mutation CreateApiKey($input: APIKeyInput!) {
   createAPIKey(input: $input)
 }
 
-mutation UpdateApiKey($id: ID!, $input: APIKeyInput!) {
-  updateAPIKey(id: $id, input: $input)
+mutation UpdateApiKey($uid: String!, $input: APIKeyInput!) {
+  updateAPIKey(uid: $uid, input: $input)
 }
 
-mutation DeleteApiKey($id: ID!) {
-  deleteAPIKey(id: $id)
+mutation DeleteApiKey($uid: String!) {
+  deleteAPIKey(uid: $uid)
 }

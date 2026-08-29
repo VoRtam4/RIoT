@@ -25,7 +25,15 @@ func getQueueDeclarationErrorMessage(queueName string) string {
 	return fmt.Sprintf("[ISC setup] Failed to declare the '%s' queue", queueName)
 }
 
+func getExchangeDeclarationErrorMessage(exchangeName string) string {
+	return fmt.Sprintf("[ISC setup] Failed to declare the '%s' exchange", exchangeName)
+}
+
 func SetupRabbitMQInfrastructureForISC(rabbitMQClient rabbitmq.Client) {
+	sharedUtils.TerminateOnError(
+		rabbitMQClient.DeclareExchange(sharedConstants.IngestExchangeName, "direct"),
+		getExchangeDeclarationErrorMessage(sharedConstants.IngestExchangeName),
+	)
 	namesOfQueuesToDeclare := sharedUtils.SliceOf[string](
 		sharedConstants.RawDataPointCacheBootstrapQueueName,
 		sharedConstants.KPIFulfillmentCacheBootstrapQueueName,
@@ -46,6 +54,8 @@ func SetupRabbitMQInfrastructureForISC(rabbitMQClient rabbitmq.Client) {
 		sharedConstants.TimeSeriesDistinctTagValuesResponseQueueName,
 		sharedConstants.TimeSeriesReprocessReadRequestQueueName,
 		sharedConstants.TimeSeriesReprocessReadResponseQueueName,
+		sharedConstants.TimeSeriesRecordNeighborhoodRequestQueueName,
+		sharedConstants.TimeSeriesLateRecordCorrectionQueueName,
 		sharedConstants.KPIReprocessRequestQueueName,
 		sharedConstants.TSDBDeleteQueueName,
 		sharedConstants.MPUDeleteQueueName,

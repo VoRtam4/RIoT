@@ -20,8 +20,7 @@ import {
 const TTL = 60_000;
 const ERROR_RETRY_COOLDOWN = 5_000;
 
-type Raw =
-  KpiDefinitionsBySdTypeQuery["kpiDefinitionsBySdType"][number];
+type Raw = KpiDefinitionsBySdTypeQuery["kpiDefinitionsBySdType"][number];
 
 type Entry = {
   rawSortedAsc: Raw[];
@@ -33,9 +32,9 @@ type Entry = {
 };
 
 type Store = {
-  byTypeId: Record<string, Entry>;
-  ensure: (id: string) => Promise<void>;
-  refresh: (id: string) => Promise<void>;
+  byTypeUID: Record<string, Entry>;
+  ensure: (uid: string) => Promise<void>;
+  refresh: (uid: string) => Promise<void>;
 };
 
 function sort(items: Raw[]) {
@@ -50,32 +49,36 @@ function sort(items: Raw[]) {
 }
 
 export const useKpiDefinitionsBySdTypeStore = create<Store>((set, get) => ({
-  byTypeId: {},
+  byTypeUID: {},
 
-  ensure: async (id) => {
-    const entry = get().byTypeId[id];
+  ensure: async (uid) => {
+    const entry = get().byTypeUID[uid];
     const now = Date.now();
 
     if (entry?.lastFetchedAt && now - entry.lastFetchedAt < TTL) {
       return;
     }
 
-    if (entry?.error && entry.lastAttemptAt && now - entry.lastAttemptAt < ERROR_RETRY_COOLDOWN) {
+    if (
+      entry?.error &&
+      entry.lastAttemptAt &&
+      now - entry.lastAttemptAt < ERROR_RETRY_COOLDOWN
+    ) {
       return;
     }
 
-    await get().refresh(id);
+    await get().refresh(uid);
   },
 
-  refresh: async (id) => {
-    const existing = get().byTypeId[id];
+  refresh: async (uid) => {
+    const existing = get().byTypeUID[uid];
 
     if (existing?.isLoading) return;
 
     set((s) => ({
-      byTypeId: {
-        ...s.byTypeId,
-        [id]: {
+      byTypeUID: {
+        ...s.byTypeUID,
+        [uid]: {
           ...existing,
           rawSortedAsc: existing?.rawSortedAsc ?? [],
           rawSortedDesc: existing?.rawSortedDesc ?? [],
@@ -93,7 +96,7 @@ export const useKpiDefinitionsBySdTypeStore = create<Store>((set, get) => ({
         KpiDefinitionsBySdTypeQueryVariables
       >({
         query: KpiDefinitionsBySdTypeDocument,
-        variables: { id },
+        variables: { uid },
         fetchPolicy: "network-only",
       });
 
@@ -102,9 +105,9 @@ export const useKpiDefinitionsBySdTypeStore = create<Store>((set, get) => ({
       );
 
       set((s) => ({
-        byTypeId: {
-          ...s.byTypeId,
-          [id]: {
+        byTypeUID: {
+          ...s.byTypeUID,
+          [uid]: {
             rawSortedAsc,
             rawSortedDesc,
             lastFetchedAt: Date.now(),
@@ -116,10 +119,10 @@ export const useKpiDefinitionsBySdTypeStore = create<Store>((set, get) => ({
       }));
     } catch (error) {
       set((s) => ({
-        byTypeId: {
-          ...s.byTypeId,
-          [id]: {
-            ...(s.byTypeId[id] ?? {}),
+        byTypeUID: {
+          ...s.byTypeUID,
+          [uid]: {
+            ...(s.byTypeUID[uid] ?? {}),
             lastFetchedAt: null,
             lastAttemptAt: Date.now(),
             isLoading: false,

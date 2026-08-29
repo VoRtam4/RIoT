@@ -42,6 +42,25 @@ func LoadAPIKeyByHash(hash string) sharedUtils.Result[sharedUtils.Optional[dllMo
 	return sharedUtils.NewSuccessResult(sharedUtils.NewOptionalOf(apiKey))
 }
 
+func LoadAPIKeyByUID(userID uint32, uid string) sharedUtils.Result[graphQLModel.APIKey] {
+	normalizedUID, normalizeErr := normalizeAPIKeyUID(uid)
+	if normalizeErr != nil {
+		return sharedUtils.NewFailureResult[graphQLModel.APIKey](normalizeErr)
+	}
+	result := dbClient.GetRelationalDatabaseClientInstance().LoadAPIKeyByUID(normalizedUID)
+	if result.IsFailure() {
+		return sharedUtils.NewFailureResult[graphQLModel.APIKey](result.GetError())
+	}
+	if result.GetPayload().IsEmpty() {
+		return sharedUtils.NewFailureResult[graphQLModel.APIKey](fmt.Errorf("not found"))
+	}
+	r := result.GetPayload().GetPayload()
+	if userID != *r.UserID {
+		return sharedUtils.NewFailureResult[graphQLModel.APIKey](fmt.Errorf("not found"))
+	}
+	return sharedUtils.NewSuccessResult(dll2gql.ToGraphQLModelAPIKey(r))
+}
+
 func LoadAPIKeyByID(userID uint32, id uint32) sharedUtils.Result[graphQLModel.APIKey] {
 	result := dbClient.GetRelationalDatabaseClientInstance().LoadAPIKeyByID(id)
 	if result.IsFailure() {
@@ -65,6 +84,14 @@ func LoadAPIKeysForUser(userID uint32) sharedUtils.Result[[]graphQLModel.APIKey]
 	return sharedUtils.NewSuccessResult(sharedUtils.Map(result.GetPayload(), func(k dllModel.APIKey) graphQLModel.APIKey {
 		return dll2gql.ToGraphQLModelAPIKey(k)
 	}))
+}
+
+func LoadAPIKeysByUserUID(userUID string) sharedUtils.Result[[]graphQLModel.APIKey] {
+	user, err := loadUserDLLByUID(userUID)
+	if err != nil {
+		return sharedUtils.NewFailureResult[[]graphQLModel.APIKey](err)
+	}
+	return LoadAPIKeysForUser(uint32(user.ID.GetPayload()))
 }
 
 func CreateAPIKey(userID uint32, input graphQLModel.APIKeyInput) sharedUtils.Result[string] {
@@ -91,9 +118,13 @@ func CreateAPIKey(userID uint32, input graphQLModel.APIKeyInput) sharedUtils.Res
 	return sharedUtils.NewSuccessResult(rawKey)
 }
 
-func UpdateAPIKeyForUser(userID uint32, id uint32, input graphQLModel.APIKeyInput) error {
+func UpdateAPIKeyForUser(userID uint32, uid string, input graphQLModel.APIKeyInput) error {
 	db := dbClient.GetRelationalDatabaseClientInstance()
-	load := db.LoadAPIKeyByID(id)
+	normalizedUID, normalizeErr := normalizeAPIKeyUID(uid)
+	if normalizeErr != nil {
+		return normalizeErr
+	}
+	load := db.LoadAPIKeyByUID(normalizedUID)
 	if load.IsFailure() {
 		return load.GetError()
 	}
@@ -116,7 +147,10 @@ func UpdateAPIKeyForUser(userID uint32, id uint32, input graphQLModel.APIKeyInpu
 		}
 	}
 	updated := gql2dll.ApplyAPIKeyUpdate(k, input)
-	updated.ID = sharedUtils.NewOptionalOf(id)
+	if k.ID.IsEmpty() {
+		return fmt.Errorf("missing id")
+	}
+	updated.ID = k.ID
 	result := db.UpdateAPIKey(updated)
 	if result.IsFailure() {
 		return result.GetError()
@@ -124,9 +158,94 @@ func UpdateAPIKeyForUser(userID uint32, id uint32, input graphQLModel.APIKeyInpu
 	return nil
 }
 
-func DeleteAPIKeyForUser(userID uint32, id uint32) error {
+func RevokeAPIKey(userID uint32, uid string, allowForeign bool) sharedUtils.Result[graphQLModel.APIKey] {
+	k, err := loadAPIKeyForOperation(userID, uid, allowForeign)
+	if err != nil {
+		return sharedUtils.NewFailureResult[graphQLModel.APIKey](err)
+	}
+	k.Revoked = true
+	result := dbClient.GetRelationalDatabaseClientInstance().UpdateAPIKey(k)
+	if result.IsFailure() {
+		return sharedUtils.NewFailureResult[graphQLModel.APIKey](result.GetError())
+	}
+	return sharedUtils.NewSuccessResult(dll2gql.ToGraphQLModelAPIKey(result.GetPayload()))
+}
+
+func RotateAPIKey(userID uint32, uid string, allowForeign bool) sharedUtils.Result[string] {
+	k, err := loadAPIKeyForOperation(userID, uid, allowForeign)
+	if err != nil {
+		return sharedUtils.NewFailureResult[string](err)
+	}
+	rawKey := sharedUtils.GenerateRandomAlphanumericString(32)
+	hash := sharedUtils.GenerateHexHash(rawKey)
+	result := dbClient.GetRelationalDatabaseClientInstance().UpdateAPIKeyHash(k.ID.GetPayload(), hash)
+	if result.IsFailure() {
+		return sharedUtils.NewFailureResult[string](result.GetError())
+	}
+	return sharedUtils.NewSuccessResult(rawKey)
+}
+
+func UpdateAPIKeyPermissions(userID uint32, uid string, permissionUIDs []string, allowForeign bool) sharedUtils.Result[graphQLModel.APIKey] {
+	k, err := loadAPIKeyForOperation(userID, uid, allowForeign)
+	if err != nil {
+		return sharedUtils.NewFailureResult[graphQLModel.APIKey](err)
+	}
+	if k.UserID == nil {
+		return sharedUtils.NewFailureResult[graphQLModel.APIKey](fmt.Errorf("missing user id"))
+	}
+	if err := validateAPIKeyPermissionsForUser(*k.UserID, permissionUIDs); err != nil {
+		return sharedUtils.NewFailureResult[graphQLModel.APIKey](err)
+	}
+	k.Permissions = permissionUIDs
+	result := dbClient.GetRelationalDatabaseClientInstance().UpdateAPIKey(k)
+	if result.IsFailure() {
+		return sharedUtils.NewFailureResult[graphQLModel.APIKey](result.GetError())
+	}
+	return sharedUtils.NewSuccessResult(dll2gql.ToGraphQLModelAPIKey(result.GetPayload()))
+}
+
+func UpdateAPIKeyRestrictions(userID uint32, uid string, input graphQLModel.APIKeyRestrictionsInput, allowForeign bool) sharedUtils.Result[graphQLModel.APIKey] {
+	k, err := loadAPIKeyForOperation(userID, uid, allowForeign)
+	if err != nil {
+		return sharedUtils.NewFailureResult[graphQLModel.APIKey](err)
+	}
+	if input.ExpiresAt != nil {
+		if *input.ExpiresAt == "" {
+			k.ExpiresAt = nil
+		} else if t, err := time.Parse(time.RFC3339, *input.ExpiresAt); err == nil {
+			k.ExpiresAt = &t
+		} else {
+			return sharedUtils.NewFailureResult[graphQLModel.APIKey](err)
+		}
+	}
+	if input.Revoked != nil {
+		k.Revoked = *input.Revoked
+	}
+	if input.RateLimit != nil {
+		val := *input.RateLimit
+		k.RateLimit = &val
+	}
+	if input.IPRestrictions != nil {
+		k.IPRestrictions = input.IPRestrictions
+	}
+	result := dbClient.GetRelationalDatabaseClientInstance().UpdateAPIKey(k)
+	if result.IsFailure() {
+		return sharedUtils.NewFailureResult[graphQLModel.APIKey](result.GetError())
+	}
+	return sharedUtils.NewSuccessResult(dll2gql.ToGraphQLModelAPIKey(result.GetPayload()))
+}
+
+func TouchAPIKeyLastUsedAt(id uint32) error {
+	return dbClient.GetRelationalDatabaseClientInstance().TouchAPIKeyLastUsedAt(id)
+}
+
+func DeleteAPIKeyForUser(userID uint32, uid string) error {
 	db := dbClient.GetRelationalDatabaseClientInstance()
-	load := db.LoadAPIKeyByID(id)
+	normalizedUID, normalizeErr := normalizeAPIKeyUID(uid)
+	if normalizeErr != nil {
+		return normalizeErr
+	}
+	load := db.LoadAPIKeyByUID(normalizedUID)
 	if load.IsFailure() {
 		return load.GetError()
 	}
@@ -137,5 +256,39 @@ func DeleteAPIKeyForUser(userID uint32, id uint32) error {
 	if userID != *k.UserID {
 		return fmt.Errorf("not found")
 	}
-	return db.DeleteAPIKey(id)
+	if k.ID.IsEmpty() {
+		return fmt.Errorf("missing id")
+	}
+	return db.DeleteAPIKey(k.ID.GetPayload())
+}
+
+func loadAPIKeyForOperation(userID uint32, uid string, allowForeign bool) (dllModel.APIKey, error) {
+	normalizedUID, normalizeErr := normalizeAPIKeyUID(uid)
+	if normalizeErr != nil {
+		return dllModel.APIKey{}, normalizeErr
+	}
+	load := dbClient.GetRelationalDatabaseClientInstance().LoadAPIKeyByUID(normalizedUID)
+	if load.IsFailure() {
+		return dllModel.APIKey{}, load.GetError()
+	}
+	if load.GetPayload().IsEmpty() {
+		return dllModel.APIKey{}, fmt.Errorf("not found")
+	}
+	k := load.GetPayload().GetPayload()
+	if k.UserID == nil || k.ID.IsEmpty() {
+		return dllModel.APIKey{}, fmt.Errorf("missing id")
+	}
+	if userID != *k.UserID && !allowForeign {
+		return dllModel.APIKey{}, fmt.Errorf("not found")
+	}
+	return k, nil
+}
+
+func validateAPIKeyPermissionsForUser(userID uint32, permissions []string) error {
+	roleResult := LoadUserRole(userID)
+	if roleResult.IsFailure() {
+		return roleResult.GetError()
+	}
+	userRole := roleResult.GetPayload()
+	return sharedUtils.ValidatePermissions[graphQLModel.Permission](userRole.Permissions, permissions, func(p graphQLModel.Permission) string { return p.UID })
 }

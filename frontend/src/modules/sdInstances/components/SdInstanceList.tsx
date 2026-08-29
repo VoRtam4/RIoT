@@ -15,7 +15,6 @@ import VirtualizedCardGrid from "../../../components/virtualization/VirtualizedC
 import EmptyStateNotice from "../../../components/EmptyStateNotice";
 
 type Instance = {
-  id: string;
   label?: string | null;
   uid?: string | null;
 };
@@ -26,9 +25,9 @@ type Props = {
   onOpen: (id: string) => void;
 };
 
-export default function SdInstanceList({ instances = [], loading, }: Props) {
+export default function SdInstanceList({ instances = [], loading }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  
+
   if (loading) {
     return (
       <div className="d-flex h-100 justify-content-center align-items-center">
@@ -51,10 +50,7 @@ export default function SdInstanceList({ instances = [], loading, }: Props) {
           />
         }
         renderItem={(inst) => (
-          <SdInstanceCard
-            key={inst.id}
-            instance={inst}
-          />
+          <SdInstanceCard key={inst.uid ?? inst.label ?? ""} instance={inst} />
         )}
       />
     </div>

@@ -126,11 +126,11 @@ func subscribeClient(c *connection.Client, msg sharedModel.WebSocketMessage) err
 			raw, _ := json.Marshal(msg.Payload)
 			_ = json.Unmarshal(raw, &filter)
 		}
-		if len(filter.Ids) == 0 {
-			return fmt.Errorf("timeSeries export subscription requires at least one id")
+		if len(filter.Uids) == 0 {
+			return fmt.Errorf("timeSeries export subscription requires at least one uid")
 		}
-		for _, id := range filter.Ids {
-			if _, err := domainLogicLayer.GetTimeSeriesExport(principal.UserID, id); err != nil {
+		for _, uid := range filter.Uids {
+			if _, err := domainLogicLayer.GetTimeSeriesExport(principal.UserID, uid); err != nil {
 				return err
 			}
 		}

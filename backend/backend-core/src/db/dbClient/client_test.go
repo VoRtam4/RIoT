@@ -45,10 +45,10 @@ func TestPersistSDType(t *testing.T) {
 	}(db)
 	mock.ExpectBegin()
 	mock.ExpectQuery(`^INSERT INTO "sd_types"`).
-		WithArgs("shelly1pro").
+		WithArgs("sdt:shelly1pro", "shelly1pro").
 		WillReturnRows(sqlmock.NewRows(sharedUtils.SliceOf("id")).AddRow(1))
 	mock.ExpectQuery(`^INSERT INTO "sd_parameters"`).
-		WithArgs(1, "relay_0_temperature", "number", 1, "relay_0_output", "boolean").
+		WithArgs(1, "", "relay_0_temperature", "number", "", 1, "", "relay_0_output", "boolean", "").
 		WillReturnRows(sqlmock.NewRows(sharedUtils.SliceOf("id")).AddRow(1).AddRow(2))
 	mock.ExpectCommit()
 	sdType := dllModel.SDType{

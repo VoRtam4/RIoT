@@ -12,7 +12,10 @@
 import { useEffect, useMemo } from "react";
 
 import { apiFeatures } from "../modules/apiKeys/data/apiDocs";
-import type { ApiFeatureDoc, ApiTechnology } from "../modules/apiKeys/data/apiDocs";
+import type {
+  ApiFeatureDoc,
+  ApiTechnology,
+} from "../modules/apiKeys/data/apiDocs";
 import { matchesSearchText } from "../utils/reactSelectSearch";
 
 import ApiDocsSidebar from "../modules/apiKeys/components/APIDocsSidebar";
@@ -32,6 +35,7 @@ export default function ApiDocsPage() {
     return apiFeatures.filter((feature: ApiFeatureDoc) => {
       return matchesSearchText(
         query.q,
+        query.qMode,
         feature.title,
         feature.summary,
         ...feature.actions.map((action) => action.title),
@@ -40,7 +44,7 @@ export default function ApiDocsPage() {
         ),
       );
     });
-  }, [query.q]);
+  }, [query.q, query.qMode]);
 
   const selectedFeature =
     filteredFeatures.find((feature) => feature.id === query.feature) ?? null;
@@ -57,14 +61,17 @@ export default function ApiDocsPage() {
   }, [selectedFeature]);
 
   const selectedTechnology =
-    (query.tech &&
-    featureTechnologies.includes(query.tech)) ? query.tech : featureTechnologies[0];
+    query.tech && featureTechnologies.includes(query.tech)
+      ? query.tech
+      : featureTechnologies[0];
 
   const actionsForTechnology = useMemo(() => {
     if (!selectedFeature || !selectedTechnology) return [];
 
     return selectedFeature.actions.filter((action) =>
-      action.variants.some((variant) => variant.technology === selectedTechnology),
+      action.variants.some(
+        (variant) => variant.technology === selectedTechnology,
+      ),
     );
   }, [selectedFeature, selectedTechnology]);
 
@@ -98,7 +105,13 @@ export default function ApiDocsPage() {
       },
       { replace: true },
     );
-  }, [query, selectedAction, selectedFeature, selectedTechnology, setPageState]);
+  }, [
+    query,
+    selectedAction,
+    selectedFeature,
+    selectedTechnology,
+    setPageState,
+  ]);
 
   return (
     <div className="container-fluid mt-3">
@@ -114,12 +127,25 @@ export default function ApiDocsPage() {
             features={filteredFeatures}
             selectedFeatureId={selectedFeature?.id ?? null}
             search={query.q}
+            searchMode={query.qMode}
             onSearchChange={(q) =>
               setPageState(
                 {
                   query: {
                     ...query,
                     q,
+                  },
+                  entry: null,
+                },
+                { replace: true },
+              )
+            }
+            onSearchModeChange={(qMode) =>
+              setPageState(
+                {
+                  query: {
+                    ...query,
+                    qMode,
                   },
                   entry: null,
                 },

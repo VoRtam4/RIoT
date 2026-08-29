@@ -18,7 +18,9 @@ import (
 
 func ToDBModelRole(role dllModel.Role) dbModel.RoleEntity {
 	return dbModel.RoleEntity{
-		ID:    role.ID,
-		Label: role.Label,
+		ID:     role.ID,
+		UID:    role.UID,
+		Label:  role.Label,
+		System: role.System,
 	}
 }

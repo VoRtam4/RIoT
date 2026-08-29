@@ -24,13 +24,10 @@ import KpiSdTypeDataPanel from "../modules/kpi/components/KpiSdTypeDataPanel";
 import KpiResultHistoryPanel from "../modules/kpi/components/KpiResultHistoryPanel";
 import { usePageState } from "../app/navigation/usePageState";
 import { kpiDetailPageStateCodec } from "../modules/kpi/state/kpiDetailPageState";
-import {
-  minusDaysLocal,
-  nowLocal,
-} from "../modules/kpi/utils/dateTimeUtils";
+import { minusDaysLocal, nowLocal } from "../modules/kpi/utils/dateTimeUtils";
 
 export default function KpiDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const { uid } = useParams<{ uid: string }>();
   const navigate = useNavigate();
   const defaultRangeRef = useRef({
     from: minusDaysLocal(1),
@@ -38,21 +35,19 @@ export default function KpiDetailPage() {
   });
 
   const { config, toggleKpi } = useUserConfig();
-  const isFavorite = id && config.favoriteKpis.includes(String(id));
+  const isFavorite = uid && config.favoriteKpis.includes(String(uid));
 
-  const { kpi, loading: kpiLoading } = useKpiDefinition(id);
-  const { sdType, loading: sdTypeLoading } = useSdType(kpi?.sdTypeID);
+  const { kpi, loading: kpiLoading } = useKpiDefinition(uid);
+  const { sdType, loading: sdTypeLoading } = useSdType(kpi?.sdTypeUID);
 
   const mode = kpi?.sdInstanceMode?.toLowerCase();
 
   const { entry: instancesEntryByType, loading: instancesByTypeLoading } =
-    useSdInstancesByType(
-      mode === "all" ? kpi?.sdTypeID ?? null : null,
-    );
+    useSdInstancesByType(mode === "all" ? (kpi?.sdTypeUID ?? null) : null);
 
   const { sdInstances: instancesByKpi, loading: instancesByKpiLoading } =
     useSdInstancesByKpiDefinition(
-      mode === "selected" ? id ?? null : null,
+      mode === "selected" ? (kpi?.uid ?? null) : null,
       mode === "selected",
     );
   const { query, setPageState } = usePageState(kpiDetailPageStateCodec);
@@ -84,7 +79,7 @@ export default function KpiDetailPage() {
     return [];
   }, [kpi, mode, instancesEntryByType, instancesByKpi]);
 
-  const selectedInstanceId = query.inst;
+  const selectedInstanceUID = query.inst;
 
   const from = query.from ?? defaultRangeRef.current.from;
   const to = query.to ?? defaultRangeRef.current.to;
@@ -93,7 +88,7 @@ export default function KpiDetailPage() {
     if (
       !loading &&
       query.inst &&
-      !instances.some((instance) => String(instance.id) === String(query.inst))
+      !instances.some((instance) => String(instance.uid) === String(query.inst))
     ) {
       setPageState(
         {
@@ -163,51 +158,55 @@ export default function KpiDetailPage() {
                 wordBreak: "break-word",
               }}
             >
-              {kpi?.id ?? "\u00A0"} ({sdType?.uid ?? "\u00A0"})
+              {kpi?.uid ?? "\u00A0"} ({sdType?.uid ?? "\u00A0"})
             </div>
           </div>
 
           <div className="d-flex gap-2">
             <button
               className={`btn ${isFavorite ? "btn-danger" : "btn-outline-light"}`}
-              onClick={() => id && toggleKpi(String(id))}
+              onClick={() => uid && toggleKpi(String(uid))}
             >
-              <i className={isFavorite ? "fa-solid fa-heart" : "fa-regular fa-heart"} />
+              <i
+                className={
+                  isFavorite ? "fa-solid fa-heart" : "fa-regular fa-heart"
+                }
+              />
             </button>
 
             <button
               className="btn btn-outline-light"
-              onClick={() =>
-                {
-                  const searchParams = new URLSearchParams();
-                  searchParams.set("type", "kpi");
-                  searchParams.set("auto", "1");
-                  if (kpi?.sdTypeID) {
-                    searchParams.set("sdType", String(kpi.sdTypeID));
-                  }
-
-                  navigate(
-                    {
-                      pathname: "/history",
-                      search: `?${searchParams.toString()}`,
-                    },
-                    {
-                      state: {
-                        v: 1,
-                        sdInstanceIDs: selectedInstanceId ? [selectedInstanceId] : [],
-                        kpiDefinitionIDs: id ? [String(id)] : [],
-                      },
-                    },
-                  );
+              onClick={() => {
+                const searchParams = new URLSearchParams();
+                searchParams.set("type", "kpi");
+                searchParams.set("auto", "1");
+                if (sdType?.uid) {
+                  searchParams.set("sdType", String(sdType.uid));
                 }
-              }
+
+                navigate(
+                  {
+                    pathname: "/history",
+                    search: `?${searchParams.toString()}`,
+                  },
+                  {
+                    state: {
+                      v: 1,
+                      sdInstanceUIDs: selectedInstanceUID
+                        ? [selectedInstanceUID]
+                        : [],
+                      kpiDefinitionUIDs: kpi?.uid ? [String(kpi.uid)] : [],
+                    },
+                  },
+                );
+              }}
             >
               History
             </button>
 
             <button
               className="btn btn-primary"
-              onClick={() => navigate(`/kpi/edit/${id}`)}
+              onClick={() => navigate(`/kpi/edit/${uid}`)}
             >
               Edit
             </button>
@@ -226,9 +225,10 @@ export default function KpiDetailPage() {
         >
           <KpiInstanceSidebar
             instances={instances}
-            selectedInstanceId={selectedInstanceId}
+            selectedInstanceUID={selectedInstanceUID}
             loading={loading}
             search={query.instQ}
+            searchMode={query.instQMode}
             sort={query.instSort}
             onSearchChange={(instQ) =>
               setPageState(
@@ -236,6 +236,18 @@ export default function KpiDetailPage() {
                   query: {
                     ...query,
                     instQ,
+                  },
+                  entry: null,
+                },
+                { replace: true },
+              )
+            }
+            onSearchModeChange={(instQMode) =>
+              setPageState(
+                {
+                  query: {
+                    ...query,
+                    instQMode,
                   },
                   entry: null,
                 },
@@ -259,7 +271,7 @@ export default function KpiDetailPage() {
                 {
                   query: {
                     ...query,
-                    inst: selectedInstanceId === inst ? null : inst,
+                    inst: selectedInstanceUID === inst ? null : inst,
                   },
                   entry: null,
                 },
@@ -272,8 +284,9 @@ export default function KpiDetailPage() {
         <div className="me-3" style={{ display: "grid", gap: 16 }}>
           <div className="card p-3">
             <KpiResultHistoryPanel
-              kpiDefinitionID={id}
-              sdInstanceID={selectedInstanceId}
+              kpiDefinitionUID={kpi?.uid}
+              sdInstanceUID={selectedInstanceUID}
+              sdTypeUID={kpi?.sdTypeUID}
               from={from}
               to={to}
               onFromChange={(nextFrom) =>
@@ -305,7 +318,7 @@ export default function KpiDetailPage() {
 
           <div className="card p-0">
             <KpiSdTypeDataPanel
-              sdInstanceID={selectedInstanceId}
+              sdInstanceUID={selectedInstanceUID}
               sdType={sdType}
             />
           </div>

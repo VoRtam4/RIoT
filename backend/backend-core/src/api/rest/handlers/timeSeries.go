@@ -17,6 +17,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
@@ -122,11 +124,12 @@ func CancelTimeSeriesExport(w http.ResponseWriter, r *http.Request) {
 	if principal == nil {
 		return
 	}
-	id, ok := parseID(w, r)
-	if !ok {
+	uid := chi.URLParam(r, "uid")
+	if uid == "" {
+		http.Error(w, "missing uid", http.StatusBadRequest)
 		return
 	}
-	exportJob, err := domainLogicLayer.CancelTimeSeriesExport(principal.UserID, id)
+	exportJob, err := domainLogicLayer.CancelTimeSeriesExport(principal.UserID, uid)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -139,11 +142,12 @@ func GetTimeSeriesExport(w http.ResponseWriter, r *http.Request) {
 	if principal == nil {
 		return
 	}
-	id, ok := parseID(w, r)
-	if !ok {
+	uid := chi.URLParam(r, "uid")
+	if uid == "" {
+		http.Error(w, "missing uid", http.StatusBadRequest)
 		return
 	}
-	exportJob, err := domainLogicLayer.GetTimeSeriesExport(principal.UserID, id)
+	exportJob, err := domainLogicLayer.GetTimeSeriesExport(principal.UserID, uid)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -156,15 +160,16 @@ func TimeSeriesExport(w http.ResponseWriter, r *http.Request) {
 	if principal == nil {
 		return
 	}
-	id, ok := parseID(w, r)
-	if !ok {
+	uid := chi.URLParam(r, "uid")
+	if uid == "" {
+		http.Error(w, "missing uid", http.StatusBadRequest)
 		return
 	}
-	if _, err := domainLogicLayer.GetTimeSeriesExport(principal.UserID, id); err != nil {
+	if _, err := domainLogicLayer.GetTimeSeriesExport(principal.UserID, uid); err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	job, ok := domainLogicLayer.GetExportJob(id)
+	job, ok := domainLogicLayer.GetExportJob(uid)
 	if !ok {
 		http.Error(w, "not found", 404)
 		return

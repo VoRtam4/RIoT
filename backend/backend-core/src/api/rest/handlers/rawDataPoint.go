@@ -17,6 +17,7 @@ import (
 
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
+	"github.com/go-chi/chi/v5"
 )
 
 func GetRawDataPointsBySDType(w http.ResponseWriter, r *http.Request) {
@@ -25,12 +26,8 @@ func GetRawDataPointsBySDType(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sdTypeID, ok := parseID(w, r)
-	if !ok {
-		return
-	}
-
-	result := domainLogicLayer.GetRawDataPointsBySDType(sdTypeID)
+	uid := chi.URLParam(r, "uid")
+	result := domainLogicLayer.GetRawDataPointsBySDTypeUID(uid)
 	if result.IsFailure() {
 		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
 		return
@@ -44,12 +41,8 @@ func GetRawDataPoint(w http.ResponseWriter, r *http.Request) {
 	if principal == nil {
 		return
 	}
-	sdInstanceID, ok := parseID(w, r)
-	if !ok {
-		http.Error(w, "invalid sdInstanceID", http.StatusBadRequest)
-		return
-	}
-	result := domainLogicLayer.GetRawDataPoint(sdInstanceID)
+	uid := r.URL.Query().Get("uid")
+	result := domainLogicLayer.GetRawDataPointBySDInstanceUID(uid)
 	if result.IsFailure() {
 		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
 		return

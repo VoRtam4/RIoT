@@ -29,7 +29,7 @@ const (
 )
 
 var (
-	jwtAuthenticationMiddlewareEnabled      = sharedUtils.GetFlagEnvironmentVariableValue("JWT_AUTHENTICATION_MIDDLEWARE_ENABLED").GetPayloadOrDefault(false)
+	jwtAuthenticationMiddlewareEnabled      = sharedUtils.GetFlagEnvironmentVariableValue("JWT_AUTHENTICATION_MIDDLEWARE_ENABLED").GetPayloadOrDefault(true)
 	sameOriginExpiredSessionJWTRequestGroup singleflight.Group
 )
 
@@ -61,6 +61,8 @@ type sessionRefreshResult struct {
 	newSessionJWT         string
 	newRefreshToken       string
 	refreshTokenExpiresAt time.Time
+	sessionID             *uint
+	sessionUID            *string
 }
 
 func performSessionRefresh(refreshTokenHash string) (*sessionRefreshResult, error) {
@@ -90,9 +92,16 @@ func performSessionRefresh(refreshTokenHash string) (*sessionRefreshResult, erro
 	if userSessionPersistResult.IsFailure() {
 		return nil, fmt.Errorf("database operation error - failed to persist user session record: %w", userSessionPersistResult.GetError())
 	}
+	reloadResult := dbClientInstance.LoadUserSessionBasedOnRefreshTokenHash(userSession.RefreshTokenHash)
+	if reloadResult.IsFailure() || reloadResult.GetPayload().IsEmpty() {
+		return nil, errors.New("failed to reload refreshed session")
+	}
+	sessionID, sessionUID := sessionIdentityFromDLL(reloadResult.GetPayload().GetPayload(), userSession.UserID)
 	return &sessionRefreshResult{
 		newSessionJWT:         newSessionJWT,
 		newRefreshToken:       newRefreshToken,
 		refreshTokenExpiresAt: userSession.ExpiresAt,
+		sessionID:             sessionID,
+		sessionUID:            sessionUID,
 	}, nil
 }

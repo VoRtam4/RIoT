@@ -23,10 +23,10 @@ export const useCancelTimeSeriesExport = () => {
   >(CancelTimeSeriesExportDocument);
 
   const cancelTimeSeriesExport = async (
-    id: CancelTimeSeriesExportMutationVariables["id"],
+    uid: CancelTimeSeriesExportMutationVariables["uid"],
   ) => {
     const res = await cancelExportMutation({
-      variables: { id },
+      variables: { uid },
     });
 
     return res.data?.cancelTimeSeriesExport ?? null;

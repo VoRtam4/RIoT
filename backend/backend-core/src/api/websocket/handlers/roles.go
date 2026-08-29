@@ -31,6 +31,35 @@ func GetRoles(c *connection.Client, msg sharedModel.WebSocketMessage) {
 	sendSuccess(c, msg.ID, result.GetPayload())
 }
 
+func GetRoleByUID(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceRoles, auth.OperationRead); principal == nil {
+		return
+	}
+	uid, ok := payloadString(msg, "uid")
+	if !ok {
+		sendError(c, msg.ID, "invalid uid")
+		return
+	}
+	result := domainLogicLayer.LoadRoleByUID(uid)
+	if result.IsFailure() {
+		sendError(c, msg.ID, result.GetError().Error())
+		return
+	}
+	sendSuccess(c, msg.ID, result.GetPayload())
+}
+
+func GetPermissions(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceRoles, auth.OperationRead); principal == nil {
+		return
+	}
+	result := domainLogicLayer.LoadPermissions()
+	if result.IsFailure() {
+		sendError(c, msg.ID, result.GetError().Error())
+		return
+	}
+	sendSuccess(c, msg.ID, result.GetPayload())
+}
+
 func GetUserRole(c *connection.Client, msg sharedModel.WebSocketMessage) {
 	if principal := AuthorizeOperation(c, msg, auth.ResourceRoles, auth.OperationRead); principal == nil {
 		return
@@ -40,12 +69,12 @@ func GetUserRole(c *connection.Client, msg sharedModel.WebSocketMessage) {
 		sendError(c, msg.ID, "invalid payload")
 		return
 	}
-	userID, ok := parseID(payload)
-	if !ok {
-		sendError(c, msg.ID, "invalid userId")
+	uid, ok := payload["uid"].(string)
+	if !ok || uid == "" {
+		sendError(c, msg.ID, "invalid uid")
 		return
 	}
-	result := domainLogicLayer.LoadUserRole(userID)
+	result := domainLogicLayer.LoadUserRoleByUID(uid)
 	if result.IsFailure() {
 		sendError(c, msg.ID, result.GetError().Error())
 		return
@@ -66,6 +95,105 @@ func GetRole(c *connection.Client, msg sharedModel.WebSocketMessage) {
 	sendSuccess(c, msg.ID, result.GetPayload())
 }
 
+func CreateRole(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceRoles, auth.OperationCreate); principal == nil {
+		return
+	}
+	input, err := parsePayload[graphQLModel.RoleInput](msg)
+	if err != nil {
+		sendError(c, msg.ID, "invalid payload")
+		return
+	}
+	result := domainLogicLayer.CreateRole(input)
+	if result.IsFailure() {
+		sendError(c, msg.ID, result.GetError().Error())
+		return
+	}
+	sendSuccess(c, msg.ID, result.GetPayload())
+}
+
+func UpdateRole(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceRoles, auth.OperationUpdate); principal == nil {
+		return
+	}
+	uid, ok := payloadString(msg, "uid")
+	if !ok {
+		sendError(c, msg.ID, "invalid uid")
+		return
+	}
+	input, err := parsePayload[graphQLModel.RoleInput](msg)
+	if err != nil {
+		sendError(c, msg.ID, "invalid payload")
+		return
+	}
+	result := domainLogicLayer.UpdateRole(uid, input)
+	if result.IsFailure() {
+		sendError(c, msg.ID, result.GetError().Error())
+		return
+	}
+	sendSuccess(c, msg.ID, result.GetPayload())
+}
+
+func DeleteRole(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceRoles, auth.OperationDelete); principal == nil {
+		return
+	}
+	uid, ok := payloadString(msg, "uid")
+	if !ok {
+		sendError(c, msg.ID, "invalid uid")
+		return
+	}
+	if err := domainLogicLayer.DeleteRole(uid); err != nil {
+		sendError(c, msg.ID, err.Error())
+		return
+	}
+	sendSuccess(c, msg.ID, nil)
+}
+
+func CloneRole(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceRoles, auth.OperationCreate); principal == nil {
+		return
+	}
+	uid, ok := payloadString(msg, "uid")
+	if !ok {
+		sendError(c, msg.ID, "invalid uid")
+		return
+	}
+	label, ok := payloadString(msg, "label")
+	if !ok {
+		sendError(c, msg.ID, "invalid label")
+		return
+	}
+	result := domainLogicLayer.CloneRole(uid, label)
+	if result.IsFailure() {
+		sendError(c, msg.ID, result.GetError().Error())
+		return
+	}
+	sendSuccess(c, msg.ID, result.GetPayload())
+}
+
+func UpdatePermissionLabel(c *connection.Client, msg sharedModel.WebSocketMessage) {
+	if principal := AuthorizeOperation(c, msg, auth.ResourceRoles, auth.OperationUpdate); principal == nil {
+		return
+	}
+	uid, ok := payloadString(msg, "uid")
+	if !ok {
+		sendError(c, msg.ID, "invalid uid")
+		return
+	}
+	label, ok := payloadString(msg, "label")
+	if !ok {
+		sendError(c, msg.ID, "invalid label")
+		return
+	}
+	result := domainLogicLayer.UpdatePermissionLabel(uid, label)
+	if result.IsFailure() {
+		sendError(c, msg.ID, result.GetError().Error())
+		return
+	}
+	sendSuccess(c, msg.ID, result.GetPayload())
+}
+
 func AssignRoleToUser(c *connection.Client, msg sharedModel.WebSocketMessage) {
 	if principal := AuthorizeOperation(c, msg, auth.ResourceRoles, auth.OperationUpdate); principal == nil {
 		return
@@ -75,7 +203,7 @@ func AssignRoleToUser(c *connection.Client, msg sharedModel.WebSocketMessage) {
 		sendError(c, msg.ID, "invalid payload")
 		return
 	}
-	err = domainLogicLayer.AssignRoleToUser(req.UserID, req.RoleID)
+	err = domainLogicLayer.AssignRoleToUser(req.UserUID, req.RoleUID)
 	if err != nil {
 		sendError(c, msg.ID, err.Error())
 		return

@@ -35,17 +35,12 @@ func GetSDType(c *connection.Client, msg sharedModel.WebSocketMessage) {
 	if principal := AuthorizeOperation(c, msg, auth.ResourceSDTypes, auth.OperationRead); principal == nil {
 		return
 	}
-	payload, ok := msg.Payload.(map[string]any)
+	uid, ok := parseUIDPayload(msg.Payload)
 	if !ok {
-		sendError(c, msg.ID, "invalid payload")
+		sendError(c, msg.ID, "invalid uid")
 		return
 	}
-	id, ok := parseID(payload)
-	if !ok {
-		sendError(c, msg.ID, "invalid id")
-		return
-	}
-	result := domainLogicLayer.GetSDType(id)
+	result := domainLogicLayer.GetSDType(uid)
 	if result.IsFailure() {
 		sendError(c, msg.ID, result.GetError().Error())
 		return
@@ -74,17 +69,12 @@ func DeleteSDType(c *connection.Client, msg sharedModel.WebSocketMessage) {
 	if principal := AuthorizeOperation(c, msg, auth.ResourceSDTypes, auth.OperationDelete); principal == nil {
 		return
 	}
-	payload, ok := msg.Payload.(map[string]any)
+	uid, ok := parseUIDPayload(msg.Payload)
 	if !ok {
-		sendError(c, msg.ID, "invalid payload")
+		sendError(c, msg.ID, "invalid uid")
 		return
 	}
-	id, ok := parseID(payload)
-	if !ok {
-		sendError(c, msg.ID, "invalid id")
-		return
-	}
-	if err := domainLogicLayer.DeleteSDType(id); err != nil {
+	if err := domainLogicLayer.DeleteSDType(uid); err != nil {
 		sendError(c, msg.ID, err.Error())
 		return
 	}

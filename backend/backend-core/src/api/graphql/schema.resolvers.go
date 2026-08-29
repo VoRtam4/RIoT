@@ -1,16 +1,3 @@
-/**
- * @file schema.resolvers.go
- * @brief Implementace resolverů GraphQL API Backend Core.
- *
- * @author Michal Bureš
- * @author Vojtěch Hubáček
- *
- * @par Autorský podíl
- * - Michal Bureš: původní resolverová logika pro základní GraphQL API.
- * - Vojtěch Hubáček: doplnění autorizace operací, per-user operací, API klíčů, IP restrikcí, raw dat, time-series rozhraní, rolí, tag/field parametrů, labelů, nových KPI operací, By dotazů a sjednocených subscription událostí pro všechna rozhraní.
- *
- * @ingroup riot_backend_core
- */
 package graphql
 
 import (
@@ -23,6 +10,7 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/events"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
+	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 )
 
 func (r *mutationResolver) CreateSDType(ctx context.Context, input graphQLModel.SDTypeInput) (graphQLModel.SDType, error) {
@@ -36,22 +24,22 @@ func (r *mutationResolver) CreateSDType(ctx context.Context, input graphQLModel.
 	return createSDTypeResult.Unwrap()
 }
 
-func (r *mutationResolver) DeleteSDType(ctx context.Context, id uint32) (bool, error) {
+func (r *mutationResolver) DeleteSDType(ctx context.Context, uid string) (bool, error) {
 	if _, err := authorizeOperation(ctx, auth.ResourceSDTypes, auth.OperationDelete); err != nil {
 		return false, err
 	}
-	if err := domainLogicLayer.DeleteSDType(id); err != nil {
+	if err := domainLogicLayer.DeleteSDType(uid); err != nil {
 		log.Printf("Error occurred (delete SD type): %s\n", err.Error())
 		return false, err
 	}
 	return true, nil
 }
 
-func (r *mutationResolver) UpdateSDInstance(ctx context.Context, id uint32, input graphQLModel.SDInstanceUpdateInput) (graphQLModel.SDInstance, error) {
+func (r *mutationResolver) UpdateSDInstance(ctx context.Context, uid string, input graphQLModel.SDInstanceUpdateInput) (graphQLModel.SDInstance, error) {
 	if _, err := authorizeOperation(ctx, auth.ResourceSDInstances, auth.OperationUpdate); err != nil {
 		return graphQLModel.SDInstance{}, err
 	}
-	updateSDInstanceResult := domainLogicLayer.UpdateSDInstance(id, input)
+	updateSDInstanceResult := domainLogicLayer.UpdateSDInstance(uid, input)
 	if updateSDInstanceResult.IsFailure() {
 		log.Printf("Error occurred (update SD instance): %s\n", updateSDInstanceResult.GetError().Error())
 	}
@@ -70,24 +58,24 @@ func (r *mutationResolver) CreateKPIDefinition(ctx context.Context, input graphQ
 	return createKPIDefinitionResult.Unwrap()
 }
 
-func (r *mutationResolver) UpdateKPIDefinition(ctx context.Context, id uint32, input graphQLModel.KPIDefinitionInput) (graphQLModel.KPIDefinition, error) {
+func (r *mutationResolver) UpdateKPIDefinition(ctx context.Context, uid string, input graphQLModel.KPIDefinitionInput) (graphQLModel.KPIDefinition, error) {
 	principal, err := authorizeOperation(ctx, auth.ResourceKPIDefinitions, auth.OperationUpdate)
 	if err != nil {
 		return graphQLModel.KPIDefinition{}, err
 	}
-	updateKPIDefinitionResult := domainLogicLayer.UpdateKPIDefinition(principal.UserID, id, input)
+	updateKPIDefinitionResult := domainLogicLayer.UpdateKPIDefinition(principal.UserID, uid, input)
 	if updateKPIDefinitionResult.IsFailure() {
 		log.Printf("Error occurred (update KPI definition): %s\n", updateKPIDefinitionResult.GetError().Error())
 	}
 	return updateKPIDefinitionResult.Unwrap()
 }
 
-func (r *mutationResolver) DeleteKPIDefinition(ctx context.Context, id uint32) (bool, error) {
+func (r *mutationResolver) DeleteKPIDefinition(ctx context.Context, uid string) (bool, error) {
 	principal, err := authorizeOperation(ctx, auth.ResourceKPIDefinitions, auth.OperationDelete)
 	if err != nil {
 		return false, err
 	}
-	if err := domainLogicLayer.DeleteKPIDefinition(principal.UserID, id); err != nil {
+	if err := domainLogicLayer.DeleteKPIDefinition(principal.UserID, uid); err != nil {
 		log.Printf("Error occurred (delete KPI definition): %s\n", err.Error())
 		return false, err
 	}
@@ -105,22 +93,22 @@ func (r *mutationResolver) CreateSDInstanceGroup(ctx context.Context, input grap
 	return createSDInstanceGroupResult.Unwrap()
 }
 
-func (r *mutationResolver) UpdateSDInstanceGroup(ctx context.Context, id uint32, input graphQLModel.SDInstanceGroupInput) (graphQLModel.SDInstanceGroup, error) {
+func (r *mutationResolver) UpdateSDInstanceGroup(ctx context.Context, uid string, input graphQLModel.SDInstanceGroupInput) (graphQLModel.SDInstanceGroup, error) {
 	if _, err := authorizeOperation(ctx, auth.ResourceSDInstances, auth.OperationUpdate); err != nil {
 		return graphQLModel.SDInstanceGroup{}, err
 	}
-	updateSDInstanceGroupResult := domainLogicLayer.UpdateSDInstanceGroup(id, input)
+	updateSDInstanceGroupResult := domainLogicLayer.UpdateSDInstanceGroup(uid, input)
 	if updateSDInstanceGroupResult.IsFailure() {
 		log.Printf("Error occurred (update SD instance group): %s\n", updateSDInstanceGroupResult.GetError().Error())
 	}
 	return updateSDInstanceGroupResult.Unwrap()
 }
 
-func (r *mutationResolver) DeleteSDInstanceGroup(ctx context.Context, id uint32) (bool, error) {
+func (r *mutationResolver) DeleteSDInstanceGroup(ctx context.Context, uid string) (bool, error) {
 	if _, err := authorizeOperation(ctx, auth.ResourceSDInstances, auth.OperationDelete); err != nil {
 		return false, err
 	}
-	if err := domainLogicLayer.DeleteSDInstanceGroup(id); err != nil {
+	if err := domainLogicLayer.DeleteSDInstanceGroup(uid); err != nil {
 		log.Printf("Error occurred (delete SD instance group): %s\n", err.Error())
 		return false, err
 	}
@@ -158,11 +146,145 @@ func (r *mutationResolver) DeleteUserConfig(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
+func (r *mutationResolver) UpdateUser(ctx context.Context, uid string, input graphQLModel.UserUpdateInput) (graphQLModel.User, error) {
+	if _, err := authorizeOperation(ctx, auth.ResourceUsers, auth.OperationUpdate); err != nil {
+		return graphQLModel.User{}, err
+	}
+	result := domainLogicLayer.UpdateUser(uid, input)
+	if result.IsFailure() {
+		return graphQLModel.User{}, result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
+func (r *mutationResolver) DisableUser(ctx context.Context, uid string, reason *string) (graphQLModel.User, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceUsers, auth.OperationUpdate)
+	if err != nil {
+		return graphQLModel.User{}, err
+	}
+	result := domainLogicLayer.DisableUser(principal.UserID, uid, reason)
+	if result.IsFailure() {
+		return graphQLModel.User{}, result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
+func (r *mutationResolver) EnableUser(ctx context.Context, uid string) (graphQLModel.User, error) {
+	if _, err := authorizeOperation(ctx, auth.ResourceUsers, auth.OperationUpdate); err != nil {
+		return graphQLModel.User{}, err
+	}
+	result := domainLogicLayer.EnableUser(uid)
+	if result.IsFailure() {
+		return graphQLModel.User{}, result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
+func (r *mutationResolver) RevokeUserSessions(ctx context.Context, uid string) (bool, error) {
+	if _, err := authorizeOperation(ctx, auth.ResourceUsers, auth.OperationUpdate); err != nil {
+		return false, err
+	}
+	if err := domainLogicLayer.RevokeUserSessions(uid); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (r *mutationResolver) RevokeSession(ctx context.Context, uid string) (bool, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceSessions, auth.OperationUpdate)
+	if err != nil {
+		return false, err
+	}
+	allowForeign := auth.CanAccessOperation(principal, auth.ResourceUsers, auth.OperationUpdate)
+	if err := domainLogicLayer.RevokeSession(principal.UserID, uid, allowForeign); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (r *mutationResolver) RevokeAllSessionsForUser(ctx context.Context, userUID string) (bool, error) {
+	if _, err := authorizeOperation(ctx, auth.ResourceUsers, auth.OperationUpdate); err != nil {
+		return false, err
+	}
+	if err := domainLogicLayer.RevokeUserSessions(userUID); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (r *mutationResolver) RevokeOwnOtherSessions(ctx context.Context) (bool, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceSessions, auth.OperationUpdate)
+	if err != nil {
+		return false, err
+	}
+	if principal.SessionID == nil {
+		return false, fmt.Errorf("current session not available")
+	}
+	if err := domainLogicLayer.RevokeOwnOtherSessions(principal.UserID, *principal.SessionID); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (r *mutationResolver) CreateRole(ctx context.Context, input graphQLModel.RoleInput) (graphQLModel.Role, error) {
+	if _, err := authorizeOperation(ctx, auth.ResourceRoles, auth.OperationCreate); err != nil {
+		return graphQLModel.Role{}, err
+	}
+	result := domainLogicLayer.CreateRole(input)
+	if result.IsFailure() {
+		return graphQLModel.Role{}, result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
+func (r *mutationResolver) UpdateRole(ctx context.Context, uid string, input graphQLModel.RoleInput) (graphQLModel.Role, error) {
+	if _, err := authorizeOperation(ctx, auth.ResourceRoles, auth.OperationUpdate); err != nil {
+		return graphQLModel.Role{}, err
+	}
+	result := domainLogicLayer.UpdateRole(uid, input)
+	if result.IsFailure() {
+		return graphQLModel.Role{}, result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
+func (r *mutationResolver) DeleteRole(ctx context.Context, uid string) (bool, error) {
+	if _, err := authorizeOperation(ctx, auth.ResourceRoles, auth.OperationDelete); err != nil {
+		return false, err
+	}
+	if err := domainLogicLayer.DeleteRole(uid); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (r *mutationResolver) CloneRole(ctx context.Context, uid string, label string) (graphQLModel.Role, error) {
+	if _, err := authorizeOperation(ctx, auth.ResourceRoles, auth.OperationCreate); err != nil {
+		return graphQLModel.Role{}, err
+	}
+	result := domainLogicLayer.CloneRole(uid, label)
+	if result.IsFailure() {
+		return graphQLModel.Role{}, result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
+func (r *mutationResolver) UpdatePermissionLabel(ctx context.Context, uid string, label string) (graphQLModel.Permission, error) {
+	if _, err := authorizeOperation(ctx, auth.ResourceRoles, auth.OperationUpdate); err != nil {
+		return graphQLModel.Permission{}, err
+	}
+	result := domainLogicLayer.UpdatePermissionLabel(uid, label)
+	if result.IsFailure() {
+		return graphQLModel.Permission{}, result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
 func (r *mutationResolver) AssignRoleToUser(ctx context.Context, input graphQLModel.AssignRoleInput) (bool, error) {
 	if _, err := authorizeOperation(ctx, auth.ResourceRoles, auth.OperationUpdate); err != nil {
 		return false, err
 	}
-	err := domainLogicLayer.AssignRoleToUser(input.UserID, input.RoleID)
+	err := domainLogicLayer.AssignRoleToUser(input.UserUID, input.RoleUID)
 	if err != nil {
 		return false, err
 	}
@@ -181,24 +303,76 @@ func (r *mutationResolver) CreateAPIKey(ctx context.Context, input graphQLModel.
 	return result.GetPayload(), nil
 }
 
-func (r *mutationResolver) UpdateAPIKey(ctx context.Context, id uint32, input graphQLModel.APIKeyInput) (bool, error) {
+func (r *mutationResolver) UpdateAPIKey(ctx context.Context, uid string, input graphQLModel.APIKeyInput) (bool, error) {
 	principal, err := authorizeOperation(ctx, auth.ResourceAPIKeys, auth.OperationUpdate)
 	if err != nil {
 		return false, err
 	}
-	err = domainLogicLayer.UpdateAPIKeyForUser(principal.UserID, id, input)
+	err = domainLogicLayer.UpdateAPIKeyForUser(principal.UserID, uid, input)
 	if err != nil {
 		return false, err
 	}
 	return true, nil
 }
 
-func (r *mutationResolver) DeleteAPIKey(ctx context.Context, id uint32) (bool, error) {
+func (r *mutationResolver) RevokeAPIKey(ctx context.Context, uid string) (graphQLModel.APIKey, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceAPIKeys, auth.OperationUpdate)
+	if err != nil {
+		return graphQLModel.APIKey{}, err
+	}
+	allowForeign := auth.CanAccessOperation(principal, auth.ResourceUsers, auth.OperationUpdate)
+	result := domainLogicLayer.RevokeAPIKey(principal.UserID, uid, allowForeign)
+	if result.IsFailure() {
+		return graphQLModel.APIKey{}, result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
+func (r *mutationResolver) RotateAPIKey(ctx context.Context, uid string) (string, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceAPIKeys, auth.OperationUpdate)
+	if err != nil {
+		return "", err
+	}
+	allowForeign := auth.CanAccessOperation(principal, auth.ResourceUsers, auth.OperationUpdate)
+	result := domainLogicLayer.RotateAPIKey(principal.UserID, uid, allowForeign)
+	if result.IsFailure() {
+		return "", result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
+func (r *mutationResolver) UpdateAPIKeyPermissions(ctx context.Context, uid string, permissionUIDs []string) (graphQLModel.APIKey, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceAPIKeys, auth.OperationUpdate)
+	if err != nil {
+		return graphQLModel.APIKey{}, err
+	}
+	allowForeign := auth.CanAccessOperation(principal, auth.ResourceUsers, auth.OperationUpdate)
+	result := domainLogicLayer.UpdateAPIKeyPermissions(principal.UserID, uid, permissionUIDs, allowForeign)
+	if result.IsFailure() {
+		return graphQLModel.APIKey{}, result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
+func (r *mutationResolver) UpdateAPIKeyRestrictions(ctx context.Context, uid string, input graphQLModel.APIKeyRestrictionsInput) (graphQLModel.APIKey, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceAPIKeys, auth.OperationUpdate)
+	if err != nil {
+		return graphQLModel.APIKey{}, err
+	}
+	allowForeign := auth.CanAccessOperation(principal, auth.ResourceUsers, auth.OperationUpdate)
+	result := domainLogicLayer.UpdateAPIKeyRestrictions(principal.UserID, uid, input, allowForeign)
+	if result.IsFailure() {
+		return graphQLModel.APIKey{}, result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
+func (r *mutationResolver) DeleteAPIKey(ctx context.Context, uid string) (bool, error) {
 	principal, err := authorizeOperation(ctx, auth.ResourceAPIKeys, auth.OperationDelete)
 	if err != nil {
 		return false, err
 	}
-	err = domainLogicLayer.DeleteAPIKeyForUser(principal.UserID, id)
+	err = domainLogicLayer.DeleteAPIKeyForUser(principal.UserID, uid)
 	if err != nil {
 		return false, err
 	}
@@ -221,19 +395,19 @@ func (r *mutationResolver) StartTimeSeriesExportAggregateKpi(ctx context.Context
 	return domainLogicLayer.StartTimeSeriesExportAggregateKPI(principal.UserID, input)
 }
 
-func (r *mutationResolver) CancelTimeSeriesExport(ctx context.Context, id uint32) (graphQLModel.TimeSeriesExport, error) {
+func (r *mutationResolver) CancelTimeSeriesExport(ctx context.Context, uid string) (graphQLModel.TimeSeriesExport, error) {
 	principal, err := authorizeOperation(ctx, auth.ResourceTimeSeries, auth.OperationRead)
 	if err != nil {
 		return graphQLModel.TimeSeriesExport{}, err
 	}
-	return domainLogicLayer.CancelTimeSeriesExport(principal.UserID, id)
+	return domainLogicLayer.CancelTimeSeriesExport(principal.UserID, uid)
 }
 
-func (r *queryResolver) SdType(ctx context.Context, id uint32) (graphQLModel.SDType, error) {
+func (r *queryResolver) SdType(ctx context.Context, uid string) (graphQLModel.SDType, error) {
 	if _, err := authorizeOperation(ctx, auth.ResourceSDTypes, auth.OperationRead); err != nil {
 		return graphQLModel.SDType{}, err
 	}
-	getSDTypeResult := domainLogicLayer.GetSDType(id)
+	getSDTypeResult := domainLogicLayer.GetSDType(uid)
 	if getSDTypeResult.IsFailure() {
 		log.Printf("Error occurred (get SD type): %s\n", getSDTypeResult.GetError().Error())
 	}
@@ -251,11 +425,11 @@ func (r *queryResolver) SdTypes(ctx context.Context) ([]graphQLModel.SDType, err
 	return getSDTypesResult.Unwrap()
 }
 
-func (r *queryResolver) SdInstance(ctx context.Context, id uint32) (graphQLModel.SDInstance, error) {
+func (r *queryResolver) SdInstance(ctx context.Context, uid string) (graphQLModel.SDInstance, error) {
 	if _, err := authorizeOperation(ctx, auth.ResourceSDInstances, auth.OperationRead); err != nil {
 		return graphQLModel.SDInstance{}, err
 	}
-	getSDInstanceResult := domainLogicLayer.GetSDInstance(id)
+	getSDInstanceResult := domainLogicLayer.GetSDInstance(uid)
 	if getSDInstanceResult.IsFailure() {
 		log.Printf("Error occurred (get SD instance): %s\n", getSDInstanceResult.GetError().Error())
 	}
@@ -273,34 +447,35 @@ func (r *queryResolver) SdInstances(ctx context.Context) ([]graphQLModel.SDInsta
 	return getSDInstancesResult.Unwrap()
 }
 
-func (r *queryResolver) SdInstancesByType(ctx context.Context, id uint32) ([]graphQLModel.SDInstance, error) {
+func (r *queryResolver) SdInstancesByType(ctx context.Context, uid string) ([]graphQLModel.SDInstance, error) {
 	if _, err := authorizeOperation(ctx, auth.ResourceSDInstances, auth.OperationRead); err != nil {
 		return nil, err
 	}
-	result := domainLogicLayer.GetSDInstancesByType(id)
+	result := domainLogicLayer.GetSDInstancesByType(uid)
 	if result.IsFailure() {
 		log.Printf("Error occurred (get SD instances by type): %s\n", result.GetError().Error())
 	}
 	return result.Unwrap()
 }
 
-func (r *queryResolver) SdInstancesByKpiDefinition(ctx context.Context, id uint32) ([]graphQLModel.SDInstance, error) {
-	if _, err := authorizeOperation(ctx, auth.ResourceSDInstances, auth.OperationRead); err != nil {
+func (r *queryResolver) SdInstancesByKpiDefinition(ctx context.Context, uid string) ([]graphQLModel.SDInstance, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceSDInstances, auth.OperationRead)
+	if err != nil {
 		return nil, err
 	}
-	result := domainLogicLayer.GetSDInstancesByKpiDefinition(id)
+	result := domainLogicLayer.GetSDInstancesByKpiDefinition(principal.UserID, uid)
 	if result.IsFailure() {
 		log.Printf("Error occurred (get SD instances by KPI): %s\n", result.GetError().Error())
 	}
 	return result.Unwrap()
 }
 
-func (r *queryResolver) KpiDefinition(ctx context.Context, id uint32) (graphQLModel.KPIDefinition, error) {
+func (r *queryResolver) KpiDefinition(ctx context.Context, uid string) (graphQLModel.KPIDefinition, error) {
 	principal, err := authorizeOperation(ctx, auth.ResourceKPIDefinitions, auth.OperationRead)
 	if err != nil {
 		return graphQLModel.KPIDefinition{}, err
 	}
-	getKPIDefinitionResult := domainLogicLayer.GetKPIDefinition(principal.UserID, id)
+	getKPIDefinitionResult := domainLogicLayer.GetKPIDefinition(principal.UserID, uid)
 	if getKPIDefinitionResult.IsFailure() {
 		log.Printf("Error occurred (get KPI definition): %s\n", getKPIDefinitionResult.GetError().Error())
 	}
@@ -319,36 +494,36 @@ func (r *queryResolver) KpiDefinitions(ctx context.Context) ([]graphQLModel.KPID
 	return getKPIDefinitionsResult.Unwrap()
 }
 
-func (r *queryResolver) KpiDefinitionsBySdType(ctx context.Context, id uint32) ([]graphQLModel.KPIDefinition, error) {
+func (r *queryResolver) KpiDefinitionsBySdType(ctx context.Context, uid string) ([]graphQLModel.KPIDefinition, error) {
 	principal, err := authorizeOperation(ctx, auth.ResourceKPIDefinitions, auth.OperationRead)
 	if err != nil {
 		return nil, err
 	}
-	result := domainLogicLayer.GetKPIDefinitionsBySDType(principal.UserID, id)
+	result := domainLogicLayer.GetKPIDefinitionsBySDType(principal.UserID, uid)
 	if result.IsFailure() {
 		log.Printf("Error occurred (get KPI definitions by SDType): %s\n", result.GetError().Error())
 	}
 	return result.Unwrap()
 }
 
-func (r *queryResolver) KpiDefinitionsBySdInstance(ctx context.Context, id uint32) ([]graphQLModel.KPIDefinition, error) {
+func (r *queryResolver) KpiDefinitionsBySdInstance(ctx context.Context, uid string) ([]graphQLModel.KPIDefinition, error) {
 	principal, err := authorizeOperation(ctx, auth.ResourceKPIDefinitions, auth.OperationRead)
 	if err != nil {
 		return nil, err
 	}
-	result := domainLogicLayer.GetKPIDefinitionsBySDInstance(principal.UserID, id)
+	result := domainLogicLayer.GetKPIDefinitionsBySDInstance(principal.UserID, uid)
 	if result.IsFailure() {
 		log.Printf("Error occurred (get KPI definitions by SDInstance): %s\n", result.GetError().Error())
 	}
 	return result.Unwrap()
 }
 
-func (r *queryResolver) RawDataPointsBySDType(ctx context.Context, id uint32) ([]graphQLModel.RawDataPoint, error) {
+func (r *queryResolver) RawDataPointsBySDType(ctx context.Context, uid string) ([]graphQLModel.RawDataPoint, error) {
 	_, err := authorizeOperation(ctx, auth.ResourceRawData, auth.OperationRead)
 	if err != nil {
 		return nil, err
 	}
-	result := domainLogicLayer.GetRawDataPointsBySDType(id)
+	result := domainLogicLayer.GetRawDataPointsBySDTypeUID(uid)
 	if result.IsFailure() {
 		log.Printf("Error occurred (get raw data points by sd type): %s\n", result.GetError().Error())
 		return nil, result.GetError()
@@ -356,12 +531,12 @@ func (r *queryResolver) RawDataPointsBySDType(ctx context.Context, id uint32) ([
 	return result.Unwrap()
 }
 
-func (r *queryResolver) RawDataPoint(ctx context.Context, id uint32) (graphQLModel.RawDataPoint, error) {
+func (r *queryResolver) RawDataPoint(ctx context.Context, uid string) (graphQLModel.RawDataPoint, error) {
 	_, err := authorizeOperation(ctx, auth.ResourceRawData, auth.OperationRead)
 	if err != nil {
 		return graphQLModel.RawDataPoint{}, err
 	}
-	opt, err := domainLogicLayer.GetRawDataPoint(id).Unwrap()
+	opt, err := domainLogicLayer.GetRawDataPointBySDInstanceUID(uid).Unwrap()
 	if err != nil {
 		log.Printf("Error occurred (get raw data point): %s\n", err.Error())
 		return graphQLModel.RawDataPoint{}, err
@@ -385,12 +560,12 @@ func (r *queryResolver) KpiResults(ctx context.Context) ([]graphQLModel.KPIFulfi
 	return result.Unwrap()
 }
 
-func (r *queryResolver) KpiResultsByKpi(ctx context.Context, id uint32) ([]graphQLModel.KPIFulfillmentCheckResult, error) {
+func (r *queryResolver) KpiResultsByKpi(ctx context.Context, uid string) ([]graphQLModel.KPIFulfillmentCheckResult, error) {
 	principal, err := authorizeOperation(ctx, auth.ResourceKPIResults, auth.OperationRead)
 	if err != nil {
 		return nil, err
 	}
-	result := domainLogicLayer.GetKPIFulfillmentCheckResultsByKPI(principal.UserID, id)
+	result := domainLogicLayer.GetKPIFulfillmentCheckResultsByKPIUID(principal.UserID, uid)
 	if result.IsFailure() {
 		log.Printf("Error occurred (get kpi results by kpi definition): %s\n", result.GetError().Error())
 		return nil, result.GetError()
@@ -414,11 +589,11 @@ func (r *queryResolver) KpiResult(ctx context.Context, request graphQLModel.KPIF
 	return opt.GetPayload(), nil
 }
 
-func (r *queryResolver) SdInstanceGroup(ctx context.Context, id uint32) (graphQLModel.SDInstanceGroup, error) {
+func (r *queryResolver) SdInstanceGroup(ctx context.Context, uid string) (graphQLModel.SDInstanceGroup, error) {
 	if _, err := authorizeOperation(ctx, auth.ResourceSDInstances, auth.OperationRead); err != nil {
 		return graphQLModel.SDInstanceGroup{}, err
 	}
-	getSDInstanceGroupResult := domainLogicLayer.GetSDInstanceGroup(id)
+	getSDInstanceGroupResult := domainLogicLayer.GetSDInstanceGroupByUID(uid)
 	if getSDInstanceGroupResult.IsFailure() {
 		log.Printf("Error occurred (get SD instance group): %s\n", getSDInstanceGroupResult.GetError().Error())
 	}
@@ -472,6 +647,63 @@ func (r *queryResolver) UserConfig(ctx context.Context) (graphQLModel.UserConfig
 	return getUserConfigResult.Unwrap()
 }
 
+func (r *queryResolver) Users(ctx context.Context) ([]graphQLModel.User, error) {
+	if _, err := authorizeOperation(ctx, auth.ResourceUsers, auth.OperationRead); err != nil {
+		return nil, err
+	}
+	result := domainLogicLayer.LoadUsers()
+	if result.IsFailure() {
+		return nil, result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
+func (r *queryResolver) User(ctx context.Context, uid string) (graphQLModel.User, error) {
+	if _, err := authorizeOperation(ctx, auth.ResourceUsers, auth.OperationRead); err != nil {
+		return graphQLModel.User{}, err
+	}
+	result := domainLogicLayer.LoadUserByUID(uid)
+	if result.IsFailure() {
+		return graphQLModel.User{}, result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
+func (r *queryResolver) Me(ctx context.Context) (graphQLModel.User, error) {
+	principal, ok := auth.PrincipalFromContext(ctx)
+	if !ok {
+		return graphQLModel.User{}, fmt.Errorf("unauthorized")
+	}
+	result := domainLogicLayer.LoadUserByID(principal.UserID)
+	if result.IsFailure() {
+		return graphQLModel.User{}, result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
+func (r *queryResolver) Sessions(ctx context.Context) ([]graphQLModel.UserSession, error) {
+	principal, err := authorizeOperation(ctx, auth.ResourceSessions, auth.OperationRead)
+	if err != nil {
+		return nil, err
+	}
+	result := domainLogicLayer.LoadUserSessions(principal.UserID)
+	if result.IsFailure() {
+		return nil, result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
+func (r *queryResolver) SessionsByUser(ctx context.Context, userUID string) ([]graphQLModel.UserSession, error) {
+	if _, err := authorizeOperation(ctx, auth.ResourceUsers, auth.OperationRead); err != nil {
+		return nil, err
+	}
+	result := domainLogicLayer.LoadUserSessionsByUserUID(userUID)
+	if result.IsFailure() {
+		return nil, result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
 func (r *queryResolver) Roles(ctx context.Context) ([]graphQLModel.Role, error) {
 	if _, err := authorizeOperation(ctx, auth.ResourceRoles, auth.OperationRead); err != nil {
 		return nil, err
@@ -483,11 +715,22 @@ func (r *queryResolver) Roles(ctx context.Context) ([]graphQLModel.Role, error) 
 	return result.GetPayload(), nil
 }
 
-func (r *queryResolver) UserRole(ctx context.Context, id uint32) (*graphQLModel.Role, error) {
+func (r *queryResolver) Permissions(ctx context.Context) ([]graphQLModel.Permission, error) {
 	if _, err := authorizeOperation(ctx, auth.ResourceRoles, auth.OperationRead); err != nil {
 		return nil, err
 	}
-	result := domainLogicLayer.LoadUserRole(id)
+	result := domainLogicLayer.LoadPermissions()
+	if result.IsFailure() {
+		return nil, result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
+func (r *queryResolver) UserRole(ctx context.Context, uid string) (*graphQLModel.Role, error) {
+	if _, err := authorizeOperation(ctx, auth.ResourceRoles, auth.OperationRead); err != nil {
+		return nil, err
+	}
+	result := domainLogicLayer.LoadUserRoleByUID(uid)
 	if result.IsFailure() {
 		return nil, result.GetError()
 	}
@@ -495,12 +738,17 @@ func (r *queryResolver) UserRole(ctx context.Context, id uint32) (*graphQLModel.
 	return &role, nil
 }
 
-func (r *queryResolver) Role(ctx context.Context) (*graphQLModel.Role, error) {
+func (r *queryResolver) Role(ctx context.Context, uid *string) (*graphQLModel.Role, error) {
 	principal, err := authorizeOperation(ctx, auth.ResourceRoles, auth.OperationRead)
 	if err != nil {
 		return nil, err
 	}
-	result := domainLogicLayer.LoadUserRole(principal.UserID)
+	var result sharedUtils.Result[graphQLModel.Role]
+	if uid != nil && *uid != "" {
+		result = domainLogicLayer.LoadRoleByUID(*uid)
+	} else {
+		result = domainLogicLayer.LoadUserRole(principal.UserID)
+	}
 	if result.IsFailure() {
 		return nil, result.GetError()
 	}
@@ -520,12 +768,26 @@ func (r *queryResolver) APIKeys(ctx context.Context) ([]graphQLModel.APIKey, err
 	return result.GetPayload(), nil
 }
 
-func (r *queryResolver) APIKey(ctx context.Context, id uint32) (graphQLModel.APIKey, error) {
+func (r *queryResolver) APIKeysByUser(ctx context.Context, userUID string) ([]graphQLModel.APIKey, error) {
+	if _, err := authorizeOperation(ctx, auth.ResourceUsers, auth.OperationRead); err != nil {
+		return nil, err
+	}
+	if _, err := authorizeOperation(ctx, auth.ResourceAPIKeys, auth.OperationRead); err != nil {
+		return nil, err
+	}
+	result := domainLogicLayer.LoadAPIKeysByUserUID(userUID)
+	if result.IsFailure() {
+		return nil, result.GetError()
+	}
+	return result.GetPayload(), nil
+}
+
+func (r *queryResolver) APIKey(ctx context.Context, uid string) (graphQLModel.APIKey, error) {
 	principal, err := authorizeOperation(ctx, auth.ResourceAPIKeys, auth.OperationRead)
 	if err != nil {
 		return graphQLModel.APIKey{}, err
 	}
-	result := domainLogicLayer.LoadAPIKeyByID(principal.UserID, id)
+	result := domainLogicLayer.LoadAPIKeyByUID(principal.UserID, uid)
 	if result.IsFailure() {
 		return graphQLModel.APIKey{}, result.GetError()
 	}
@@ -568,12 +830,12 @@ func (r *queryResolver) TimeSeriesDistinctTagValues(ctx context.Context, request
 	return result.GetPayload(), nil
 }
 
-func (r *queryResolver) TimeSeriesExport(ctx context.Context, id uint32) (graphQLModel.TimeSeriesExport, error) {
+func (r *queryResolver) TimeSeriesExport(ctx context.Context, uid string) (graphQLModel.TimeSeriesExport, error) {
 	principal, err := authorizeOperation(ctx, auth.ResourceTimeSeries, auth.OperationRead)
 	if err != nil {
 		return graphQLModel.TimeSeriesExport{}, err
 	}
-	return domainLogicLayer.GetTimeSeriesExport(principal.UserID, id)
+	return domainLogicLayer.GetTimeSeriesExport(principal.UserID, uid)
 }
 
 func (r *subscriptionResolver) OnSDInstanceRegistered(ctx context.Context, filter *graphQLModel.SDInstanceRegisteredFilter) (<-chan graphQLModel.SDInstance, error) {
@@ -619,8 +881,8 @@ func (r *subscriptionResolver) OnTimeSeriesExportUpdated(ctx context.Context, fi
 	if err != nil {
 		return nil, err
 	}
-	for _, id := range filter.Ids {
-		if _, err := domainLogicLayer.GetTimeSeriesExport(principal.UserID, id); err != nil {
+	for _, uid := range filter.Uids {
+		if _, err := domainLogicLayer.GetTimeSeriesExport(principal.UserID, uid); err != nil {
 			return nil, err
 		}
 	}

@@ -33,6 +33,33 @@ import (
 
 var activeReprocessJobs sync.Map
 
+func EnsureIngestQueueForSDType(rabbitMQClient rabbitmq.Client, sdTypeUID string) error {
+	if sdTypeUID == "" {
+		return fmt.Errorf("cannot declare ingest queue for empty SD type UID")
+	}
+	queueName := sharedConstants.IngestQueueName(sdTypeUID)
+	if err := rabbitMQClient.DeclareExchange(sharedConstants.IngestExchangeName, "direct"); err != nil {
+		return err
+	}
+	if err := rabbitMQClient.DeclareQueue(queueName); err != nil {
+		return err
+	}
+	return rabbitMQClient.BindQueue(queueName, sharedConstants.IngestExchangeName, sdTypeUID)
+}
+
+func EnsureIngestQueuesForAllSDTypes(rabbitMQClient rabbitmq.Client) error {
+	sdTypesLoadResult := dbClient.GetRelationalDatabaseClientInstance().LoadSDTypes()
+	if sdTypesLoadResult.IsFailure() {
+		return sdTypesLoadResult.GetError()
+	}
+	for _, sdType := range sdTypesLoadResult.GetPayload() {
+		if err := EnsureIngestQueueForSDType(rabbitMQClient, sdType.UID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func ProcessIncomingMessageProcessingUnitConnectionNotifications() {
 	rabbitMQClient := rabbitmq.NewClient()
 	defer rabbitMQClient.Dispose()
@@ -54,7 +81,15 @@ func ProcessIncomingSDInstanceRegistrationRequests() {
 		updated := false
 		for _, msg := range tuple {
 			log.Printf("SD instance registrace: %s", msg.SDTypeUID)
-			result := dbClient.GetRelationalDatabaseClientInstance().UpsertSDInstance(msg.SDInstanceUID, msg.SDTypeUID, msg.Label)
+			sdTypeUID, _, normalizeErr := sharedUtils.NormalizePrefixedUID(msg.SDTypeUID, "sdt", "SD type")
+			if normalizeErr != nil {
+				return normalizeErr
+			}
+			sdInstanceUID, _, normalizeErr := sharedUtils.NormalizeScopedUID(msg.SDInstanceUID, sdTypeUID, "sdi", "SD instance")
+			if normalizeErr != nil {
+				return normalizeErr
+			}
+			result := dbClient.GetRelationalDatabaseClientInstance().UpsertSDInstance(sdInstanceUID, sdTypeUID, msg.Label)
 			if result.IsSuccess() {
 				instance := result.GetPayload()
 				events.GetEventBus().Publish(events.SDInstanceRegisteredEventType, dll2gql.ToGraphQLModelSDInstance(instance))
@@ -83,7 +118,17 @@ func ProcessIncomingRawDataPoints() {
 		}
 		grouped := make(map[string][]sharedModel.RawDataPointISCMessage)
 		for _, msg := range rawTuple {
-			grouped[msg.SDInstanceUID] = append(grouped[msg.SDInstanceUID], msg)
+			sdTypeUID, _, normalizeErr := sharedUtils.NormalizePrefixedUID(msg.SDTypeUID, "sdt", "SD type")
+			if normalizeErr != nil {
+				return normalizeErr
+			}
+			sdInstanceUID, _, normalizeErr := sharedUtils.NormalizeScopedUID(msg.SDInstanceUID, sdTypeUID, "sdi", "SD instance")
+			if normalizeErr != nil {
+				return normalizeErr
+			}
+			msg.SDTypeUID = sdTypeUID
+			msg.SDInstanceUID = sdInstanceUID
+			grouped[sdInstanceUID] = append(grouped[sdInstanceUID], msg)
 		}
 		for uid, messages := range grouped {
 			instanceResult := dbClient.GetRelationalDatabaseClientInstance().UpsertSDInstance(uid, messages[0].SDTypeUID, "")
@@ -92,7 +137,9 @@ func ProcessIncomingRawDataPoints() {
 			}
 			instance := instanceResult.GetPayload()
 			instanceID := instance.ID.GetPayload()
+			instanceUID := instance.UID
 			sdTypeID := instance.SDType.ID.GetPayload()
+			sdTypeUID := instance.SDType.UID
 			points := make([]dllModel.RawDataPoint, 0, len(messages))
 			for _, msg := range messages {
 				eventTime := msg.EventTime
@@ -100,10 +147,12 @@ func ProcessIncomingRawDataPoints() {
 					eventTime = time.Now().UTC()
 				}
 				points = append(points, dllModel.RawDataPoint{
-					SDTypeID:     sdTypeID,
-					SDInstanceID: instanceID,
-					EventTime:    eventTime,
-					Payload:      msg.Payload,
+					SDTypeID:      sdTypeID,
+					SDTypeUID:     sdTypeUID,
+					SDInstanceID:  instanceID,
+					SDInstanceUID: instanceUID,
+					EventTime:     eventTime,
+					Payload:       msg.Payload,
 				})
 			}
 			result := dbClient.GetRelationalDatabaseClientInstance().PersistRawDataPoints(points)
@@ -112,10 +161,10 @@ func ProcessIncomingRawDataPoints() {
 			}
 			gql := sharedUtils.Map(result.GetPayload(), func(p dllModel.RawDataPoint) graphQLModel.RawDataPoint {
 				return graphQLModel.RawDataPoint{
-					SdTypeID:     p.SDTypeID,
-					SdInstanceID: p.SDInstanceID,
-					EventTime:    p.EventTime.Format(time.RFC3339Nano),
-					Payload:      string(p.Payload),
+					SdTypeUID:     p.SDTypeUID,
+					SdInstanceUID: p.SDInstanceUID,
+					EventTime:     p.EventTime.Format(time.RFC3339Nano),
+					Payload:       string(p.Payload),
 				}
 			})
 			events.GetEventBus().Publish(events.RawDataPointReceivedEventType, gql)
@@ -131,9 +180,29 @@ func ProcessIncomingKPIFulfillmentCheckResults() {
 		if len(results.Tuple) == 0 {
 			return nil
 		}
+		kpiDefinitionsResult := dbClient.GetRelationalDatabaseClientInstance().LoadAllKPIDefinitions()
+		if kpiDefinitionsResult.IsFailure() {
+			return kpiDefinitionsResult.GetError()
+		}
+		kpiDefinitionsByUID := make(map[string]sharedModel.KPIDefinition, len(kpiDefinitionsResult.GetPayload()))
+		for _, kpiDefinition := range kpiDefinitionsResult.GetPayload() {
+			if kpiDefinition.UID != nil {
+				kpiDefinitionsByUID[*kpiDefinition.UID] = kpiDefinition
+			}
+		}
 		grouped := make(map[string][]sharedModel.KPIFulfillmentCheckResultISCMessage)
 		for _, msg := range results.Tuple {
-			grouped[msg.SDInstanceUID] = append(grouped[msg.SDInstanceUID], msg)
+			sdTypeUID, _, normalizeErr := sharedUtils.NormalizePrefixedUID(msg.SDTypeUID, "sdt", "SD type")
+			if normalizeErr != nil {
+				return normalizeErr
+			}
+			sdInstanceUID, _, normalizeErr := sharedUtils.NormalizeScopedUID(msg.SDInstanceUID, sdTypeUID, "sdi", "SD instance")
+			if normalizeErr != nil {
+				return normalizeErr
+			}
+			msg.SDTypeUID = sdTypeUID
+			msg.SDInstanceUID = sdInstanceUID
+			grouped[sdInstanceUID] = append(grouped[sdInstanceUID], msg)
 		}
 		for uid, messages := range grouped {
 			instanceResult := dbClient.GetRelationalDatabaseClientInstance().UpsertSDInstance(uid, messages[0].SDTypeUID, "")
@@ -142,19 +211,31 @@ func ProcessIncomingKPIFulfillmentCheckResults() {
 			}
 			instance := instanceResult.GetPayload()
 			instanceID := instance.ID.GetPayload()
+			instanceUID := instance.UID
 			sdTypeID := instance.SDType.ID.GetPayload()
+			sdTypeUID := instance.SDType.UID
 			points := make([]dllModel.KPIFulfillmentCheckResult, 0, len(messages))
 			for _, msg := range messages {
+				kpiDefinition, ok := kpiDefinitionsByUID[msg.KPIDefinitionUID]
+				if !ok {
+					return fmt.Errorf("kpiDefinition not found for UID: %s", msg.KPIDefinitionUID)
+				}
+				if kpiDefinition.ID == nil {
+					return fmt.Errorf("kpiDefinition loaded by UID has no internal ID: %s", msg.KPIDefinitionUID)
+				}
 				eventTime := msg.EventTime
 				if eventTime.IsZero() {
 					eventTime = time.Now().UTC()
 				}
 				points = append(points, dllModel.KPIFulfillmentCheckResult{
-					SDTypeID:        sdTypeID,
-					SDInstanceID:    instanceID,
-					KPIDefinitionID: msg.KPIDefinitionID,
-					Fulfilled:       msg.Fulfilled,
-					EventTime:       eventTime,
+					SDTypeID:         sdTypeID,
+					SDTypeUID:        sdTypeUID,
+					SDInstanceID:     instanceID,
+					SDInstanceUID:    instanceUID,
+					KPIDefinitionID:  *kpiDefinition.ID,
+					KPIDefinitionUID: msg.KPIDefinitionUID,
+					Fulfilled:        msg.Fulfilled,
+					EventTime:        eventTime,
 				})
 			}
 			result := dbClient.GetRelationalDatabaseClientInstance().PersistKPIFulfillmentCheckResults(points, results.Reprocess)
@@ -163,11 +244,11 @@ func ProcessIncomingKPIFulfillmentCheckResults() {
 			}
 			gql := sharedUtils.Map(result.GetPayload(), func(p dllModel.KPIFulfillmentCheckResult) graphQLModel.KPIFulfillmentCheckResult {
 				return graphQLModel.KPIFulfillmentCheckResult{
-					SdTypeID:        p.SDTypeID,
-					SdInstanceID:    p.SDInstanceID,
-					KpiDefinitionID: p.KPIDefinitionID,
-					Fulfilled:       p.Fulfilled,
-					EventTime:       p.EventTime.Format(time.RFC3339Nano),
+					SdTypeUID:        p.SDTypeUID,
+					SdInstanceUID:    p.SDInstanceUID,
+					KpiDefinitionUID: p.KPIDefinitionUID,
+					Fulfilled:        p.Fulfilled,
+					EventTime:        p.EventTime.Format(time.RFC3339Nano),
 				}
 			})
 			events.GetEventBus().Publish(events.KPIFulfillmentCheckedEventType, gql)
@@ -184,11 +265,12 @@ func ProcessIncomingSDTypeRegistrationRequests() {
 			return nil
 		}
 		for _, message := range tuple {
+			sdTypeUID, _, normalizeErr := sharedUtils.NormalizePrefixedUID(message.SDTypeUID, "sdt", "SD type")
+			if normalizeErr != nil {
+				return normalizeErr
+			}
 			params := make([]dllModel.SDParameter, 0)
 			for _, p := range message.Parameters {
-				if message.SDTypeUID == "" {
-					continue
-				}
 				params = append(params, dllModel.SDParameter{
 					Denotation: p.Denotation,
 					Label:      sharedUtils.SafeLabel(p.Label, p.Denotation),
@@ -197,15 +279,18 @@ func ProcessIncomingSDTypeRegistrationRequests() {
 				})
 			}
 			sdType := dllModel.SDType{
-				UID:        message.SDTypeUID,
-				Label:      sharedUtils.SafeLabel(message.Label, message.SDTypeUID),
+				UID:        sdTypeUID,
+				Label:      sharedUtils.SafeLabel(message.Label, sdTypeUID),
 				Parameters: params,
 			}
 			result := dbClient.GetRelationalDatabaseClientInstance().UpsertSDType(sdType)
 			if result.IsFailure() {
 				return result.GetError()
 			}
-			log.Printf("SDType %s registrován (params=%d).", message.SDTypeUID, len(params))
+			if err := EnsureIngestQueueForSDType(rabbitMQClient, sdTypeUID); err != nil {
+				return fmt.Errorf("failed to ensure ingest queue for SDType %s: %w", sdTypeUID, err)
+			}
+			log.Printf("SDType %s registrován (params=%d).", sdTypeUID, len(params))
 		}
 		EnqueueMessageRepresentingCurrentSDTypeConfiguration(rabbitMQClient)
 		return nil
@@ -272,6 +357,10 @@ func EnqueueMessageRepresentingCurrentKPIDefinitionConfiguration(rabbitMQClient 
 		kpiDefinitions := kpiDefinitionsLoadResult.GetPayload()
 		kpiDefinitionsBySDTypeDenotationMap := make(map[string][]sharedModel.KPIDefinitionMPU)
 		for _, kpiDefinition := range kpiDefinitions {
+			kpiDefinitionUID := sharedUtils.NewOptionalFromPointer(kpiDefinition.UID).GetPayload()
+			if kpiDefinitionUID == "" {
+				continue
+			}
 			sdTypeSpecification := kpiDefinition.SDTypeSpecification
 			if _, exists := kpiDefinitionsBySDTypeDenotationMap[sdTypeSpecification]; !exists {
 				kpiDefinitionsBySDTypeDenotationMap[sdTypeSpecification] = make([]sharedModel.KPIDefinitionMPU, 0)
@@ -284,13 +373,8 @@ func EnqueueMessageRepresentingCurrentKPIDefinitionConfiguration(rabbitMQClient 
 				}
 				selectedSDInstanceUIDs = append(selectedSDInstanceUIDs, uid.GetPayload().UID)
 			}
-			var userID uint32
-			if kpiDefinition.UserID != nil {
-				userID = *kpiDefinition.UserID
-			}
 			kpiDefinitionsBySDTypeDenotationMap[sdTypeSpecification] = append(kpiDefinitionsBySDTypeDenotationMap[sdTypeSpecification], sharedModel.KPIDefinitionMPU{
-				ID:                     kpiDefinition.ID,
-				UserID:                 userID,
+				UID:                    kpiDefinitionUID,
 				SDTypeUID:              kpiDefinition.SDTypeSpecification,
 				RootNode:               kpiDefinition.RootNode,
 				SDInstanceMode:         kpiDefinition.SDInstanceMode,
@@ -404,11 +488,11 @@ func EnqueueMessageRepresentingCurrentKPICache(rabbitMQClient rabbitmq.Client) {
 				continue
 			}
 			messages = append(messages, sharedModel.KPIFulfillmentCheckResultISCMessage{
-				SDTypeUID:       instance.SDType.UID,
-				SDInstanceUID:   instance.UID,
-				KPIDefinitionID: result.KPIDefinitionID,
-				EventTime:       result.EventTime,
-				Fulfilled:       result.Fulfilled,
+				SDTypeUID:        instance.SDType.UID,
+				SDInstanceUID:    instance.UID,
+				KPIDefinitionUID: result.KPIDefinitionUID,
+				EventTime:        result.EventTime,
+				Fulfilled:        result.Fulfilled,
 			})
 		}
 
@@ -452,11 +536,11 @@ func EnqueueMessagesRepresentingCurrentSystemConfiguration(rabbitMQClient rabbit
 
 func EnqueueKPIReprocessRequest(rabbitMQClient rabbitmq.Client, kpiDefinition sharedModel.KPIDefinition, fromTime time.Time, jobID string, wait bool) error {
 	req := sharedModel.KPIReprocessRequestISCMessage{
-		JobID:           jobID,
-		Wait:            wait,
-		KPIDefinitionID: sharedUtils.NewOptionalFromPointer(kpiDefinition.ID).GetPayload(),
-		SDTypeUID:       kpiDefinition.SDTypeSpecification,
-		To:              fromTime,
+		JobID:            jobID,
+		Wait:             wait,
+		KPIDefinitionUID: sharedUtils.NewOptionalFromPointer(kpiDefinition.UID).GetPayload(),
+		SDTypeUID:        kpiDefinition.SDTypeSpecification,
+		To:               fromTime,
 	}
 	if kpiDefinition.SDInstanceMode == sharedModel.SELECTED {
 		var selectedSDInstanceUIDs []string
@@ -476,15 +560,11 @@ func EnqueueKPIReprocessRequest(rabbitMQClient rabbitmq.Client, kpiDefinition sh
 	return rabbitMQClient.PublishJSONMessage(sharedUtils.NewEmptyOptional[string](), sharedUtils.NewOptionalOf(sharedConstants.KPIReprocessRequestQueueName), jsonResult.GetPayload())
 }
 
-func EnqueueKPIDeleteRequest(rabbitMQClient rabbitmq.Client, kpiDefinitionID uint32, sdTypeID uint32, jobID string) error {
-	result := dbClient.GetRelationalDatabaseClientInstance().LoadSDType(sdTypeID)
-	if result.IsFailure() {
-		return result.GetError()
-	}
+func EnqueueKPIDeleteRequest(rabbitMQClient rabbitmq.Client, kpiDefinition sharedModel.KPIDefinition, jobID string) error {
 	payload := sharedModel.KPIDeleteResultsRequestISCMessage{
-		JobID:           jobID,
-		KPIDefinitionID: kpiDefinitionID,
-		SDTypeUID:       result.GetPayload().UID,
+		JobID:            jobID,
+		KPIDefinitionUID: sharedUtils.NewOptionalFromPointer(kpiDefinition.UID).GetPayload(),
+		SDTypeUID:        kpiDefinition.SDTypeSpecification,
 	}
 	jsonResult := sharedUtils.SerializeToJSON(payload)
 	if jsonResult.IsFailure() {

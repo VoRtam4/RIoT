@@ -22,15 +22,12 @@ type Params = {
 
   aggregateSeconds: number;
 
-  kpiDefinitionIDs?: string[];
-  sdInstanceIDs?: string[];
-  sdTypeID?: string;
+  kpiDefinitionUIDs?: string[];
+  sdInstanceUIDs?: string[];
+  sdTypeUID?: string;
 };
 
-export const useTimeSeriesAggregateKpi = (
-  params: Params,
-  enabled: boolean,
-) => {
+export const useTimeSeriesAggregateKpi = (params: Params, enabled: boolean) => {
   const { data, loading, error } = useQuery<
     TimeSeriesReadAggregateKpiQuery,
     TimeSeriesReadAggregateKpiQueryVariables
@@ -42,9 +39,9 @@ export const useTimeSeriesAggregateKpi = (
         to: params.to,
         aggregateSeconds: params.aggregateSeconds,
 
-        kpiDefinitionIDs: params.kpiDefinitionIDs,
-        sdInstanceIDs: params.sdInstanceIDs,
-        sdTypeID: params.sdTypeID,
+        kpiDefinitionUIDs: params.kpiDefinitionUIDs,
+        sdInstanceUIDs: params.sdInstanceUIDs,
+        sdTypeUID: params.sdTypeUID,
       },
     },
     fetchPolicy: "cache-and-network",

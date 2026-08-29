@@ -11,20 +11,20 @@
  */
 import { useQuery } from "@apollo/client/react";
 import {
-  SdTypeByIdDocument,
-  type SdTypeByIdQuery,
-  type SdTypeByIdQueryVariables,
+  SdTypeByUidDocument,
+  type SdTypeByUidQuery,
+  type SdTypeByUidQueryVariables,
 } from "../../../generated/graphql";
 
-export const useSdType = (id?: string) => {
+export const useSdType = (uid?: string) => {
   const { data, loading, error, refetch } = useQuery<
-    SdTypeByIdQuery,
-    SdTypeByIdQueryVariables
-  >(SdTypeByIdDocument, {
+    SdTypeByUidQuery,
+    SdTypeByUidQueryVariables
+  >(SdTypeByUidDocument, {
     variables: {
-      id: id ?? "",
+      uid: uid ?? "",
     },
-    skip: !id,
+    skip: !uid,
     fetchPolicy: "cache-and-network",
   });
 

@@ -12,28 +12,28 @@
 import { useEffect } from "react";
 import { useSdInstancesStore } from "../stores/sdInstancesStore";
 
-export const useSdInstancesByType = (typeId: string | null) => {
+export const useSdInstancesByType = (typeUID: string | null) => {
   const ensure = useSdInstancesStore((s) => s.ensure);
   const refresh = useSdInstancesStore((s) => s.refresh);
 
   const entry = useSdInstancesStore((s) =>
-    typeId ? s.byType[typeId] : undefined,
+    typeUID ? s.byType[typeUID] : undefined,
   );
 
   useEffect(() => {
-    if (!typeId) return;
+    if (!typeUID) return;
 
     if (!entry) {
-      void refresh(typeId);
+      void refresh(typeUID);
     } else {
-      void ensure(typeId);
+      void ensure(typeUID);
     }
-  }, [typeId, entry, ensure, refresh]);
+  }, [typeUID, entry, ensure, refresh]);
 
   return {
     entry,
     sdInstances: entry?.rawSortedAsc ?? [],
-    loading: typeId ? entry?.isLoading ?? true : false,
+    loading: typeUID ? (entry?.isLoading ?? true) : false,
     error: entry?.error ?? null,
   };
 };

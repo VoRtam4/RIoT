@@ -15,34 +15,30 @@ import { useKpiSubscription } from "../../kpi/hooks/useKpiSubscription";
 import { colors } from "../../../theme/colors";
 
 type Props = {
-  kpiDefinitionID?: string | null;
-  sdInstanceID?: string | null;
+  kpiDefinitionUID?: string | null;
+  sdInstanceUID?: string | null;
 };
 
 export default function SdInstanceKpiResultPanel({
-  kpiDefinitionID,
-  sdInstanceID,
+  kpiDefinitionUID,
+  sdInstanceUID,
 }: Props) {
-  const safeInstanceID = sdInstanceID ?? undefined;
+  const safeInstanceUID = sdInstanceUID ?? undefined;
 
   const { result } = useKpiResult(
-    kpiDefinitionID ?? undefined,
-    safeInstanceID,
+    kpiDefinitionUID ?? undefined,
+    safeInstanceUID,
   );
 
   const { latest } = useKpiSubscription(
-    kpiDefinitionID ?? undefined,
-    safeInstanceID,
+    kpiDefinitionUID ?? undefined,
+    safeInstanceUID,
   );
 
   const liveResult = latest ?? result;
 
-  if (!kpiDefinitionID) {
-    return (
-      <div className="text-muted form-label">
-        Vyber KPI definici
-      </div>
-    );
+  if (!kpiDefinitionUID) {
+    return <div className="text-muted form-label">Vyber KPI definici</div>;
   }
 
   return (
@@ -64,11 +60,7 @@ export default function SdInstanceKpiResultPanel({
 
       {liveResult?.eventTime && (
         <small style={{ opacity: 0.6 }}>
-          (
-          {new Date(
-            liveResult.eventTime,
-          ).toLocaleString("cs-CZ")}
-          )
+          ({new Date(liveResult.eventTime).toLocaleString("cs-CZ")})
         </small>
       )}
     </div>

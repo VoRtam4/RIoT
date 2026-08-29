@@ -16,15 +16,15 @@ import {
   type RawDataPointQueryVariables,
 } from "../../../generated/graphql";
 
-export const useRawDataPoint = (sdInstanceID?: string | null) => {
+export const useRawDataPoint = (sdInstanceUID?: string | null) => {
   const { data, loading, error, refetch } = useQuery<
     RawDataPointQuery,
     RawDataPointQueryVariables
   >(RawDataPointDocument, {
     variables: {
-      id: sdInstanceID as string,
+      uid: sdInstanceUID as string,
     },
-    skip: sdInstanceID == null,
+    skip: sdInstanceUID == null,
     fetchPolicy: "cache-and-network",
   });
 

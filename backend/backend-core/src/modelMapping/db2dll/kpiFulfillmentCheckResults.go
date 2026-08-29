@@ -20,10 +20,20 @@ import (
 
 func ToDLLModelKPIFulfillmentCheckResult(row dbModel.KPIFulfillmentCheckResultEntity) dllModel.KPIFulfillmentCheckResult {
 	return dllModel.KPIFulfillmentCheckResult{
-		SDTypeID:        row.SDInstance.SDTypeID,
-		SDInstanceID:    row.SDInstanceID,
-		KPIDefinitionID: row.KPIDefinitionID,
-		Fulfilled:       row.Fulfilled,
-		EventTime:       row.EventTime,
+		SDTypeID:         row.SDInstance.SDTypeID,
+		SDTypeUID:        row.SDInstance.SDType.UID,
+		SDInstanceID:     row.SDInstanceID,
+		SDInstanceUID:    row.SDInstance.UID,
+		KPIDefinitionID:  row.KPIDefinitionID,
+		KPIDefinitionUID: kpiDefinitionUID(row.KPIDefinition),
+		Fulfilled:        row.Fulfilled,
+		EventTime:        row.EventTime,
 	}
+}
+
+func kpiDefinitionUID(kpiDefinition dbModel.KPIDefinitionEntity) string {
+	if kpiDefinition.UID == nil {
+		return ""
+	}
+	return *kpiDefinition.UID
 }

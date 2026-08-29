@@ -38,6 +38,12 @@ export type ApiFeatureDoc = {
 const gql = "GraphQL";
 const rest = "REST";
 const ws = "WebSocket";
+const canonicalSDInstanceUIDNote =
+  "Read, filter, group and update APIs expect canonical SD instance UIDs in the `sdt:<type>.sdi:<instance>` form.";
+const sdInstanceRegistrationUIDNote =
+  "When an ingest or registration message carries `sdTypeUID`, `sdInstanceUID` may be the local suffix; the system stores and returns the canonical `sdt:<type>.sdi:<instance>` form.";
+const kpiUIDSuffixNote =
+  "For create/update inputs, `uid` is the KPI UID suffix. The system stores and returns the canonical `sdt:<type>.kpi:<kpi>` KPI UID.";
 
 export const apiFeatures: ApiFeatureDoc[] = [
   {
@@ -49,7 +55,8 @@ export const apiFeatures: ApiFeatureDoc[] = [
       {
         id: "list-types",
         title: "List Types",
-        summary: "Load the full catalog of device types including parameter metadata.",
+        summary:
+          "Load the full catalog of device types including parameter metadata.",
         variants: [
           {
             technology: "graphql",
@@ -58,11 +65,9 @@ export const apiFeatures: ApiFeatureDoc[] = [
               "Use one query to load all types and every parameter needed for editors or validation.",
             requestExample: `query ListDeviceTypes {
   sdTypes {
-    id
     uid
     label
     parameters {
-      id
       label
       denotation
       type
@@ -74,19 +79,16 @@ export const apiFeatures: ApiFeatureDoc[] = [
   "data": {
     "sdTypes": [
       {
-        "id": "4",
-        "uid": "thermostat",
+        "uid": "sdt:thermostat",
         "label": "Thermostat",
         "parameters": [
           {
-            "id": "21",
             "label": "Temperature",
             "denotation": "temperature",
             "type": "number",
             "role": "field"
           },
           {
-            "id": "22",
             "label": "Location",
             "denotation": "location",
             "type": "string",
@@ -123,12 +125,10 @@ Authorization: Bearer <token>`,
   "success": true,
   "payload": [
     {
-      "id": 4,
-      "uid": "thermostat",
+      "uid": "sdt:thermostat",
       "label": "Thermostat",
       "parameters": [
         {
-          "id": 21,
           "label": "Temperature",
           "denotation": "temperature",
           "type": "number",
@@ -150,14 +150,12 @@ Authorization: Bearer <token>`,
             technology: "graphql",
             label: gql,
             summary:
-              "Resolve one type by ID for editors, previews, or device-type-aware forms.",
+              "Resolve one type by UID for editors, previews, or device-type-aware forms.",
             requestExample: `query DeviceTypeDetail {
-  sdType(id: 4) {
-    id
+  sdType(uid: "sdt:thermostat") {
     uid
     label
     parameters {
-      id
       label
       denotation
       type
@@ -170,19 +168,19 @@ Authorization: Bearer <token>`,
             technology: "rest",
             label: rest,
             summary: "Read one type by path parameter.",
-            requestExample: `GET /rest/sd-types/4
+            requestExample: `GET /rest/sd-types/sdt:thermostat
 Accept: application/json`,
           },
           {
             technology: "websocket",
             label: ws,
-            summary: "Pass the target ID in the WebSocket payload.",
+            summary: "Pass the target UID in the WebSocket payload.",
             requestExample: `{
   "type": "request",
   "id": "sd-type-detail",
   "action": "get_sd_type",
   "payload": {
-    "id": 4
+    "uid": "sdt:thermostat"
   }
 }`,
           },
@@ -225,7 +223,6 @@ Accept: application/json`,
       ]
     }
   ) {
-    id
     uid
     label
   }
@@ -302,27 +299,27 @@ Content-Type: application/json
           {
             technology: "graphql",
             label: gql,
-            summary: "Delete by ID and receive a boolean success flag.",
+            summary: "Delete by UID and receive a boolean success flag.",
             requestExample: `mutation DeleteDeviceType {
-  deleteSDType(id: 12)
+  deleteSDType(uid: "sdt:thermostat")
 }`,
           },
           {
             technology: "rest",
             label: rest,
             summary: "Delete the resource directly.",
-            requestExample: `DELETE /rest/sd-types/12`,
+            requestExample: `DELETE /rest/sd-types/sdt:thermostat`,
           },
           {
             technology: "websocket",
             label: ws,
-            summary: "Send the target ID in the delete action payload.",
+            summary: "Send the target UID in the delete action payload.",
             requestExample: `{
   "type": "request",
   "id": "sd-type-delete",
   "action": "delete_sd_type",
   "payload": {
-    "id": 12
+    "uid": "sdt:thermostat"
   }
 }`,
           },
@@ -344,16 +341,15 @@ Content-Type: application/json
           {
             technology: "graphql",
             label: gql,
-            summary: "Query the full device list including type metadata for overview pages.",
+            summary:
+              "Query the full device list including type metadata for overview pages.",
             requestExample: `query ListDevices {
   sdInstances {
-    id
     uid
     label
     confirmedByUser
     userIdentifier
     type {
-      id
       uid
       label
     }
@@ -369,7 +365,8 @@ Content-Type: application/json
           {
             technology: "websocket",
             label: ws,
-            summary: "The WebSocket action mirrors the REST collection endpoint.",
+            summary:
+              "The WebSocket action mirrors the REST collection endpoint.",
             requestExample: `{
   "type": "request",
   "id": "devices-list",
@@ -388,18 +385,15 @@ Content-Type: application/json
             label: gql,
             summary: "Resolve one device in a single query for detail pages.",
             requestExample: `query DeviceDetail {
-  sdInstance(id: 17) {
-    id
+  sdInstance(uid: "sdt:thermostat.sdi:device-a-17") {
     uid
     label
     confirmedByUser
     userIdentifier
     type {
-      id
       uid
       label
       parameters {
-        id
         denotation
         type
         role
@@ -413,23 +407,25 @@ Content-Type: application/json
             label: rest,
             summary:
               "The current REST router exposes device detail via `/rest/sd-instance`.",
-            requestExample: `GET /rest/sd-instance?id=17`,
+            requestExample: `GET /rest/sd-instance?uid=sdt:thermostat.sdi:device-a-17`,
             notes: [
+              canonicalSDInstanceUIDNote,
               "This endpoint uses a query parameter instead of a path parameter in the current backend.",
             ],
           },
           {
             technology: "websocket",
             label: ws,
-            summary: "Pass the device ID in the payload.",
+            summary: "Pass the device UID in the payload.",
             requestExample: `{
   "type": "request",
   "id": "device-detail",
   "action": "get_sd_instance",
   "payload": {
-    "id": 17
+    "uid": "sdt:thermostat.sdi:device-a-17"
   }
 }`,
+            notes: [canonicalSDInstanceUIDNote],
           },
         ],
       },
@@ -444,44 +440,44 @@ Content-Type: application/json
             summary:
               "GraphQL exposes dedicated queries for both filter dimensions.",
             requestExample: `query FilterDevices {
-  byType: sdInstancesByType(id: 4) {
-    id
+  byType: sdInstancesByType(uid: "sdt:thermostat") {
     label
     uid
   }
-  byKpi: sdInstancesByKpiDefinition(id: 9) {
-    id
+  byKpi: sdInstancesByKpiDefinition(uid: "sdt:thermostat.kpi:overheat_alarm") {
     label
     uid
   }
 }`,
+            notes: [canonicalSDInstanceUIDNote],
           },
           {
             technology: "rest",
             label: rest,
             summary:
               "REST exposes separate endpoints for type-based and KPI-based filtering.",
-            requestExample: `GET /rest/sd-instances/type/4
-GET /rest/sd-instances/kpi/9`,
+            requestExample: `GET /rest/sd-instances/type/sdt:thermostat
+GET /rest/sd-instances/kpi/sdt:thermostat.kpi:overheat_alarm`,
           },
           {
             technology: "websocket",
             label: ws,
             summary:
-              "Use one action per filter mode and send the selected ID in the payload.",
+              "Use one action per filter mode and send the selected UID in the payload.",
             requestExample: `{
   "type": "request",
   "id": "devices-by-type",
   "action": "get_sd_instances_by_type",
-  "payload": { "id": 4 }
+  "payload": { "uid": "sdt:thermostat" }
 }
 
 {
   "type": "request",
   "id": "devices-by-kpi",
   "action": "get_sd_instances_by_kpi",
-  "payload": { "id": 9 }
+  "payload": { "uid": "sdt:thermostat.kpi:overheat_alarm" }
 }`,
+            notes: [canonicalSDInstanceUIDNote],
           },
         ],
       },
@@ -498,25 +494,26 @@ GET /rest/sd-instances/kpi/9`,
               "Use the update mutation to rename the device, set a user identifier, or confirm it.",
             requestExample: `mutation UpdateDevice {
   updateSDInstance(
-    id: 17
+    uid: "sdt:thermostat.sdi:device-a-17"
     input: {
       label: "Boiler Sensor A-17"
       userIdentifier: "asset-plant-a-17"
       confirmedByUser: true
     }
   ) {
-    id
+    uid
     label
     userIdentifier
     confirmedByUser
   }
 }`,
+            notes: [canonicalSDInstanceUIDNote],
           },
           {
             technology: "rest",
             label: rest,
             summary: "PATCH the mutable fields of one device.",
-            requestExample: `PATCH /rest/sd-instances/17
+            requestExample: `PATCH /rest/sd-instances/sdt:thermostat.sdi:device-a-17
 Content-Type: application/json
 
 {
@@ -524,17 +521,18 @@ Content-Type: application/json
   "userIdentifier": "asset-plant-a-17",
   "confirmedByUser": true
 }`,
+            notes: [canonicalSDInstanceUIDNote],
           },
           {
             technology: "websocket",
             label: ws,
-            summary: "Send the device ID and the update input in one message.",
+            summary: "Send the device UID and the update input in one message.",
             requestExample: `{
   "type": "request",
   "id": "device-update",
   "action": "update_sd_instance",
   "payload": {
-    "id": 17,
+    "uid": "sdt:thermostat.sdi:device-a-17",
     "input": {
       "label": "Boiler Sensor A-17",
       "userIdentifier": "asset-plant-a-17",
@@ -542,6 +540,7 @@ Content-Type: application/json
     }
   }
 }`,
+            notes: [canonicalSDInstanceUIDNote],
           },
         ],
       },
@@ -554,15 +553,16 @@ Content-Type: application/json
           {
             technology: "graphql",
             label: gql,
-            summary: "Subscribe directly to registration events with an optional filter.",
+            summary:
+              "Subscribe directly to registration events with an optional filter.",
             requestExample: `subscription DeviceRegistrationStream {
-  onSDInstanceRegistered(filter: { sdTypeID: 4 }) {
-    id
+  onSDInstanceRegistered(filter: { sdTypeUID: "sdt:thermostat" }) {
     uid
     label
     confirmedByUser
   }
 }`,
+            notes: [sdInstanceRegistrationUIDNote],
           },
           {
             technology: "websocket",
@@ -574,9 +574,10 @@ Content-Type: application/json
   "id": "device-registration-stream",
   "topic": "sd_instance_registered",
   "payload": {
-    "sdTypeID": 4
+    "sdTypeUID": "sdt:thermostat"
   }
 }`,
+            notes: [sdInstanceRegistrationUIDNote],
           },
           {
             technology: "rest",
@@ -592,8 +593,9 @@ Accept: text/event-stream
 
 Body:
 {
-  "sdTypeID": 4
+  "sdTypeUID": "sdt:thermostat"
 }`,
+            notes: [sdInstanceRegistrationUIDNote],
           },
         ],
       },
@@ -615,11 +617,11 @@ Body:
             technology: "graphql",
             label: gql,
             summary:
-              "Use the SD type ID to fetch the latest raw data points across all matching device instances.",
+              "Use the SD type UID to fetch the latest raw data points across all matching device instances.",
             requestExample: `query RawDataByType {
-  rawDataPointsBySDType(id: 4) {
-    sdTypeID
-    sdInstanceID
+  rawDataPointsBySDType(uid: "sdt:thermostat") {
+    sdTypeUID
+    sdInstanceUID
     payload
     eventTime
   }
@@ -628,22 +630,22 @@ Body:
   "data": {
     "rawDataPointsBySDType": [
       {
-        "sdTypeID": "4",
-        "sdInstanceID": "17",
+        "sdTypeUID": "sdt:thermostat",
+        "sdInstanceUID": "sdt:thermostat.sdi:boiler-room-a",
         "payload": {
           "temperature": 82.4,
           "isOnline": true,
-          "location": "boiler-room-a"
+          "location": "sdt:thermostat.sdi:boiler-room-a"
         },
         "eventTime": "2026-04-14T12:30:00Z"
       },
       {
-        "sdTypeID": "4",
-        "sdInstanceID": "18",
+        "sdTypeUID": "sdt:thermostat",
+        "sdInstanceUID": "sdt:thermostat.sdi:boiler-room-b",
         "payload": {
           "temperature": 79.1,
           "isOnline": true,
-          "location": "boiler-room-b"
+          "location": "sdt:thermostat.sdi:boiler-room-b"
         },
         "eventTime": "2026-04-14T12:29:42Z"
       }
@@ -655,28 +657,28 @@ Body:
             technology: "rest",
             label: rest,
             summary:
-              "Read the latest raw data set for one SD type from the REST path-based endpoint.",
-            requestExample: `GET /rest/raw/4
+              "Read the latest raw data set for one SD type UID from the REST path-based endpoint.",
+            requestExample: `GET /rest/raw/type/sdt:thermostat
 Accept: application/json
 X-API-Key: riot_live_abc123_secret_value`,
             responseExample: `[
   {
-    "sdTypeID": 4,
-    "sdInstanceID": 17,
+    "sdTypeUID": "sdt:thermostat",
+    "sdInstanceUID": "sdt:thermostat.sdi:boiler-room-a",
     "payload": {
       "temperature": 82.4,
       "isOnline": true,
-      "location": "boiler-room-a"
+      "location": "sdt:thermostat.sdi:boiler-room-a"
     },
     "eventTime": "2026-04-14T12:30:00Z"
   },
   {
-    "sdTypeID": 4,
-    "sdInstanceID": 18,
+    "sdTypeUID": "sdt:thermostat",
+    "sdInstanceUID": "sdt:thermostat.sdi:boiler-room-b",
     "payload": {
       "temperature": 79.1,
       "isOnline": true,
-      "location": "boiler-room-b"
+      "location": "sdt:thermostat.sdi:boiler-room-b"
     },
     "eventTime": "2026-04-14T12:29:42Z"
   }
@@ -692,7 +694,7 @@ X-API-Key: riot_live_abc123_secret_value`,
   "id": "raw-by-type",
   "action": "get_raw_by_sdtype",
   "payload": {
-    "id": 4
+    "uid": "sdt:thermostat"
   }
 }`,
             responseExample: `{
@@ -701,8 +703,8 @@ X-API-Key: riot_live_abc123_secret_value`,
   "success": true,
   "payload": [
     {
-      "sdTypeID": 4,
-      "sdInstanceID": 17,
+      "sdTypeUID": "sdt:thermostat",
+      "sdInstanceUID": "sdt:thermostat.sdi:boiler-room-a",
       "payload": {
         "temperature": 82.4,
         "isOnline": true
@@ -724,11 +726,11 @@ X-API-Key: riot_live_abc123_secret_value`,
             technology: "graphql",
             label: gql,
             summary:
-              "Query the latest raw data point for one device instance by its ID.",
+              "Query the latest raw data point for one device instance by its UID.",
             requestExample: `query LatestRawDataPoint {
-  rawDataPoint(id: 17) {
-    sdTypeID
-    sdInstanceID
+  rawDataPoint(uid: "sdt:thermostat.sdi:boiler-room-a") {
+    sdTypeUID
+    sdInstanceUID
     payload
     eventTime
   }
@@ -736,38 +738,40 @@ X-API-Key: riot_live_abc123_secret_value`,
             responseExample: `{
   "data": {
     "rawDataPoint": {
-      "sdTypeID": "4",
-      "sdInstanceID": "17",
+      "sdTypeUID": "sdt:thermostat",
+      "sdInstanceUID": "sdt:thermostat.sdi:boiler-room-a",
       "payload": {
         "temperature": 82.4,
         "isOnline": true,
-        "location": "boiler-room-a"
+        "location": "sdt:thermostat.sdi:boiler-room-a"
       },
       "eventTime": "2026-04-14T12:30:00Z"
     }
   }
 }`,
+            notes: [canonicalSDInstanceUIDNote],
           },
           {
             technology: "rest",
             label: rest,
             summary:
-              "Use the single raw-data REST endpoint with the device instance ID.",
-            requestExample: `GET /rest/raw?id=17
+              "Use the single raw-data REST endpoint with the device instance UID.",
+            requestExample: `GET /rest/raw?uid=sdt:thermostat.sdi:boiler-room-a
 Accept: application/json
 X-API-Key: riot_live_abc123_secret_value`,
             responseExample: `{
-  "sdTypeID": 4,
-  "sdInstanceID": 17,
+  "sdTypeUID": "sdt:thermostat",
+  "sdInstanceUID": "sdt:thermostat.sdi:boiler-room-a",
   "payload": {
     "temperature": 82.4,
     "isOnline": true,
-    "location": "boiler-room-a"
+    "location": "sdt:thermostat.sdi:boiler-room-a"
   },
   "eventTime": "2026-04-14T12:30:00Z"
 }`,
             notes: [
-              "The current REST router exposes this endpoint as `/rest/raw` and expects the instance ID through request parsing logic.",
+              canonicalSDInstanceUIDNote,
+              "The current REST router exposes this endpoint as `/rest/raw` and expects the instance UID in the `uid` query parameter.",
             ],
           },
           {
@@ -780,7 +784,7 @@ X-API-Key: riot_live_abc123_secret_value`,
   "id": "raw-by-instance",
   "action": "get_raw_by_instance",
   "payload": {
-    "id": 17
+    "uid": "sdt:thermostat.sdi:boiler-room-a"
   }
 }`,
             responseExample: `{
@@ -788,8 +792,8 @@ X-API-Key: riot_live_abc123_secret_value`,
   "id": "raw-by-instance",
   "success": true,
   "payload": {
-    "sdTypeID": 4,
-    "sdInstanceID": 17,
+    "sdTypeUID": "sdt:thermostat",
+    "sdInstanceUID": "sdt:thermostat.sdi:boiler-room-a",
     "payload": {
       "temperature": 82.4,
       "isOnline": true
@@ -797,6 +801,7 @@ X-API-Key: riot_live_abc123_secret_value`,
     "eventTime": "2026-04-14T12:30:00Z"
   }
 }`,
+            notes: [canonicalSDInstanceUIDNote],
           },
         ],
       },
@@ -812,9 +817,9 @@ X-API-Key: riot_live_abc123_secret_value`,
             summary:
               "Subscribe to incoming raw data and optionally filter by device type or device instance.",
             requestExample: `subscription RawDataPointStream {
-  onRawDataPointArrived(filter: { sdTypeID: 4, sdInstanceID: 17 }) {
-    sdTypeID
-    sdInstanceID
+  onRawDataPointArrived(filter: { sdTypeUIDs: ["sdt:thermostat"], sdInstanceUIDs: ["sdt:thermostat.sdi:boiler-room-a"] }) {
+    sdTypeUID
+    sdInstanceUID
     payload
     eventTime
   }
@@ -823,8 +828,8 @@ X-API-Key: riot_live_abc123_secret_value`,
   "data": {
     "onRawDataPointArrived": [
       {
-        "sdTypeID": "4",
-        "sdInstanceID": "17",
+        "sdTypeUID": "sdt:thermostat",
+        "sdInstanceUID": "sdt:thermostat.sdi:boiler-room-a",
         "payload": {
           "temperature": 83.2,
           "isOnline": true
@@ -834,6 +839,7 @@ X-API-Key: riot_live_abc123_secret_value`,
     ]
   }
 }`,
+            notes: [canonicalSDInstanceUIDNote],
           },
           {
             technology: "rest",
@@ -849,11 +855,12 @@ Accept: text/event-stream
 
 Body:
 {
-  "sdTypeID": 4,
-  "sdInstanceID": 17
+  "sdTypeUIDs": ["sdt:thermostat"],
+  "sdInstanceUIDs": ["sdt:thermostat.sdi:boiler-room-a"]
 }`,
             responseExample: `event: raw_data_point
-data: [{"sdTypeID":4,"sdInstanceID":17,"payload":{"temperature":83.2,"isOnline":true},"eventTime":"2026-04-14T12:31:05Z"}]`,
+data: [{"sdTypeUID":"sdt:thermostat","sdInstanceUID":"sdt:thermostat.sdi:boiler-room-a","payload":{"temperature":83.2,"isOnline":true},"eventTime":"2026-04-14T12:31:05Z"}]`,
+            notes: [canonicalSDInstanceUIDNote],
           },
           {
             technology: "websocket",
@@ -865,8 +872,8 @@ data: [{"sdTypeID":4,"sdInstanceID":17,"payload":{"temperature":83.2,"isOnline":
   "id": "raw-data-stream",
   "topic": "raw_data_point",
   "payload": {
-    "sdTypeID": 4,
-    "sdInstanceID": 17
+    "sdTypeUIDs": ["sdt:thermostat"],
+    "sdInstanceUIDs": ["sdt:thermostat.sdi:boiler-room-a"]
   }
 }`,
             responseExample: `{
@@ -875,8 +882,8 @@ data: [{"sdTypeID":4,"sdInstanceID":17,"payload":{"temperature":83.2,"isOnline":
   "topic": "raw_data_point",
   "payload": [
     {
-      "sdTypeID": 4,
-      "sdInstanceID": 17,
+      "sdTypeUID": "sdt:thermostat",
+      "sdInstanceUID": "sdt:thermostat.sdi:boiler-room-a",
       "payload": {
         "temperature": 83.2,
         "isOnline": true
@@ -885,6 +892,7 @@ data: [{"sdTypeID":4,"sdInstanceID":17,"payload":{"temperature":83.2,"isOnline":
     }
   ]
 }`,
+            notes: [canonicalSDInstanceUIDNote],
           },
         ],
       },
@@ -908,13 +916,12 @@ data: [{"sdTypeID":4,"sdInstanceID":17,"payload":{"temperature":83.2,"isOnline":
               "Query all KPI definitions with the selected instance mode and node tree.",
             requestExample: `query ListKpis {
   kpiDefinitions {
-    id
+    uid
     label
-    sdTypeID
     sdTypeUID
     userIdentifier
     sdInstanceMode
-    selectedSDInstanceIDs
+    selectedSDInstanceUIDs
     nodes {
       id
       parentNodeID
@@ -951,13 +958,12 @@ data: [{"sdTypeID":4,"sdInstanceID":17,"payload":{"temperature":83.2,"isOnline":
             label: gql,
             summary: "Fetch one KPI for detail pages or rule editors.",
             requestExample: `query KpiDetail {
-  kpiDefinition(id: 9) {
-    id
+  kpiDefinition(uid: "sdt:thermostat.kpi:overheat_alarm") {
+    uid
     label
-    sdTypeID
     sdTypeUID
     sdInstanceMode
-    selectedSDInstanceIDs
+    selectedSDInstanceUIDs
     nodes {
       id
       parentNodeID
@@ -966,7 +972,6 @@ data: [{"sdTypeID":4,"sdInstanceID":17,"payload":{"temperature":83.2,"isOnline":
         type
       }
       ... on NumericGTAtomKPINode {
-        sdParameterID
         sdParameterSpecification
         numericReferenceValue
       }
@@ -978,18 +983,18 @@ data: [{"sdTypeID":4,"sdInstanceID":17,"payload":{"temperature":83.2,"isOnline":
             technology: "rest",
             label: rest,
             summary: "Read one KPI definition by path parameter.",
-            requestExample: `GET /rest/kpi-definitions/9`,
+            requestExample: `GET /rest/kpi-definitions/sdt:thermostat.kpi:overheat_alarm`,
           },
           {
             technology: "websocket",
             label: ws,
-            summary: "Send the target KPI ID in the payload.",
+            summary: "Send the target KPI UID in the payload.",
             requestExample: `{
   "type": "request",
   "id": "kpi-detail",
   "action": "get_kpi_definition",
   "payload": {
-    "id": 9
+    "uid": "sdt:thermostat.kpi:overheat_alarm"
   }
 }`,
           },
@@ -1006,12 +1011,12 @@ data: [{"sdTypeID":4,"sdInstanceID":17,"payload":{"temperature":83.2,"isOnline":
             summary:
               "Use dedicated filter queries for editors bound to a device type or a selected device.",
             requestExample: `query FilterKpis {
-  byType: kpiDefinitionsBySdType(id: 4) {
-    id
+  byType: kpiDefinitionsBySdType(uid: "sdt:thermostat") {
+    uid
     label
   }
-  byDevice: kpiDefinitionsBySdInstance(id: 17) {
-    id
+  byDevice: kpiDefinitionsBySdInstance(uid: "sdt:thermostat.sdi:device-a-17") {
+    uid
     label
   }
 }`,
@@ -1021,8 +1026,8 @@ data: [{"sdTypeID":4,"sdInstanceID":17,"payload":{"temperature":83.2,"isOnline":
             label: rest,
             summary:
               "REST exposes separate endpoints for both filter dimensions.",
-            requestExample: `GET /rest/kpi-definitions/type/4
-GET /rest/kpi-definitions/instance/17`,
+            requestExample: `GET /rest/kpi-definitions/type/sdt:thermostat
+GET /rest/kpi-definitions/instance/sdt:thermostat.sdi:device-a-17`,
           },
           {
             technology: "websocket",
@@ -1032,14 +1037,14 @@ GET /rest/kpi-definitions/instance/17`,
   "type": "request",
   "id": "kpi-by-type",
   "action": "get_kpi_definitions_by_type",
-  "payload": { "id": 4 }
+    "payload": { "uid": "sdt:thermostat" }
 }
 
 {
   "type": "request",
   "id": "kpi-by-device",
   "action": "get_kpi_definitions_by_sd_instance",
-  "payload": { "id": 17 }
+  "payload": { "uid": "sdt:thermostat.sdi:device-a-17" }
 }`,
           },
         ],
@@ -1054,16 +1059,16 @@ GET /rest/kpi-definitions/instance/17`,
             technology: "graphql",
             label: gql,
             summary:
-              "This example creates a KPI for one device type and targets selected instances.",
+              "This example creates a KPI for one device type and targets selected instances. The input UID is a suffix.",
             requestExample: `mutation CreateKpi {
   createKPIDefinition(
     input: {
+      uid: "overheat_alarm"
       label: "Overheat Alarm"
-      sdTypeID: 4
-      sdTypeUID: "thermostat"
+      sdTypeUID: "sdt:thermostat"
       userIdentifier: "user-42"
       sdInstanceMode: selected
-      selectedSDInstanceIDs: [17, 18]
+      selectedSDInstanceUIDs: ["sdt:thermostat.sdi:thermostat-a-17", "sdt:thermostat.sdi:thermostat-a-18"]
       nodes: [
         {
           id: 1
@@ -1075,7 +1080,6 @@ GET /rest/kpi-definitions/instance/17`,
           id: 2
           parentNodeID: 1
           nodeType: numericGTAtom
-          sdParameterID: 21
           sdParameterSpecification: "temperature"
           numericReferenceValue: 85
         }
@@ -1083,33 +1087,40 @@ GET /rest/kpi-definitions/instance/17`,
           id: 3
           parentNodeID: 1
           nodeType: booleanEQAtom
-          sdParameterID: 25
           sdParameterSpecification: "isOnline"
           booleanReferenceValue: true
         }
       ]
     }
   ) {
-    id
+    uid
     label
   }
 }`,
+            responseExample: `{
+  "data": {
+    "createKPIDefinition": {
+      "uid": "sdt:thermostat.kpi:overheat_alarm",
+      "label": "Overheat Alarm"
+    }
+  }
+}`,
+            notes: [kpiUIDSuffixNote, canonicalSDInstanceUIDNote],
           },
           {
             technology: "rest",
             label: rest,
-            summary:
-              "Send the same rule tree in JSON to the create endpoint.",
+            summary: "Send the same rule tree in JSON to the create endpoint.",
             requestExample: `POST /rest/kpi-definitions
 Content-Type: application/json
 
 {
+  "uid": "overheat_alarm",
   "label": "Overheat Alarm",
-  "sdTypeID": 4,
-  "sdTypeUID": "thermostat",
+  "sdTypeUID": "sdt:thermostat",
   "userIdentifier": "user-42",
   "sdInstanceMode": "selected",
-  "selectedSDInstanceIDs": [17, 18],
+  "selectedSDInstanceUIDs": ["sdt:thermostat.sdi:thermostat-a-17", "sdt:thermostat.sdi:thermostat-a-18"],
   "nodes": [
     {
       "id": 1,
@@ -1121,12 +1132,16 @@ Content-Type: application/json
       "id": 2,
       "parentNodeID": 1,
       "nodeType": "numericGTAtom",
-      "sdParameterID": 21,
       "sdParameterSpecification": "temperature",
       "numericReferenceValue": 85
     }
   ]
 }`,
+            responseExample: `{
+  "uid": "sdt:thermostat.kpi:overheat_alarm",
+  "label": "Overheat Alarm"
+}`,
+            notes: [kpiUIDSuffixNote, canonicalSDInstanceUIDNote],
           },
           {
             technology: "websocket",
@@ -1137,12 +1152,12 @@ Content-Type: application/json
   "id": "kpi-create",
   "action": "create_kpi_definition",
   "payload": {
+    "uid": "overheat_alarm",
     "label": "Overheat Alarm",
-    "sdTypeID": 4,
-    "sdTypeUID": "thermostat",
+    "sdTypeUID": "sdt:thermostat",
     "userIdentifier": "user-42",
     "sdInstanceMode": "selected",
-    "selectedSDInstanceIDs": [17, 18],
+    "selectedSDInstanceUIDs": ["sdt:thermostat.sdi:thermostat-a-17", "sdt:thermostat.sdi:thermostat-a-18"],
     "nodes": [
       {
         "id": 1,
@@ -1153,6 +1168,16 @@ Content-Type: application/json
     ]
   }
 }`,
+            responseExample: `{
+  "type": "response",
+  "id": "kpi-create",
+  "success": true,
+  "payload": {
+    "uid": "sdt:thermostat.kpi:overheat_alarm",
+    "label": "Overheat Alarm"
+  }
+}`,
+            notes: [kpiUIDSuffixNote, canonicalSDInstanceUIDNote],
           },
         ],
       },
@@ -1166,17 +1191,17 @@ Content-Type: application/json
             technology: "graphql",
             label: gql,
             summary:
-              "The update mutation uses the same rich input shape as creation.",
+              "The update mutation uses the canonical KPI UID in the target argument and the UID suffix in the replacement input.",
             requestExample: `mutation UpdateKpi {
   updateKPIDefinition(
-    id: 9
+    uid: "sdt:thermostat.kpi:overheat_alarm"
     input: {
+      uid: "overheat_alarm"
       label: "Overheat Alarm v2"
-      sdTypeID: 4
-      sdTypeUID: "thermostat"
+      sdTypeUID: "sdt:thermostat"
       userIdentifier: "user-42"
       sdInstanceMode: all
-      selectedSDInstanceIDs: []
+      selectedSDInstanceUIDs: []
       nodes: [
         {
           id: 1
@@ -1188,33 +1213,34 @@ Content-Type: application/json
           id: 2
           parentNodeID: 1
           nodeType: numericGTAtom
-          sdParameterID: 21
           sdParameterSpecification: "temperature"
           numericReferenceValue: 90
         }
       ]
     }
   ) {
-    id
+    uid
     label
     sdInstanceMode
   }
 }`,
+            notes: [kpiUIDSuffixNote],
           },
           {
             technology: "rest",
             label: rest,
-            summary: "PUT the complete definition to keep server and editor state aligned.",
-            requestExample: `PUT /rest/kpi-definitions/9
+            summary:
+              "PUT the complete definition to keep server and editor state aligned.",
+            requestExample: `PUT /rest/kpi-definitions/sdt:thermostat.kpi:overheat_alarm
 Content-Type: application/json
 
 {
+  "uid": "overheat_alarm",
   "label": "Overheat Alarm v2",
-  "sdTypeID": 4,
-  "sdTypeUID": "thermostat",
+  "sdTypeUID": "sdt:thermostat",
   "userIdentifier": "user-42",
   "sdInstanceMode": "all",
-  "selectedSDInstanceIDs": [],
+  "selectedSDInstanceUIDs": [],
   "nodes": [
     {
       "id": 1,
@@ -1226,66 +1252,73 @@ Content-Type: application/json
       "id": 2,
       "parentNodeID": 1,
       "nodeType": "numericGTAtom",
-      "sdParameterID": 21,
       "sdParameterSpecification": "temperature",
       "numericReferenceValue": 90
     }
   ]
 }`,
+            responseExample: `{
+  "uid": "sdt:thermostat.kpi:overheat_alarm",
+  "label": "Overheat Alarm v2",
+  "sdInstanceMode": "all"
+}`,
+            notes: [kpiUIDSuffixNote],
           },
           {
             technology: "websocket",
             label: ws,
-            summary: "Send the target ID plus the full replacement input.",
+            summary: "Send the target UID plus the full replacement input.",
             requestExample: `{
   "type": "request",
   "id": "kpi-update",
   "action": "update_kpi_definition",
   "payload": {
-    "id": 9,
+    "uid": "sdt:thermostat.kpi:overheat_alarm",
     "input": {
+      "uid": "overheat_alarm",
       "label": "Overheat Alarm v2",
-      "sdTypeID": 4,
-      "sdTypeUID": "thermostat",
+      "sdTypeUID": "sdt:thermostat",
       "userIdentifier": "user-42",
       "sdInstanceMode": "all",
-      "selectedSDInstanceIDs": [],
+      "selectedSDInstanceUIDs": [],
       "nodes": []
     }
   }
 }`,
+            notes: [kpiUIDSuffixNote],
           },
         ],
       },
       {
         id: "delete-kpi",
         title: "Delete KPI Definition",
-        summary: "Delete an obsolete KPI definition by ID.",
+        summary: "Delete an obsolete KPI definition by UID.",
         variants: [
           {
             technology: "graphql",
             label: gql,
-            summary: "Delete through a simple mutation and check the boolean result.",
+            summary:
+              "Delete through a simple mutation and check the boolean result.",
             requestExample: `mutation DeleteKpi {
-  deleteKPIDefinition(id: 9)
+  deleteKPIDefinition(uid: "sdt:thermostat.kpi:overheat_alarm")
 }`,
           },
           {
             technology: "rest",
             label: rest,
             summary: "Delete the KPI resource directly.",
-            requestExample: `DELETE /rest/kpi-definitions/9`,
+            requestExample: `DELETE /rest/kpi-definitions/sdt:thermostat.kpi:overheat_alarm`,
           },
           {
             technology: "websocket",
             label: ws,
-            summary: "Use the delete action with the KPI ID in the payload.",
+            summary: "Use the delete action with the KPI UID in the payload.",
             requestExample: `{
   "type": "request",
   "id": "kpi-delete",
   "action": "delete_kpi_definition",
   "payload": {
-    "id": 9
+    "uid": "sdt:thermostat.kpi:overheat_alarm"
   }
 }`,
           },
@@ -1307,14 +1340,14 @@ Content-Type: application/json
           {
             technology: "graphql",
             label: gql,
-            summary: "Fetch all results or include only the fields needed by the current view.",
+            summary:
+              "Fetch all results or include only the fields needed by the current view.",
             requestExample: `query ListKpiResults {
   kpiResults {
-    id
-    kpiDefinitionID
-    sdInstanceID
+    kpiDefinitionUID
+    sdTypeUID
+    sdInstanceUID
     fulfilled
-    payload
     eventTime
   }
 }`,
@@ -1347,9 +1380,9 @@ Content-Type: application/json
             label: gql,
             summary: "Query a KPI-scoped result history.",
             requestExample: `query ResultsByKpi {
-  kpiResultsByKPI(id: 9) {
-    id
-    sdInstanceID
+  kpiResultsByKPI(uid: "sdt:thermostat.kpi:room_temperature") {
+    kpiDefinitionUID
+    sdInstanceUID
     fulfilled
     eventTime
   }
@@ -1358,8 +1391,8 @@ Content-Type: application/json
           {
             technology: "rest",
             label: rest,
-            summary: "Use the KPI ID as a path parameter.",
-            requestExample: `GET /rest/kpi-results/9`,
+            summary: "Use the KPI UID as a path parameter.",
+            requestExample: `GET /rest/kpi-results/sdt:thermostat.kpi:room_temperature`,
           },
           {
             technology: "websocket",
@@ -1370,7 +1403,7 @@ Content-Type: application/json
   "id": "kpi-results-by-kpi",
   "action": "get_kpi_results_by_kpi",
   "payload": {
-    "id": 9
+	    "uid": "sdt:thermostat.kpi:room_temperature"
   }
 }`,
           },
@@ -1386,18 +1419,17 @@ Content-Type: application/json
             technology: "graphql",
             label: gql,
             summary:
-              "Use a rich request object when the result must be resolved by more than just a numeric ID.",
+              "Use a UID request object when resolving a specific KPI result.",
             requestExample: `query OneKpiResult {
   kpiResult(
     request: {
-      kpiDefinitionID: 9
-      sdInstanceID: 17
-      eventTime: "2026-04-14T12:30:00Z"
+      kpiDefinitionUID: "sdt:thermostat.kpi:room_temperature"
+      sdInstanceUID: "sdt:thermostat.sdi:boiler-room-a"
     }
   ) {
-    id
+    kpiDefinitionUID
+    sdInstanceUID
     fulfilled
-    payload
     eventTime
   }
 }`,
@@ -1411,9 +1443,8 @@ Content-Type: application/json
 Content-Type: application/json
 
 {
-  "kpiDefinitionID": 9,
-  "sdInstanceID": 17,
-  "eventTime": "2026-04-14T12:30:00Z"
+  "kpiDefinitionUID": "sdt:thermostat.kpi:room_temperature",
+  "sdInstanceUID": "sdt:thermostat.sdi:boiler-room-a"
 }`,
           },
           {
@@ -1425,9 +1456,8 @@ Content-Type: application/json
   "id": "kpi-result-one",
   "action": "get_kpi_result",
   "payload": {
-    "kpiDefinitionID": 9,
-    "sdInstanceID": 17,
-    "eventTime": "2026-04-14T12:30:00Z"
+    "kpiDefinitionUID": "sdt:thermostat.kpi:room_temperature",
+    "sdInstanceUID": "sdt:thermostat.sdi:boiler-room-a"
   }
 }`,
           },
@@ -1441,13 +1471,14 @@ Content-Type: application/json
           {
             technology: "graphql",
             label: gql,
-            summary: "Subscribe directly from Apollo or another GraphQL client.",
+            summary:
+              "Subscribe directly from Apollo or another GraphQL client.",
             requestExample: `subscription KpiResultStream {
-  onKPIFulfillmentChecked(filter: { kpiDefinitionID: 9, sdInstanceID: 17 }) {
-    id
+  onKPIFulfillmentChecked(filter: { kpiDefinitionUIDs: ["sdt:thermostat.kpi:room_temperature"], sdInstanceUIDs: ["sdt:thermostat.sdi:boiler-room-a"] }) {
+    kpiDefinitionUID
+    sdInstanceUID
     fulfilled
     eventTime
-    payload
   }
 }`,
           },
@@ -1461,8 +1492,8 @@ Content-Type: application/json
   "id": "kpi-result-stream",
   "topic": "kpi_fulfillment_checked",
   "payload": {
-    "kpiDefinitionID": 9,
-    "sdInstanceID": 17
+    "kpiDefinitionUIDs": ["sdt:thermostat.kpi:room_temperature"],
+    "sdInstanceUIDs": ["sdt:thermostat.sdi:boiler-room-a"]
   }
 }`,
           },
@@ -1480,8 +1511,8 @@ Accept: text/event-stream
 
 Body:
 {
-  "kpiDefinitionID": 9,
-  "sdInstanceID": 17
+  "kpiDefinitionUIDs": ["sdt:thermostat.kpi:room_temperature"],
+  "sdInstanceUIDs": ["sdt:thermostat.sdi:boiler-room-a"]
 }`,
           },
         ],
@@ -1502,12 +1533,12 @@ Body:
           {
             technology: "graphql",
             label: gql,
-            summary: "Load the group collection with its member IDs.",
+            summary: "Load the group collection with its member UIDs.",
             requestExample: `query ListGroups {
   sdInstanceGroups {
-    id
+    uid
     label
-    sdInstanceIDs
+    sdInstanceUIDs
   }
 }`,
           },
@@ -1537,12 +1568,12 @@ Body:
           {
             technology: "graphql",
             label: gql,
-            summary: "Read one group by ID.",
+            summary: "Read one group by UID.",
             requestExample: `query GroupDetail {
-  sdInstanceGroup(id: 3) {
-    id
+  sdInstanceGroup(uid: "grp:boiler_room") {
+    uid
     label
-    sdInstanceIDs
+    sdInstanceUIDs
   }
 }`,
           },
@@ -1550,17 +1581,17 @@ Body:
             technology: "rest",
             label: rest,
             summary: "Use a path parameter to fetch one group.",
-            requestExample: `GET /rest/sd-instance-groups/3`,
+            requestExample: `GET /rest/sd-instance-groups/grp:boiler_room`,
           },
           {
             technology: "websocket",
             label: ws,
-            summary: "Send the group ID in the payload.",
+            summary: "Send the group UID in the payload.",
             requestExample: `{
   "type": "request",
   "id": "group-detail",
   "action": "get_sd_instance_group",
-  "payload": { "id": 3 }
+  "payload": { "uid": "grp:boiler_room" }
 }`,
           },
         ],
@@ -1575,17 +1606,19 @@ Body:
             label: gql,
             summary: "Create a group with its initial device membership.",
             requestExample: `mutation CreateGroup {
-  createSDInstanceGroup(
-    input: {
-      label: "Boiler Room"
-      sdInstanceIDs: [17, 18, 19]
-    }
-  ) {
-    id
-    label
-    sdInstanceIDs
-  }
-}`,
+	  createSDInstanceGroup(
+	    input: {
+	      uid: "grp:boiler_room"
+	      label: "Boiler Room"
+	      userIdentifier: "BR"
+	      sdInstanceUIDs: ["sdt:boiler.sdi:boiler-a", "sdt:boiler.sdi:boiler-b", "sdt:boiler.sdi:boiler-c"]
+	    }
+	  ) {
+	    uid
+	    label
+	    sdInstanceUIDs
+	  }
+	}`,
           },
           {
             technology: "rest",
@@ -1595,8 +1628,10 @@ Body:
 Content-Type: application/json
 
 {
+  "uid": "grp:boiler_room",
   "label": "Boiler Room",
-  "sdInstanceIDs": [17, 18, 19]
+  "userIdentifier": "BR",
+  "sdInstanceUIDs": ["sdt:boiler.sdi:boiler-a", "sdt:boiler.sdi:boiler-b", "sdt:boiler.sdi:boiler-c"]
 }`,
           },
           {
@@ -1608,8 +1643,10 @@ Content-Type: application/json
   "id": "group-create",
   "action": "create_sd_instance_group",
   "payload": {
+    "uid": "grp:boiler_room",
     "label": "Boiler Room",
-    "sdInstanceIDs": [17, 18, 19]
+    "userIdentifier": "BR",
+    "sdInstanceUIDs": ["sdt:boiler.sdi:boiler-a", "sdt:boiler.sdi:boiler-b", "sdt:boiler.sdi:boiler-c"]
   }
 }`,
           },
@@ -1625,44 +1662,51 @@ Content-Type: application/json
             label: gql,
             summary: "Replace the group state in one mutation.",
             requestExample: `mutation UpdateGroup {
-  updateSDInstanceGroup(
-    id: 3
-    input: {
-      label: "Boiler Room - North"
-      sdInstanceIDs: [17, 18, 22]
-    }
-  ) {
-    id
-    label
-    sdInstanceIDs
-  }
-}`,
+	  updateSDInstanceGroup(
+	    uid: "grp:boiler_room"
+	    input: {
+	      uid: "grp:boiler_room"
+	      label: "Boiler Room - North"
+	      userIdentifier: "BR-N"
+	      sdInstanceUIDs: ["sdt:boiler.sdi:boiler-a", "sdt:boiler.sdi:boiler-b", "sdt:boiler.sdi:boiler-north"]
+	    }
+	  ) {
+	    uid
+	    label
+	    sdInstanceUIDs
+	  }
+	}`,
           },
           {
             technology: "rest",
             label: rest,
             summary: "PUT the full group payload.",
-            requestExample: `PUT /rest/sd-instance-groups/3
+            requestExample: `PUT /rest/sd-instance-groups/grp:boiler_room
 Content-Type: application/json
 
 {
+  "uid": "grp:boiler_room",
   "label": "Boiler Room - North",
-  "sdInstanceIDs": [17, 18, 22]
+  "userIdentifier": "BR-N",
+  "sdInstanceUIDs": ["sdt:boiler.sdi:boiler-a", "sdt:boiler.sdi:boiler-b", "sdt:boiler.sdi:boiler-north"]
 }`,
           },
           {
             technology: "websocket",
             label: ws,
-            summary: "Provide the group ID together with the replacement input.",
+            summary:
+              "Provide the group UID together with the replacement input.",
             requestExample: `{
   "type": "request",
   "id": "group-update",
   "action": "update_sd_instance_group",
   "payload": {
-    "id": 3,
+    "uid": "grp:boiler_room",
     "input": {
+      "uid": "grp:boiler_room",
       "label": "Boiler Room - North",
-      "sdInstanceIDs": [17, 18, 22]
+      "userIdentifier": "BR-N",
+      "sdInstanceUIDs": ["sdt:boiler.sdi:boiler-a", "sdt:boiler.sdi:boiler-b", "sdt:boiler.sdi:boiler-north"]
     }
   }
 }`,
@@ -1677,27 +1721,27 @@ Content-Type: application/json
           {
             technology: "graphql",
             label: gql,
-            summary: "Delete by group ID and check the boolean result.",
+            summary: "Delete by group UID and check the boolean result.",
             requestExample: `mutation DeleteGroup {
-  deleteSDInstanceGroup(id: 3)
+  deleteSDInstanceGroup(uid: "grp:boiler_room")
 }`,
           },
           {
             technology: "rest",
             label: rest,
             summary: "Delete the group resource directly.",
-            requestExample: `DELETE /rest/sd-instance-groups/3`,
+            requestExample: `DELETE /rest/sd-instance-groups/grp:boiler_room`,
           },
           {
             technology: "websocket",
             label: ws,
-            summary: "Issue the delete action with the group ID.",
+            summary: "Issue the delete action with the group UID.",
             requestExample: `{
   "type": "request",
   "id": "group-delete",
   "action": "delete_sd_instance_group",
   "payload": {
-    "id": 3
+    "uid": "grp:boiler_room"
   }
 }`,
           },
@@ -1726,14 +1770,14 @@ Content-Type: application/json
   timeSeriesRead(
     request: {
       type: kpi
-      sdTypeID: 4
-      sdInstanceIDs: [17]
-      kpiDefinitionIDs: [9]
+      sdTypeUID: "sdt:boiler"
+      sdInstanceUIDs: ["sdt:boiler.sdi:boiler-sensor-a-17"]
+      kpiDefinitionUIDs: ["sdt:boiler.kpi:overheat"]
       sortDesc: true
       limit: 50
       cursor: {
         time: "2026-04-14T12:00:00Z"
-        sdInstanceUID: "boiler-sensor-a-17"
+        sdInstanceUID: "sdt:boiler.sdi:boiler-sensor-a-17"
       }
     }
   ) {
@@ -1753,7 +1797,7 @@ Content-Type: application/json
     nextCursor {
       time
       sdInstanceUID
-      kpiDefinitionID
+      kpiDefinitionUID
     }
   }
 }`,
@@ -1768,14 +1812,14 @@ Content-Type: application/json
 
 {
   "type": "kpi",
-  "sdTypeID": 4,
-  "sdInstanceIDs": [17],
-  "kpiDefinitionIDs": [9],
+  "sdTypeUID": "sdt:boiler",
+  "sdInstanceUIDs": ["sdt:boiler.sdi:boiler-sensor-a-17"],
+  "kpiDefinitionUIDs": ["sdt:boiler.kpi:overheat"],
   "sortDesc": true,
   "limit": 50,
   "cursor": {
     "time": "2026-04-14T12:00:00Z",
-    "sdInstanceUID": "boiler-sensor-a-17"
+    "sdInstanceUID": "sdt:boiler.sdi:boiler-sensor-a-17"
   }
 }`,
           },
@@ -1790,9 +1834,9 @@ Content-Type: application/json
   "action": "time-series",
   "payload": {
     "type": "kpi",
-    "sdTypeID": 4,
-    "sdInstanceIDs": [17],
-    "kpiDefinitionIDs": [9],
+    "sdTypeUID": "sdt:boiler",
+    "sdInstanceUIDs": ["sdt:boiler.sdi:boiler-sensor-a-17"],
+    "kpiDefinitionUIDs": ["sdt:boiler.kpi:overheat"],
     "sortDesc": true,
     "limit": 50
   }
@@ -1815,8 +1859,8 @@ Content-Type: application/json
   timeSeriesDistinctTagValues(
     request: {
       type: raw
-      sdTypeID: 4
-      sdInstanceIDs: [17, 18]
+      sdTypeUID: "sdt:boiler"
+      sdInstanceUIDs: ["sdt:boiler.sdi:boiler-sensor-a-17", "sdt:boiler.sdi:boiler-sensor-a-18"]
       from: "2026-04-01T00:00:00Z"
       to: "2026-04-14T23:59:59Z"
       tag: "location"
@@ -1837,8 +1881,8 @@ Content-Type: application/json
 
 {
   "type": "raw",
-  "sdTypeID": 4,
-  "sdInstanceIDs": [17, 18],
+  "sdTypeUID": "sdt:boiler",
+  "sdInstanceUIDs": ["sdt:boiler.sdi:boiler-sensor-a-17", "sdt:boiler.sdi:boiler-sensor-a-18"],
   "from": "2026-04-01T00:00:00Z",
   "to": "2026-04-14T23:59:59Z",
   "tag": "location"
@@ -1855,8 +1899,8 @@ Content-Type: application/json
   "action": "time-series-distinct-tag-values",
   "payload": {
     "type": "raw",
-    "sdTypeID": 4,
-    "sdInstanceIDs": [17, 18],
+    "sdTypeUID": "sdt:boiler",
+    "sdInstanceUIDs": ["sdt:boiler.sdi:boiler-sensor-a-17", "sdt:boiler.sdi:boiler-sensor-a-18"],
     "from": "2026-04-01T00:00:00Z",
     "to": "2026-04-14T23:59:59Z",
     "tag": "location"
@@ -1888,9 +1932,9 @@ Content-Type: application/json
             requestExample: `query ReadAggregateKpi {
   timeSeriesReadAggregateKPI(
     request: {
-      sdTypeID: 4
-      kpiDefinitionIDs: [9, 11]
-      sdInstanceIDs: [17, 18]
+      sdTypeUID: "sdt:boiler"
+      kpiDefinitionUIDs: ["sdt:boiler.kpi:overheat", "sdt:boiler.kpi:pressure-drop"]
+      sdInstanceUIDs: ["sdt:boiler.sdi:boiler-sensor-a-17", "sdt:boiler.sdi:boiler-sensor-a-18"]
       from: "2026-04-01T00:00:00Z"
       to: "2026-04-14T23:59:59Z"
       aggregateSeconds: 3600
@@ -1914,7 +1958,7 @@ Content-Type: application/json
     nextCursor {
       time
       sdInstanceUID
-      kpiDefinitionID
+      kpiDefinitionUID
     }
   }
 }`,
@@ -1928,9 +1972,9 @@ Content-Type: application/json
 Content-Type: application/json
 
 {
-  "sdTypeID": 4,
-  "kpiDefinitionIDs": [9, 11],
-  "sdInstanceIDs": [17, 18],
+  "sdTypeUID": "sdt:boiler",
+  "kpiDefinitionUIDs": ["sdt:boiler.kpi:overheat", "sdt:boiler.kpi:pressure-drop"],
+  "sdInstanceUIDs": ["sdt:boiler.sdi:boiler-sensor-a-17", "sdt:boiler.sdi:boiler-sensor-a-18"],
   "from": "2026-04-01T00:00:00Z",
   "to": "2026-04-14T23:59:59Z",
   "aggregateSeconds": 3600,
@@ -1948,9 +1992,9 @@ Content-Type: application/json
   "id": "history-aggregate",
   "action": "time-series-aggregate-kpi",
   "payload": {
-    "sdTypeID": 4,
-    "kpiDefinitionIDs": [9, 11],
-    "sdInstanceIDs": [17, 18],
+    "sdTypeUID": "sdt:boiler",
+    "kpiDefinitionUIDs": ["sdt:boiler.kpi:overheat", "sdt:boiler.kpi:pressure-drop"],
+    "sdInstanceUIDs": ["sdt:boiler.sdi:boiler-sensor-a-17", "sdt:boiler.sdi:boiler-sensor-a-18"],
     "from": "2026-04-01T00:00:00Z",
     "to": "2026-04-14T23:59:59Z",
     "aggregateSeconds": 3600,
@@ -1976,13 +2020,13 @@ Content-Type: application/json
   startTimeSeriesExport(
     input: {
       type: raw
-      sdTypeID: 4
-      sdInstanceIDs: [17, 18]
+      sdTypeUID: "sdt:boiler"
+      sdInstanceUIDs: ["sdt:boiler.sdi:boiler-sensor-a-17", "sdt:boiler.sdi:boiler-sensor-a-18"]
       sortDesc: true
       limit: 1000
     }
   ) {
-    id
+    uid
     status
     downloadUrl
     createdAt
@@ -1993,7 +2037,7 @@ Content-Type: application/json
             responseExample: `{
   "data": {
     "startTimeSeriesExport": {
-      "id": 41,
+      "uid": "exp:J4K8M2Q9R7T6W3P1",
       "status": "pending",
       "downloadUrl": null,
       "createdAt": "2026-05-02T23:53:23.626667429Z",
@@ -2003,7 +2047,7 @@ Content-Type: application/json
   }
 }`,
             notes: [
-              "Use the returned id for status checks, cancellation, or subscriptions.",
+              "Use the returned uid for status checks, cancellation, or subscriptions.",
               "The CSV file is still downloaded through REST once the job reaches done.",
             ],
           },
@@ -2017,13 +2061,13 @@ Content-Type: application/json
 
 {
   "type": "raw",
-  "sdTypeID": 4,
-  "sdInstanceIDs": [17, 18],
+  "sdTypeUID": "sdt:boiler",
+  "sdInstanceUIDs": ["sdt:boiler.sdi:boiler-sensor-a-17", "sdt:boiler.sdi:boiler-sensor-a-18"],
   "sortDesc": true,
   "limit": 1000
 }`,
             responseExample: `{
-  "id": 41,
+  "uid": "exp:J4K8M2Q9R7T6W3P1",
   "status": "pending",
   "downloadUrl": null,
   "createdAt": "2026-05-02T23:53:23.626667429Z",
@@ -2042,8 +2086,8 @@ Content-Type: application/json
   "action": "time-series-export",
   "payload": {
     "type": "raw",
-    "sdTypeID": 4,
-    "sdInstanceIDs": [17, 18],
+    "sdTypeUID": "sdt:boiler",
+    "sdInstanceUIDs": ["sdt:boiler.sdi:boiler-sensor-a-17", "sdt:boiler.sdi:boiler-sensor-a-18"],
     "limit": 1000
   }
 }`,
@@ -2052,7 +2096,7 @@ Content-Type: application/json
   "id": "history-export",
   "success": true,
   "payload": {
-    "id": 41,
+    "uid": "exp:J4K8M2Q9R7T6W3P1",
     "status": "pending",
     "downloadUrl": null,
     "createdAt": "2026-05-02T23:53:23.626667429Z",
@@ -2073,10 +2117,10 @@ Content-Type: application/json
             technology: "graphql",
             label: gql,
             summary:
-              "Use the export ID to fetch a single snapshot that can be pending, processing, done, failed, cancelled, or expired.",
+              "Use the export UID to fetch a single snapshot that can be pending, processing, done, failed, cancelled, or expired.",
             requestExample: `query ExportStatus {
-  timeSeriesExport(id: 41) {
-    id
+  timeSeriesExport(uid: "exp:J4K8M2Q9R7T6W3P1") {
+    uid
     status
     downloadUrl
     createdAt
@@ -2087,9 +2131,9 @@ Content-Type: application/json
             responseExample: `{
   "data": {
     "timeSeriesExport": {
-      "id": 41,
+      "uid": "exp:J4K8M2Q9R7T6W3P1",
       "status": "done",
-      "downloadUrl": "/rest/time-series/export/41",
+      "downloadUrl": "/rest/time-series/export/exp:J4K8M2Q9R7T6W3P1",
       "createdAt": "2026-05-02T23:53:23.626667429Z",
       "expiresAt": "2026-05-03T00:23:31.688347473Z",
       "error": null
@@ -2102,11 +2146,11 @@ Content-Type: application/json
             label: rest,
             summary:
               "The status endpoint returns the same export shape as the GraphQL query and WebSocket status request.",
-            requestExample: `GET /rest/time-series/export/41/status`,
+            requestExample: `GET /rest/time-series/export/exp:J4K8M2Q9R7T6W3P1/status`,
             responseExample: `{
-  "id": 41,
+  "uid": "exp:J4K8M2Q9R7T6W3P1",
   "status": "done",
-  "downloadUrl": "/rest/time-series/export/41",
+  "downloadUrl": "/rest/time-series/export/exp:J4K8M2Q9R7T6W3P1",
   "createdAt": "2026-05-02T23:53:23.626667429Z",
   "expiresAt": "2026-05-03T00:23:31.688347473Z",
   "error": null
@@ -2122,7 +2166,7 @@ Content-Type: application/json
   "id": "history-export-status",
   "action": "time-series-export-status",
   "payload": {
-    "id": 41
+    "uid": "exp:J4K8M2Q9R7T6W3P1"
   }
 }`,
             responseExample: `{
@@ -2130,9 +2174,9 @@ Content-Type: application/json
   "id": "history-export-status",
   "success": true,
   "payload": {
-    "id": 41,
+    "uid": "exp:J4K8M2Q9R7T6W3P1",
     "status": "done",
-    "downloadUrl": "/rest/time-series/export/41",
+    "downloadUrl": "/rest/time-series/export/exp:J4K8M2Q9R7T6W3P1",
     "createdAt": "2026-05-02T23:53:23.626667429Z",
     "expiresAt": "2026-05-03T00:23:31.688347473Z",
     "error": null
@@ -2153,8 +2197,8 @@ Content-Type: application/json
             summary:
               "GraphQL cancellation returns the terminal or already-completed export snapshot.",
             requestExample: `mutation CancelExport {
-  cancelTimeSeriesExport(id: 41) {
-    id
+  cancelTimeSeriesExport(uid: "exp:J4K8M2Q9R7T6W3P1") {
+    uid
     status
     downloadUrl
     createdAt
@@ -2165,7 +2209,7 @@ Content-Type: application/json
             responseExample: `{
   "data": {
     "cancelTimeSeriesExport": {
-      "id": 41,
+      "uid": "exp:J4K8M2Q9R7T6W3P1",
       "status": "cancelled",
       "downloadUrl": null,
       "createdAt": "2026-05-02T23:53:23.626667429Z",
@@ -2180,9 +2224,9 @@ Content-Type: application/json
             label: rest,
             summary:
               "Use DELETE on the export resource to request cancellation.",
-            requestExample: `DELETE /rest/time-series/export/41`,
+            requestExample: `DELETE /rest/time-series/export/exp:J4K8M2Q9R7T6W3P1`,
             responseExample: `{
-  "id": 41,
+  "uid": "exp:J4K8M2Q9R7T6W3P1",
   "status": "cancelled",
   "downloadUrl": null,
   "createdAt": "2026-05-02T23:53:23.626667429Z",
@@ -2194,13 +2238,13 @@ Content-Type: application/json
             technology: "websocket",
             label: ws,
             summary:
-              "The low-level WebSocket API uses a dedicated cancel action with the export id in the payload.",
+              "The low-level WebSocket API uses a dedicated cancel action with the export uid in the payload.",
             requestExample: `{
   "type": "request",
   "id": "history-export-cancel",
   "action": "time-series-export-cancel",
   "payload": {
-    "id": 41
+    "uid": "exp:J4K8M2Q9R7T6W3P1"
   }
 }`,
             responseExample: `{
@@ -2208,7 +2252,7 @@ Content-Type: application/json
   "id": "history-export-cancel",
   "success": true,
   "payload": {
-    "id": 41,
+    "uid": "exp:J4K8M2Q9R7T6W3P1",
     "status": "cancelled",
     "downloadUrl": null,
     "createdAt": "2026-05-02T23:53:23.626667429Z",
@@ -2229,10 +2273,10 @@ Content-Type: application/json
             technology: "graphql",
             label: gql,
             summary:
-              "Apollo-style GraphQL subscriptions stream the same TimeSeriesExport payload filtered by export IDs.",
+              "Apollo-style GraphQL subscriptions stream the same TimeSeriesExport payload filtered by export UIDs.",
             requestExample: `subscription OnExportUpdated {
-  onTimeSeriesExportUpdated(filter: { ids: [41] }) {
-    id
+  onTimeSeriesExportUpdated(filter: { uids: ["exp:J4K8M2Q9R7T6W3P1"] }) {
+    uid
     status
     downloadUrl
     createdAt
@@ -2243,9 +2287,9 @@ Content-Type: application/json
             responseExample: `{
   "data": {
     "onTimeSeriesExportUpdated": {
-      "id": 41,
+      "uid": "exp:J4K8M2Q9R7T6W3P1",
       "status": "done",
-      "downloadUrl": "/rest/time-series/export/41",
+      "downloadUrl": "/rest/time-series/export/exp:J4K8M2Q9R7T6W3P1",
       "createdAt": "2026-05-02T23:53:23.626667429Z",
       "expiresAt": "2026-05-03T00:23:31.688347473Z",
       "error": null
@@ -2263,7 +2307,7 @@ Content-Type: application/json
   "id": "history-export-events",
   "topic": "time_series_export_updated",
   "payload": {
-    "ids": [41]
+    "uids": ["exp:J4K8M2Q9R7T6W3P1"]
   }
 }`,
             responseExample: `{
@@ -2271,9 +2315,9 @@ Content-Type: application/json
   "id": "history-export-events",
   "topic": "time_series_export_updated",
   "payload": {
-    "id": 41,
+    "uid": "exp:J4K8M2Q9R7T6W3P1",
     "status": "done",
-    "downloadUrl": "/rest/time-series/export/41",
+    "downloadUrl": "/rest/time-series/export/exp:J4K8M2Q9R7T6W3P1",
     "createdAt": "2026-05-02T23:53:23.626667429Z",
     "expiresAt": "2026-05-03T00:23:31.688347473Z",
     "error": null
@@ -2293,14 +2337,14 @@ Content-Type: application/json
             label: rest,
             summary:
               "The download endpoint serves the file. If called too early it waits for job completion, so the recommended flow is start -> status/subscription -> download.",
-            requestExample: `GET /rest/time-series/export/41`,
+            requestExample: `GET /rest/time-series/export/exp:J4K8M2Q9R7T6W3P1`,
             responseExample: `HTTP/1.1 200 OK
 Content-Type: text/csv
 Content-Disposition: attachment; filename="time-series-export-41.csv"
 
 time,sdInstanceUID,temperature
-2026-05-02T23:53:24Z,boiler-sensor-a-17,71.2
-2026-05-02T23:53:25Z,boiler-sensor-a-17,71.3`,
+2026-05-02T23:53:24Z,sdt:boiler.sdi:boiler-sensor-a-17,71.2
+2026-05-02T23:53:25Z,sdt:boiler.sdi:boiler-sensor-a-17,71.3`,
           },
         ],
       },
@@ -2318,15 +2362,15 @@ time,sdInstanceUID,temperature
             requestExample: `mutation StartAggregateExport {
   startTimeSeriesExportAggregateKPI(
     input: {
-      sdTypeID: 4
-      kpiDefinitionIDs: [9]
-      sdInstanceIDs: [17, 18]
+      sdTypeUID: "sdt:boiler"
+      kpiDefinitionUIDs: ["sdt:boiler.kpi:overheat"]
+      sdInstanceUIDs: ["sdt:boiler.sdi:boiler-sensor-a-17", "sdt:boiler.sdi:boiler-sensor-a-18"]
       from: "2026-04-01T00:00:00Z"
       to: "2026-04-14T23:59:59Z"
       aggregateSeconds: 3600
     }
   ) {
-    id
+    uid
     status
     downloadUrl
     createdAt
@@ -2337,7 +2381,7 @@ time,sdInstanceUID,temperature
             responseExample: `{
   "data": {
     "startTimeSeriesExportAggregateKPI": {
-      "id": 56,
+      "uid": "exp:T8P1K6R3M9Q2W5D4",
       "status": "pending",
       "downloadUrl": null,
       "createdAt": "2026-05-02T23:58:11.054112902Z",
@@ -2359,15 +2403,15 @@ time,sdInstanceUID,temperature
 Content-Type: application/json
 
 {
-  "sdTypeID": 4,
-  "kpiDefinitionIDs": [9],
-  "sdInstanceIDs": [17, 18],
+  "sdTypeUID": "sdt:boiler",
+  "kpiDefinitionUIDs": ["sdt:boiler.kpi:overheat"],
+  "sdInstanceUIDs": ["sdt:boiler.sdi:boiler-sensor-a-17", "sdt:boiler.sdi:boiler-sensor-a-18"],
   "from": "2026-04-01T00:00:00Z",
   "to": "2026-04-14T23:59:59Z",
   "aggregateSeconds": 3600
 }`,
             responseExample: `{
-  "id": 56,
+  "uid": "exp:T8P1K6R3M9Q2W5D4",
   "status": "pending",
   "downloadUrl": null,
   "createdAt": "2026-05-02T23:58:11.054112902Z",
@@ -2385,9 +2429,9 @@ Content-Type: application/json
   "id": "history-export-aggregate",
   "action": "time-series-export-aggregate-kpi",
   "payload": {
-    "sdTypeID": 4,
-    "kpiDefinitionIDs": [9],
-    "sdInstanceIDs": [17, 18],
+    "sdTypeUID": "sdt:boiler",
+    "kpiDefinitionUIDs": ["sdt:boiler.kpi:overheat"],
+    "sdInstanceUIDs": ["sdt:boiler.sdi:boiler-sensor-a-17", "sdt:boiler.sdi:boiler-sensor-a-18"],
     "aggregateSeconds": 3600
   }
 }`,
@@ -2396,12 +2440,323 @@ Content-Type: application/json
   "id": "history-export-aggregate",
   "success": true,
   "payload": {
-    "id": 56,
+    "uid": "exp:T8P1K6R3M9Q2W5D4",
     "status": "pending",
     "downloadUrl": null,
     "createdAt": "2026-05-02T23:58:11.054112902Z",
     "expiresAt": null,
     "error": null
+  }
+}`,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "users",
+    title: "Users And Sessions",
+    summary:
+      "Inspect users, update account metadata, disable or re-enable accounts, and revoke active sessions.",
+    actions: [
+      {
+        id: "list-users",
+        title: "List Users",
+        summary: "Load all user accounts visible to the current administrator.",
+        variants: [
+          {
+            technology: "graphql",
+            label: gql,
+            summary: "Read users with role and disabled state in one query.",
+            requestExample: `query Users {
+  users {
+    uid
+    email
+    name
+    disabled
+    disabledAt
+    disabledReason
+    role {
+      uid
+      label
+    }
+  }
+}`,
+          },
+          {
+            technology: "rest",
+            label: rest,
+            summary: "Read the user collection from the REST endpoint.",
+            requestExample: `GET /rest/users`,
+          },
+          {
+            technology: "websocket",
+            label: ws,
+            summary:
+              "Request the user list over the interactive WebSocket API.",
+            requestExample: `{
+  "type": "request",
+  "id": "users-list",
+  "action": "get_users"
+}`,
+          },
+        ],
+      },
+      {
+        id: "get-user",
+        title: "Get User",
+        summary: "Inspect one account by public user UID.",
+        variants: [
+          {
+            technology: "graphql",
+            label: gql,
+            summary: "Resolve one user by UID.",
+            requestExample: `query UserDetail {
+  user(uid: "usr:H8P2R5T9K1M4Q7D6") {
+    uid
+    email
+    name
+    disabled
+    role {
+      uid
+      label
+    }
+  }
+}`,
+          },
+          {
+            technology: "rest",
+            label: rest,
+            summary: "Use the user UID in the REST path.",
+            requestExample: `GET /rest/users/usr:H8P2R5T9K1M4Q7D6`,
+          },
+          {
+            technology: "websocket",
+            label: ws,
+            summary: "Send the target user UID in the payload.",
+            requestExample: `{
+  "type": "request",
+  "id": "user-detail",
+  "action": "get_user",
+  "payload": {
+    "uid": "usr:H8P2R5T9K1M4Q7D6"
+  }
+}`,
+          },
+        ],
+      },
+      {
+        id: "update-user",
+        title: "Update User",
+        summary: "Update editable user profile fields.",
+        variants: [
+          {
+            technology: "graphql",
+            label: gql,
+            summary: "Patch the user through the dedicated update mutation.",
+            requestExample: `mutation UpdateUser {
+  updateUser(
+    uid: "usr:H8P2R5T9K1M4Q7D6"
+    input: {
+      name: "Ops Console User"
+      profileImageURL: "https://example.test/avatar.png"
+    }
+  ) {
+    uid
+    name
+    profileImageURL
+  }
+}`,
+          },
+          {
+            technology: "rest",
+            label: rest,
+            summary: "PATCH the editable fields on the user resource.",
+            requestExample: `PATCH /rest/users/usr:H8P2R5T9K1M4Q7D6
+Content-Type: application/json
+
+{
+  "name": "Ops Console User",
+  "profileImageURL": "https://example.test/avatar.png"
+}`,
+          },
+          {
+            technology: "websocket",
+            label: ws,
+            summary: "Send the user UID and update input in the payload.",
+            requestExample: `{
+  "type": "request",
+  "id": "user-update",
+  "action": "update_user",
+  "payload": {
+    "uid": "usr:H8P2R5T9K1M4Q7D6",
+    "input": {
+      "name": "Ops Console User",
+      "profileImageURL": "https://example.test/avatar.png"
+    }
+  }
+}`,
+          },
+        ],
+      },
+      {
+        id: "disable-user",
+        title: "Disable User",
+        summary: "Block future authentication for a user and store the reason.",
+        variants: [
+          {
+            technology: "graphql",
+            label: gql,
+            summary: "Disable the account by UID.",
+            requestExample: `mutation DisableUser {
+  disableUser(
+    uid: "usr:H8P2R5T9K1M4Q7D6"
+    reason: "Access no longer required"
+  ) {
+    uid
+    disabled
+    disabledReason
+  }
+}`,
+          },
+          {
+            technology: "rest",
+            label: rest,
+            summary: "POST the disable command to the user resource.",
+            requestExample: `POST /rest/users/usr:H8P2R5T9K1M4Q7D6/disable
+Content-Type: application/json
+
+{
+  "reason": "Access no longer required"
+}`,
+          },
+          {
+            technology: "websocket",
+            label: ws,
+            summary: "Send the disable command through the WebSocket API.",
+            requestExample: `{
+  "type": "request",
+  "id": "user-disable",
+  "action": "disable_user",
+  "payload": {
+    "uid": "usr:H8P2R5T9K1M4Q7D6",
+    "reason": "Access no longer required"
+  }
+}`,
+          },
+        ],
+      },
+      {
+        id: "enable-user",
+        title: "Enable User",
+        summary: "Allow a previously disabled account to authenticate again.",
+        variants: [
+          {
+            technology: "graphql",
+            label: gql,
+            summary: "Enable the account by UID.",
+            requestExample: `mutation EnableUser {
+  enableUser(uid: "usr:H8P2R5T9K1M4Q7D6") {
+    uid
+    disabled
+  }
+}`,
+          },
+          {
+            technology: "rest",
+            label: rest,
+            summary: "POST the enable command to the user resource.",
+            requestExample: `POST /rest/users/usr:H8P2R5T9K1M4Q7D6/enable`,
+          },
+          {
+            technology: "websocket",
+            label: ws,
+            summary: "Send the enable command through the WebSocket API.",
+            requestExample: `{
+  "type": "request",
+  "id": "user-enable",
+  "action": "enable_user",
+  "payload": {
+    "uid": "usr:H8P2R5T9K1M4Q7D6"
+  }
+}`,
+          },
+        ],
+      },
+      {
+        id: "list-sessions",
+        title: "List Sessions",
+        summary:
+          "Inspect active sessions for the current user or a selected user.",
+        variants: [
+          {
+            technology: "graphql",
+            label: gql,
+            summary:
+              "Use `sessions` for own sessions and `sessionsByUser` for admin lookup.",
+            requestExample: `query Sessions {
+  sessions {
+    uid
+    userUID
+    expiresAt
+    revoked
+    createdAt
+  }
+}`,
+          },
+          {
+            technology: "rest",
+            label: rest,
+            summary:
+              "Read own sessions or path-based sessions for a selected user.",
+            requestExample: `GET /rest/sessions
+
+GET /rest/users/usr:H8P2R5T9K1M4Q7D6/sessions`,
+          },
+          {
+            technology: "websocket",
+            label: ws,
+            summary: "Use the matching WebSocket session actions.",
+            requestExample: `{
+  "type": "request",
+  "id": "sessions-list",
+  "action": "get_sessions"
+}`,
+          },
+        ],
+      },
+      {
+        id: "revoke-session",
+        title: "Revoke Session",
+        summary: "Revoke one session or all sessions for a selected user.",
+        variants: [
+          {
+            technology: "graphql",
+            label: gql,
+            summary:
+              "Revoke by session UID or revoke all sessions for a user UID.",
+            requestExample: `mutation RevokeSession {
+  revokeSession(uid: "ses:M8Q2W5D9R1T6P4K7")
+}`,
+          },
+          {
+            technology: "rest",
+            label: rest,
+            summary: "Delete one session or revoke all sessions for a user.",
+            requestExample: `DELETE /rest/sessions/ses:M8Q2W5D9R1T6P4K7
+
+POST /rest/users/usr:H8P2R5T9K1M4Q7D6/sessions/revoke`,
+          },
+          {
+            technology: "websocket",
+            label: ws,
+            summary: "Send the session UID in the revoke action payload.",
+            requestExample: `{
+  "type": "request",
+  "id": "session-revoke",
+  "action": "revoke_session",
+  "payload": {
+    "uid": "ses:M8Q2W5D9R1T6P4K7"
   }
 }`,
           },
@@ -2423,10 +2778,11 @@ Content-Type: application/json
           {
             technology: "graphql",
             label: gql,
-            summary: "Load the list with permissions and restrictions for management screens.",
+            summary:
+              "Load the list with permissions and restrictions for management screens.",
             requestExample: `query ListApiKeys {
   apiKeys {
-    id
+    uid
     label
     expiresAt
     revoked
@@ -2465,8 +2821,8 @@ Content-Type: application/json
             label: gql,
             summary: "Read the editable state of a single key.",
             requestExample: `query ApiKeyDetail {
-  apiKey(id: 5) {
-    id
+  apiKey(uid: "ak:F7M2Q9R4T8K1P6D3") {
+    uid
     label
     expiresAt
     revoked
@@ -2481,18 +2837,19 @@ Content-Type: application/json
             technology: "rest",
             label: rest,
             summary: "Read a single key from the REST resource path.",
-            requestExample: `GET /rest/api-keys/5`,
+            requestExample: `GET /rest/api-keys/ak:F7M2Q9R4T8K1P6D3`,
           },
           {
             technology: "websocket",
             label: ws,
-            summary: "Use the detail action with the target ID in the payload.",
+            summary:
+              "Use the detail action with the target UID in the payload.",
             requestExample: `{
   "type": "request",
   "id": "api-key-detail",
   "action": "get_api_key",
   "payload": {
-    "id": 5
+    "uid": "ak:F7M2Q9R4T8K1P6D3"
   }
 }`,
           },
@@ -2516,9 +2873,9 @@ Content-Type: application/json
       expiresAt: "2026-12-31"
       rateLimit: 1000
       permissions: [
-        "read time_series"
-        "read kpi_results"
-        "subscribe raw_data"
+        "time_series.read"
+        "kpi_results.read"
+        "raw_data.subscribe"
       ]
       ipRestrictions: [
         "10.0.0.0/24"
@@ -2536,7 +2893,8 @@ Content-Type: application/json
           {
             technology: "rest",
             label: rest,
-            summary: "The REST endpoint returns the created key secret or creation result payload.",
+            summary:
+              "The REST endpoint returns the created key secret or creation result payload.",
             requestExample: `POST /rest/api-keys
 Content-Type: application/json
 
@@ -2545,9 +2903,9 @@ Content-Type: application/json
   "expiresAt": "2026-12-31",
   "rateLimit": 1000,
   "permissions": [
-    "read time_series",
-    "read kpi_results",
-    "subscribe raw_data"
+    "time_series.read",
+    "kpi_results.read",
+    "raw_data.subscribe"
   ],
   "ipRestrictions": [
     "10.0.0.0/24",
@@ -2558,7 +2916,8 @@ Content-Type: application/json
           {
             technology: "websocket",
             label: ws,
-            summary: "Create the key through the WebSocket action and keep the returned secret immediately.",
+            summary:
+              "Create the key through the WebSocket action and keep the returned secret immediately.",
             requestExample: `{
   "type": "request",
   "id": "api-key-create",
@@ -2568,9 +2927,9 @@ Content-Type: application/json
     "expiresAt": "2026-12-31",
     "rateLimit": 1000,
     "permissions": [
-      "read time_series",
-      "read kpi_results",
-      "subscribe raw_data"
+      "time_series.read",
+      "kpi_results.read",
+      "raw_data.subscribe"
     ],
     "ipRestrictions": [
       "10.0.0.0/24",
@@ -2593,15 +2952,15 @@ Content-Type: application/json
             summary: "Update the full editable state of an existing key.",
             requestExample: `mutation UpdateApiKey {
   updateAPIKey(
-    id: 5
+    uid: "ak:F7M2Q9R4T8K1P6D3"
     input: {
       label: "Grafana Import - Read Only"
       expiresAt: "2027-01-31"
       revoked: false
       rateLimit: 500
       permissions: [
-        "read time_series"
-        "read kpi_results"
+        "time_series.read"
+        "kpi_results.read"
       ]
       ipRestrictions: [
         "10.0.0.0/24"
@@ -2614,7 +2973,7 @@ Content-Type: application/json
             technology: "rest",
             label: rest,
             summary: "PUT the replacement state for the API key.",
-            requestExample: `PUT /rest/api-keys/5
+            requestExample: `PUT /rest/api-keys/ak:F7M2Q9R4T8K1P6D3
 Content-Type: application/json
 
 {
@@ -2623,8 +2982,8 @@ Content-Type: application/json
   "revoked": false,
   "rateLimit": 500,
   "permissions": [
-    "read time_series",
-    "read kpi_results"
+    "time_series.read",
+    "kpi_results.read"
   ],
   "ipRestrictions": [
     "10.0.0.0/24"
@@ -2634,21 +2993,21 @@ Content-Type: application/json
           {
             technology: "websocket",
             label: ws,
-            summary: "Send the target key ID plus the replacement input.",
+            summary: "Send the target key UID plus the replacement input.",
             requestExample: `{
   "type": "request",
   "id": "api-key-update",
   "action": "update_api_key",
   "payload": {
-    "id": 5,
+    "uid": "ak:F7M2Q9R4T8K1P6D3",
     "input": {
       "label": "Grafana Import - Read Only",
       "expiresAt": "2027-01-31",
       "revoked": false,
       "rateLimit": 500,
       "permissions": [
-        "read time_series",
-        "read kpi_results"
+        "time_series.read",
+        "kpi_results.read"
       ],
       "ipRestrictions": [
         "10.0.0.0/24"
@@ -2667,27 +3026,27 @@ Content-Type: application/json
           {
             technology: "graphql",
             label: gql,
-            summary: "Delete by ID and verify the boolean result.",
+            summary: "Delete by UID and verify the boolean result.",
             requestExample: `mutation DeleteApiKey {
-  deleteAPIKey(id: 5)
+  deleteAPIKey(uid: "ak:F7M2Q9R4T8K1P6D3")
 }`,
           },
           {
             technology: "rest",
             label: rest,
             summary: "Delete the key resource directly.",
-            requestExample: `DELETE /rest/api-keys/5`,
+            requestExample: `DELETE /rest/api-keys/ak:F7M2Q9R4T8K1P6D3`,
           },
           {
             technology: "websocket",
             label: ws,
-            summary: "Issue the delete action with the key ID.",
+            summary: "Issue the delete action with the key UID.",
             requestExample: `{
   "type": "request",
   "id": "api-key-delete",
   "action": "delete_api_key",
   "payload": {
-    "id": 5
+    "uid": "ak:F7M2Q9R4T8K1P6D3"
   }
 }`,
           },
@@ -2709,7 +3068,8 @@ Content-Type: application/json
           {
             technology: "graphql",
             label: gql,
-            summary: "This is the same data used by the dashboard and favorites logic in the frontend.",
+            summary:
+              "This is the same data used by the dashboard and favorites logic in the frontend.",
             requestExample: `query UserPreferences {
   userConfig {
     favoriteKpis
@@ -2771,7 +3131,8 @@ Content-Type: application/json
           {
             technology: "websocket",
             label: ws,
-            summary: "Use the same payload inside the WebSocket request envelope.",
+            summary:
+              "Use the same payload inside the WebSocket request envelope.",
             requestExample: `{
   "type": "request",
   "id": "user-config-update",
@@ -2806,7 +3167,8 @@ Content-Type: application/json
           {
             technology: "websocket",
             label: ws,
-            summary: "Trigger the delete request action without additional payload.",
+            summary:
+              "Trigger the delete request action without additional payload.",
             requestExample: `{
   "type": "request",
   "id": "user-config-delete",
@@ -2831,9 +3193,11 @@ Content-Type: application/json
           {
             technology: "graphql",
             label: gql,
-            summary: "The role list is useful for admin forms and permission explainers.",
+            summary:
+              "The role list is useful for admin forms and permission explainers.",
             requestExample: `query Roles {
   roles {
+    uid
     label
     permissions
   }
@@ -2843,7 +3207,7 @@ Content-Type: application/json
             technology: "rest",
             label: rest,
             summary: "Use the REST collection endpoint for all roles.",
-            requestExample: `GET /rest/user-roles`,
+            requestExample: `GET /rest/roles`,
           },
           {
             technology: "websocket",
@@ -2852,7 +3216,7 @@ Content-Type: application/json
             requestExample: `{
   "type": "request",
   "id": "roles-list",
-  "action": "get_user_roles"
+  "action": "get_roles"
 }`,
           },
         ],
@@ -2868,6 +3232,7 @@ Content-Type: application/json
             summary: "Use `role` to fetch the current user's effective role.",
             requestExample: `query CurrentRole {
   role {
+    uid
     label
     permissions
   }
@@ -2876,8 +3241,9 @@ Content-Type: application/json
           {
             technology: "rest",
             label: rest,
-            summary: "The current-user role endpoint is separate from role lookup by user ID.",
-            requestExample: `GET /rest/user-roles/user`,
+            summary:
+              "The current-user role endpoint is separate from role lookup by user UID.",
+            requestExample: `GET /rest/roles/current`,
           },
           {
             technology: "websocket",
@@ -2894,14 +3260,15 @@ Content-Type: application/json
       {
         id: "get-user-role",
         title: "Get Another User Role",
-        summary: "Resolve the assigned role for a specific user ID.",
+        summary: "Resolve the assigned role for a specific user UID.",
         variants: [
           {
             technology: "graphql",
             label: gql,
-            summary: "Query another user's role by ID.",
+            summary: "Query another user's role by UID.",
             requestExample: `query UserRole {
-  userRole(id: 4) {
+  userRole(uid: "usr:H8P2R5T9K1M4Q7D6") {
+    uid
     label
     permissions
   }
@@ -2910,19 +3277,19 @@ Content-Type: application/json
           {
             technology: "rest",
             label: rest,
-            summary: "Use the user ID in the REST path.",
-            requestExample: `GET /rest/user-roles/user/4`,
+            summary: "Use the user UID in the REST path.",
+            requestExample: `GET /rest/users/usr:H8P2R5T9K1M4Q7D6/role`,
           },
           {
             technology: "websocket",
             label: ws,
-            summary: "Send the user ID in the payload.",
+            summary: "Send the user UID in the payload.",
             requestExample: `{
   "type": "request",
   "id": "role-user",
   "action": "get_user_role",
   "payload": {
-    "id": 4
+    "uid": "usr:H8P2R5T9K1M4Q7D6"
   }
 }`,
           },
@@ -2936,12 +3303,12 @@ Content-Type: application/json
           {
             technology: "graphql",
             label: gql,
-            summary: "Use a dedicated input object with user ID and role label.",
+            summary: "Use a dedicated input object with user UID and role UID.",
             requestExample: `mutation AssignRole {
   assignRoleToUser(
     input: {
-      userID: 4
-      roleLabel: "Admin"
+      userUID: "usr:H8P2R5T9K1M4Q7D6"
+      roleUID: "role:P9K2M6Q1T8R4D7W3"
     }
   )
 }`,
@@ -2950,25 +3317,314 @@ Content-Type: application/json
             technology: "rest",
             label: rest,
             summary: "Submit the assignment payload to the update endpoint.",
-            requestExample: `PUT /rest/user-roles/user
+            requestExample: `PUT /rest/users/usr:H8P2R5T9K1M4Q7D6/role
 Content-Type: application/json
 
 {
-  "userID": 4,
-  "roleLabel": "Admin"
+  "roleUID": "role:P9K2M6Q1T8R4D7W3"
 }`,
           },
           {
             technology: "websocket",
             label: ws,
-            summary: "Send the same assignment payload inside the request envelope.",
+            summary:
+              "Send the same assignment payload inside the request envelope.",
             requestExample: `{
   "type": "request",
   "id": "role-assign",
   "action": "update_user_role",
   "payload": {
-    "userID": 4,
-    "roleLabel": "Admin"
+    "userUID": "usr:H8P2R5T9K1M4Q7D6",
+    "roleUID": "role:P9K2M6Q1T8R4D7W3"
+  }
+}`,
+          },
+        ],
+      },
+      {
+        id: "list-permissions",
+        title: "List Permissions",
+        summary: "Load the available permission catalog.",
+        variants: [
+          {
+            technology: "graphql",
+            label: gql,
+            summary: "Read every permission UID and its editable label.",
+            requestExample: `query Permissions {
+  permissions {
+    uid
+    label
+  }
+}`,
+          },
+          {
+            technology: "rest",
+            label: rest,
+            summary: "Use the REST permission catalog endpoint.",
+            requestExample: `GET /rest/permissions`,
+          },
+          {
+            technology: "websocket",
+            label: ws,
+            summary: "Fetch permissions through the WebSocket API.",
+            requestExample: `{
+  "type": "request",
+  "id": "permissions-list",
+  "action": "get_permissions"
+}`,
+          },
+        ],
+      },
+      {
+        id: "create-role",
+        title: "Create Role",
+        summary:
+          "Create a custom role from a label and selected permission UIDs.",
+        variants: [
+          {
+            technology: "graphql",
+            label: gql,
+            summary: "Create a non-system role.",
+            requestExample: `mutation CreateRole {
+  createRole(
+    input: {
+      label: "Read Only Integrations"
+      permissionUIDs: [
+        "time_series.read"
+        "kpi_results.read"
+      ]
+    }
+  ) {
+    uid
+    label
+    system
+    permissions
+  }
+}`,
+          },
+          {
+            technology: "rest",
+            label: rest,
+            summary: "POST the new role definition to the role collection.",
+            requestExample: `POST /rest/roles
+Content-Type: application/json
+
+{
+  "label": "Read Only Integrations",
+  "permissionUIDs": [
+    "time_series.read",
+    "kpi_results.read"
+  ]
+}`,
+          },
+          {
+            technology: "websocket",
+            label: ws,
+            summary: "Create the role through the WebSocket action.",
+            requestExample: `{
+  "type": "request",
+  "id": "role-create",
+  "action": "create_role",
+  "payload": {
+    "label": "Read Only Integrations",
+    "permissionUIDs": [
+      "time_series.read",
+      "kpi_results.read"
+    ]
+  }
+}`,
+          },
+        ],
+      },
+      {
+        id: "update-role",
+        title: "Update Role",
+        summary:
+          "Replace the editable label and permission set for a custom role.",
+        variants: [
+          {
+            technology: "graphql",
+            label: gql,
+            summary: "Update a role by UID.",
+            requestExample: `mutation UpdateRole {
+  updateRole(
+    uid: "role:P9K2M6Q1T8R4D7W3"
+    input: {
+      label: "Operations Read Only"
+      permissionUIDs: [
+        "sd_types.read"
+        "sd_instances.read"
+        "time_series.read"
+      ]
+    }
+  ) {
+    uid
+    label
+    permissions
+  }
+}`,
+          },
+          {
+            technology: "rest",
+            label: rest,
+            summary: "PUT the replacement role definition.",
+            requestExample: `PUT /rest/roles/role:P9K2M6Q1T8R4D7W3
+Content-Type: application/json
+
+{
+  "label": "Operations Read Only",
+  "permissionUIDs": [
+    "sd_types.read",
+    "sd_instances.read",
+    "time_series.read"
+  ]
+}`,
+          },
+          {
+            technology: "websocket",
+            label: ws,
+            summary: "Send the role UID and replacement input.",
+            requestExample: `{
+  "type": "request",
+  "id": "role-update",
+  "action": "update_role",
+  "payload": {
+    "uid": "role:P9K2M6Q1T8R4D7W3",
+    "label": "Operations Read Only",
+    "permissionUIDs": [
+      "sd_types.read",
+      "sd_instances.read",
+      "time_series.read"
+    ]
+  }
+}`,
+          },
+        ],
+      },
+      {
+        id: "delete-role",
+        title: "Delete Role",
+        summary: "Delete a custom role that is not assigned to users.",
+        variants: [
+          {
+            technology: "graphql",
+            label: gql,
+            summary: "Delete a role by UID.",
+            requestExample: `mutation DeleteRole {
+  deleteRole(uid: "role:P9K2M6Q1T8R4D7W3")
+}`,
+          },
+          {
+            technology: "rest",
+            label: rest,
+            summary: "Delete the role resource directly.",
+            requestExample: `DELETE /rest/roles/role:P9K2M6Q1T8R4D7W3`,
+          },
+          {
+            technology: "websocket",
+            label: ws,
+            summary: "Send the role UID in the delete action payload.",
+            requestExample: `{
+  "type": "request",
+  "id": "role-delete",
+  "action": "delete_role",
+  "payload": {
+    "uid": "role:P9K2M6Q1T8R4D7W3"
+  }
+}`,
+          },
+        ],
+      },
+      {
+        id: "clone-role",
+        title: "Clone Role",
+        summary:
+          "Create a custom role by copying an existing role's permissions.",
+        variants: [
+          {
+            technology: "graphql",
+            label: gql,
+            summary: "Clone by source role UID and target label.",
+            requestExample: `mutation CloneRole {
+  cloneRole(
+    uid: "role:user"
+    label: "User Copy"
+  ) {
+    uid
+    label
+    permissions
+  }
+}`,
+          },
+          {
+            technology: "rest",
+            label: rest,
+            summary: "POST a clone command under the source role.",
+            requestExample: `POST /rest/roles/role:user/clone
+Content-Type: application/json
+
+{
+  "label": "User Copy"
+}`,
+          },
+          {
+            technology: "websocket",
+            label: ws,
+            summary: "Send the source UID and new label.",
+            requestExample: `{
+  "type": "request",
+  "id": "role-clone",
+  "action": "clone_role",
+  "payload": {
+    "uid": "role:user",
+    "label": "User Copy"
+  }
+}`,
+          },
+        ],
+      },
+      {
+        id: "update-permission-label",
+        title: "Update Permission Label",
+        summary:
+          "Change the display label of a permission without changing its UID.",
+        variants: [
+          {
+            technology: "graphql",
+            label: gql,
+            summary: "Update the label by permission UID.",
+            requestExample: `mutation UpdatePermissionLabel {
+  updatePermissionLabel(
+    uid: "time_series.read"
+    label: "Read Time Series"
+  ) {
+    uid
+    label
+  }
+}`,
+          },
+          {
+            technology: "rest",
+            label: rest,
+            summary: "PATCH the permission label resource.",
+            requestExample: `PATCH /rest/permissions/time_series.read/label
+Content-Type: application/json
+
+{
+  "label": "Read Time Series"
+}`,
+          },
+          {
+            technology: "websocket",
+            label: ws,
+            summary: "Send the permission UID and replacement label.",
+            requestExample: `{
+  "type": "request",
+  "id": "permission-label-update",
+  "action": "update_permission_label",
+  "payload": {
+    "uid": "time_series.read",
+    "label": "Read Time Series"
   }
 }`,
           },

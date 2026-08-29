@@ -10,41 +10,38 @@
 
 query KpiDefinitions {
   kpiDefinitions {
-    id
+    uid
     label
-    sdTypeID
     sdTypeUID
     sdInstanceMode
   }
 }
 
-query KpiDefinitionsBySdType($id: ID!) {
-  kpiDefinitionsBySdType(id: $id) {
-    id
+query KpiDefinitionsBySdType($uid: String!) {
+  kpiDefinitionsBySdType(uid: $uid) {
+    uid
     label
-    sdTypeID
+    sdTypeUID
     sdInstanceMode
   }
 }
 
 mutation CreateKpiDefinition($input: KPIDefinitionInput!) {
   createKPIDefinition(input: $input) {
-    id
+    uid
     label
   }
 }
 
-mutation UpdateKpiDefinition($id: ID!, $input: KPIDefinitionInput!) {
-  updateKPIDefinition(id: $id, input: $input) {
-    id
+mutation UpdateKpiDefinition($uid: String!, $input: KPIDefinitionInput!) {
+  updateKPIDefinition(uid: $uid, input: $input) {
+    uid
     label
   }
 }
 
 query KpiResult($request: KPIFulfillmentCheckResultRequest!) {
   kpiResult(request: $request) {
-    kpiDefinitionID
-    sdInstanceID
     eventTime
     fulfilled
   }
@@ -52,37 +49,35 @@ query KpiResult($request: KPIFulfillmentCheckResultRequest!) {
 
 subscription OnKPIFulfillmentChecked($filter: KPIFulfillmentCheckedFilter) {
   onKPIFulfillmentChecked(filter: $filter) {
-    sdTypeID
-    sdInstanceID
-    kpiDefinitionID
+    sdTypeUID
+    sdInstanceUID
+    kpiDefinitionUID
     eventTime
     fulfilled
   }
 }
 
-query KpiDefinitionsBySdInstance($id: ID!) {
-  kpiDefinitionsBySdInstance(id: $id) {
-    id
+query KpiDefinitionsBySdInstance($uid: String!) {
+  kpiDefinitionsBySdInstance(uid: $uid) {
+    uid
     label
-    sdTypeID
     sdTypeUID
     sdInstanceMode
   }
 }
 
-mutation DeleteKpiDefinition($id: ID!) {
-  deleteKPIDefinition(id: $id)
+mutation DeleteKpiDefinition($uid: String!) {
+  deleteKPIDefinition(uid: $uid)
 }
 
-query KpiDefinition($id: ID!) {
-  kpiDefinition(id: $id) {
-    id
+query KpiDefinition($uid: String!) {
+  kpiDefinition(uid: $uid) {
+    uid
     label
-    sdTypeID
     sdTypeUID
     userIdentifier
     sdInstanceMode
-    selectedSDInstanceIDs
+    selectedSDInstanceUIDs
     nodes {
       id
       parentNodeID
@@ -92,93 +87,84 @@ query KpiDefinition($id: ID!) {
         type
       }
 
+      ... on AtomKPINode {
+        sdParameterSpecification
+        referenceMode
+        comparedSDParameterSpecification
+        comparedRecordOffset
+      }
+
       ... on StringEQAtomKPINode {
-        sdParameterID
         sdParameterSpecification
         stringReferenceValue
       }
 
       ... on StringNEQAtomKPINode {
-        sdParameterID
         sdParameterSpecification
         stringReferenceValue
       }
 
       ... on StringExistsAtomKPINode {
-        sdParameterID
         sdParameterSpecification
       }
 
       ... on StringNotExistsAtomKPINode {
-        sdParameterID
         sdParameterSpecification
       }
 
       ... on BooleanEQAtomKPINode {
-        sdParameterID
         sdParameterSpecification
         booleanReferenceValue
       }
 
       ... on BooleanNEQAtomKPINode {
-        sdParameterID
         sdParameterSpecification
         booleanReferenceValue
       }
 
       ... on BooleanExistsAtomKPINode {
-        sdParameterID
         sdParameterSpecification
       }
 
       ... on BooleanNotExistsAtomKPINode {
-        sdParameterID
         sdParameterSpecification
       }
 
       ... on NumericEQAtomKPINode {
-        sdParameterID
         sdParameterSpecification
         numericReferenceValue
       }
 
       ... on NumericNEQAtomKPINode {
-        sdParameterID
         sdParameterSpecification
         numericReferenceValue
       }
 
       ... on NumericGTAtomKPINode {
-        sdParameterID
         sdParameterSpecification
         numericReferenceValue
       }
 
       ... on NumericGEQAtomKPINode {
-        sdParameterID
         sdParameterSpecification
         numericReferenceValue
       }
 
       ... on NumericLTAtomKPINode {
-        sdParameterID
         sdParameterSpecification
         numericReferenceValue
       }
 
       ... on NumericLEQAtomKPINode {
-        sdParameterID
         sdParameterSpecification
         numericReferenceValue
       }
 
       ... on NumericExistsAtomKPINode {
-        sdParameterID
         sdParameterSpecification
       }
 
       ... on NumericNotExistsAtomKPINode {
-        sdParameterID
         sdParameterSpecification
       }
     }

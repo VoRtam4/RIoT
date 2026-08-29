@@ -23,15 +23,15 @@ export const useDeleteKpi = () => {
     DeleteKpiDefinitionMutationVariables
   >(DeleteKpiDefinitionDocument);
 
-  const deleteKpi = async (id: string, sdTypeID: string) => {
+  const deleteKpi = async (uid: string, sdTypeUID: string) => {
     const res = await deleteMutation({
-      variables: { id },
+      variables: { uid },
     });
 
     const ok = res.data?.deleteKPIDefinition ?? false;
 
     if (ok) {
-      await useKpiDefinitionsBySdTypeStore.getState().refresh(sdTypeID);
+      await useKpiDefinitionsBySdTypeStore.getState().refresh(sdTypeUID);
     }
 
     return ok;

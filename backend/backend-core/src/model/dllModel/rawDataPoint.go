@@ -14,8 +14,10 @@ package dllModel
 import "time"
 
 type RawDataPoint struct {
-	SDTypeID     uint32
-	SDInstanceID uint32
-	EventTime    time.Time
-	Payload      []byte
+	SDTypeID      uint32
+	SDTypeUID     string
+	SDInstanceID  uint32
+	SDInstanceUID string
+	EventTime     time.Time
+	Payload       []byte
 }

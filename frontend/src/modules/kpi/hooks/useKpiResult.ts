@@ -17,8 +17,8 @@ import {
 } from "../../../generated/graphql";
 
 export const useKpiResult = (
-  kpiDefinitionID?: string,
-  sdInstanceID?: string,
+  kpiDefinitionUID?: string,
+  sdInstanceUID?: string,
 ) => {
   const { data, loading, error, refetch } = useQuery<
     KpiResultQuery,
@@ -26,11 +26,11 @@ export const useKpiResult = (
   >(KpiResultDocument, {
     variables: {
       request: {
-        kpiDefinitionID: kpiDefinitionID ?? "",
-        sdInstanceID: sdInstanceID ?? "",
+        kpiDefinitionUID: kpiDefinitionUID ?? "",
+        sdInstanceUID: sdInstanceUID ?? "",
       },
     },
-    skip: !kpiDefinitionID || !sdInstanceID,
+    skip: !kpiDefinitionUID || !sdInstanceUID,
     fetchPolicy: "cache-and-network",
   });
 

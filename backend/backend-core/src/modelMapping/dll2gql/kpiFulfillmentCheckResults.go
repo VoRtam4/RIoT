@@ -22,9 +22,10 @@ import (
 
 func ToGraphQLModelKPIFulfillmentCheckResult(kpiFulfillmentCheckResult dllModel.KPIFulfillmentCheckResult) graphQLModel.KPIFulfillmentCheckResult {
 	return graphQLModel.KPIFulfillmentCheckResult{
-		KpiDefinitionID: kpiFulfillmentCheckResult.KPIDefinitionID,
-		SdInstanceID:    kpiFulfillmentCheckResult.SDInstanceID,
-		Fulfilled:       kpiFulfillmentCheckResult.Fulfilled,
-		EventTime:       kpiFulfillmentCheckResult.EventTime.Format(time.RFC3339Nano),
+		SdTypeUID:        kpiFulfillmentCheckResult.SDTypeUID,
+		SdInstanceUID:    kpiFulfillmentCheckResult.SDInstanceUID,
+		KpiDefinitionUID: kpiFulfillmentCheckResult.KPIDefinitionUID,
+		Fulfilled:        kpiFulfillmentCheckResult.Fulfilled,
+		EventTime:        kpiFulfillmentCheckResult.EventTime.Format(time.RFC3339Nano),
 	}
 }

@@ -10,14 +10,14 @@
 
 query UserConfig {
   userConfig {
-    userID
+    userUID
     config
   }
 }
 
 mutation UpdateUserConfig($input: UserConfigInput!) {
   updateUserConfig(input: $input) {
-    userID
+    userUID
     config
   }
 }

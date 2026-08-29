@@ -55,12 +55,12 @@ func GetKPIDefinitionsBySDType(c *connection.Client, msg sharedModel.WebSocketMe
 	if principal == nil {
 		return
 	}
-	sdTypeID, err := parsePayload[uint32](msg)
-	if err != nil {
-		sendError(c, msg.ID, "invalid payload")
+	uid, ok := parseUIDPayload(msg.Payload)
+	if !ok {
+		sendError(c, msg.ID, "invalid uid")
 		return
 	}
-	result := domainLogicLayer.GetKPIDefinitionsBySDType(principal.UserID, sdTypeID)
+	result := domainLogicLayer.GetKPIDefinitionsBySDType(principal.UserID, uid)
 	if result.IsFailure() {
 		sendError(c, msg.ID, result.GetError().Error())
 		return
@@ -73,12 +73,12 @@ func GetKPIDefinitionsBySDInstance(c *connection.Client, msg sharedModel.WebSock
 	if principal == nil {
 		return
 	}
-	sdInstanceID, err := parsePayload[uint32](msg)
-	if err != nil {
-		sendError(c, msg.ID, "invalid payload")
+	uid, ok := parseUIDPayload(msg.Payload)
+	if !ok {
+		sendError(c, msg.ID, "invalid uid")
 		return
 	}
-	result := domainLogicLayer.GetKPIDefinitionsBySDInstance(principal.UserID, sdInstanceID)
+	result := domainLogicLayer.GetKPIDefinitionsBySDInstance(principal.UserID, uid)
 	if result.IsFailure() {
 		sendError(c, msg.ID, result.GetError().Error())
 		return
@@ -91,17 +91,12 @@ func GetKPIDefinition(c *connection.Client, msg sharedModel.WebSocketMessage) {
 	if principal == nil {
 		return
 	}
-	payload, ok := msg.Payload.(map[string]any)
+	uid, ok := parseUIDPayload(msg.Payload)
 	if !ok {
-		sendError(c, msg.ID, "invalid payload")
+		sendError(c, msg.ID, "invalid uid")
 		return
 	}
-	id, ok := parseID(payload)
-	if !ok {
-		sendError(c, msg.ID, "invalid id")
-		return
-	}
-	result := domainLogicLayer.GetKPIDefinition(principal.UserID, id)
+	result := domainLogicLayer.GetKPIDefinition(principal.UserID, uid)
 	if result.IsFailure() {
 		sendError(c, msg.ID, result.GetError().Error())
 		return
@@ -119,9 +114,9 @@ func UpdateKPIDefinition(c *connection.Client, msg sharedModel.WebSocketMessage)
 		sendError(c, msg.ID, "invalid payload")
 		return
 	}
-	id, ok := parseID(payload)
+	uid, ok := parseUIDPayload(payload)
 	if !ok {
-		sendError(c, msg.ID, "invalid id")
+		sendError(c, msg.ID, "invalid uid")
 		return
 	}
 	inputRaw, ok := payload["input"]
@@ -135,7 +130,7 @@ func UpdateKPIDefinition(c *connection.Client, msg sharedModel.WebSocketMessage)
 		sendError(c, msg.ID, "invalid input")
 		return
 	}
-	result := domainLogicLayer.UpdateKPIDefinition(principal.UserID, id, input)
+	result := domainLogicLayer.UpdateKPIDefinition(principal.UserID, uid, input)
 	if result.IsFailure() {
 		sendError(c, msg.ID, result.GetError().Error())
 		return
@@ -148,19 +143,26 @@ func DeleteKPIDefinition(c *connection.Client, msg sharedModel.WebSocketMessage)
 	if principal == nil {
 		return
 	}
-	payload, ok := msg.Payload.(map[string]any)
+	uid, ok := parseUIDPayload(msg.Payload)
 	if !ok {
-		sendError(c, msg.ID, "invalid payload")
+		sendError(c, msg.ID, "invalid uid")
 		return
 	}
-	id, ok := parseID(payload)
-	if !ok {
-		sendError(c, msg.ID, "invalid id")
-		return
-	}
-	if err := domainLogicLayer.DeleteKPIDefinition(principal.UserID, id); err != nil {
+	if err := domainLogicLayer.DeleteKPIDefinition(principal.UserID, uid); err != nil {
 		sendError(c, msg.ID, err.Error())
 		return
 	}
 	sendSuccess(c, msg.ID, nil)
+}
+
+func parseUIDPayload(payload any) (string, bool) {
+	if uid, ok := payload.(string); ok {
+		return uid, uid != ""
+	}
+	payloadMap, ok := payload.(map[string]any)
+	if !ok {
+		return "", false
+	}
+	uid, ok := payloadMap["uid"].(string)
+	return uid, ok && uid != ""
 }

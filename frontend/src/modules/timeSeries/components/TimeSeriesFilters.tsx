@@ -55,16 +55,20 @@ export default function TimeSeriesFilters({
   onExport,
 }: Props) {
   const { sdTypes } = useSdTypes();
-  const { entry: kpiEntry } = useKpiDefinitionsBySdType(value.sdTypeID);
-  const { entry: instancesEntry } = useSdInstancesByType(value.sdTypeID);
+  const selectedSdType = useMemo(
+    () => sdTypes.find((t: any) => String(t.uid) === value.sdTypeUID) ?? null,
+    [sdTypes, value.sdTypeUID],
+  );
+  const { entry: kpiEntry } = useKpiDefinitionsBySdType(value.sdTypeUID);
+  const { entry: instancesEntry } = useSdInstancesByType(value.sdTypeUID);
 
   useEffect(() => {
     if (!sdTypes.length) return;
-    if (value.sdTypeID) return;
+    if (value.sdTypeUID) return;
 
     onChange({
       ...value,
-      sdTypeID: String(sdTypes[0].id),
+      sdTypeUID: String(sdTypes[0].uid),
       from: value.from ?? toUTCString(minusDaysLocal(1)),
       to: value.to ?? toUTCString(nowLocal()),
     });
@@ -73,9 +77,9 @@ export default function TimeSeriesFilters({
   const sdTypeOptions: Option[] = useMemo(
     () =>
       sdTypes.map((t: any) => ({
-        value: String(t.id),
+        value: String(t.uid),
         label: t.label ?? t.uid ?? "",
-        searchText: buildOptionSearchText(t.label, t.uid, String(t.id)),
+        searchText: buildOptionSearchText(t.label, t.uid),
       })),
     [sdTypes],
   );
@@ -83,9 +87,9 @@ export default function TimeSeriesFilters({
   const kpiOptions: Option[] = useMemo(
     () =>
       (kpiEntry?.rawSortedAsc ?? []).map((k) => ({
-        value: String(k.id),
-        label: k.label || k.id,
-        searchText: buildOptionSearchText(k.label, String(k.id)),
+        value: String(k.uid),
+        label: k.label || k.uid || "",
+        searchText: buildOptionSearchText(k.label, k.uid),
       })),
     [kpiEntry],
   );
@@ -93,26 +97,25 @@ export default function TimeSeriesFilters({
   const instancesOptions: Option[] = useMemo(
     () =>
       (instancesEntry?.rawSortedAsc ?? []).map((i) => ({
-        value: String(i.id),
+        value: String(i.uid),
         label: i.label || i.uid,
-        searchText: buildOptionSearchText(i.label, i.uid, String(i.id)),
+        searchText: buildOptionSearchText(i.label, i.uid),
       })),
     [instancesEntry],
   );
 
   const tagParameters = useMemo(() => {
-    if (!value.sdTypeID) return [];
+    if (!value.sdTypeUID) return [];
 
-    const type = sdTypes.find((t: any) => String(t.id) === value.sdTypeID);
-    if (!type?.parameters) return [];
+    if (!selectedSdType?.parameters) return [];
 
-    return type.parameters
+    return selectedSdType.parameters
       .filter((p: any) => p.role === "tag")
       .map((p: any) => ({
         denotation: p.denotation,
         label: p.label ?? p.denotation,
       }));
-  }, [sdTypes, value.sdTypeID]);
+  }, [selectedSdType, value.sdTypeUID]);
 
   const updateValue = (patch: Partial<TimeSeriesDraftState>) => {
     onChange({
@@ -145,8 +148,8 @@ export default function TimeSeriesFilters({
                 type,
                 sort: "DESC",
                 limit: 100,
-                sdInstanceIDs: [],
-                kpiDefinitionIDs: type === "kpi" ? [] : [],
+                sdInstanceUIDs: [],
+                kpiDefinitionUIDs: type === "kpi" ? [] : [],
               });
             }}
             {...virtualizedSelectProps}
@@ -159,15 +162,17 @@ export default function TimeSeriesFilters({
           <Select<Option, false>
             classNamePrefix="react-select"
             options={sdTypeOptions}
-            value={sdTypeOptions.find((o) => o.value === value.sdTypeID) ?? null}
+            value={
+              sdTypeOptions.find((o) => o.value === value.sdTypeUID) ?? null
+            }
             onChange={(v: SingleValue<Option>) => {
-              const id = v?.value ?? null;
+              const uid = v?.value ?? null;
 
               onChange({
                 ...value,
-                sdTypeID: id,
-                sdInstanceIDs: [],
-                kpiDefinitionIDs: value.type === "kpi" ? [] : [],
+                sdTypeUID: uid,
+                sdInstanceUIDs: [],
+                kpiDefinitionUIDs: value.type === "kpi" ? [] : [],
               });
             }}
             filterOption={filterSelectOption}
@@ -184,11 +189,11 @@ export default function TimeSeriesFilters({
               classNamePrefix="react-select"
               options={kpiOptions}
               value={kpiOptions.filter((o) =>
-                value.kpiDefinitionIDs.includes(o.value),
+                value.kpiDefinitionUIDs.includes(o.value),
               )}
               onChange={(v: MultiValue<Option>) => {
                 updateValue({
-                  kpiDefinitionIDs: v.map((i) => i.value),
+                  kpiDefinitionUIDs: v.map((i) => i.value),
                 });
               }}
               closeMenuOnSelect={false}
@@ -207,11 +212,11 @@ export default function TimeSeriesFilters({
             closeMenuOnSelect={false}
             options={instancesOptions}
             value={instancesOptions.filter((o) =>
-              value.sdInstanceIDs.includes(o.value),
+              value.sdInstanceUIDs.includes(o.value),
             )}
             onChange={(v: MultiValue<Option>) => {
               updateValue({
-                sdInstanceIDs: v.map((i) => i.value),
+                sdInstanceUIDs: v.map((i) => i.value),
               });
             }}
             filterOption={filterSelectOption}
@@ -288,25 +293,22 @@ export default function TimeSeriesFilters({
       </div>
 
       {(value.type === "raw" || value.type === "kpi") &&
-        value.sdTypeID &&
+        value.sdTypeUID &&
         tagParameters.length > 0 && (
-        <div className="col-12 mt-3">
-          <label className="form-label">Tag filters</label>
+          <div className="col-12 mt-3">
+            <label className="form-label">Tag filters</label>
 
-          <TimeSeriesQueryBuilder
-            parameters={tagParameters}
-            value={value.filters as FilterNodeInput | undefined}
-            onChange={(filter) => updateValue({ filters: filter })}
-          />
-        </div>
-      )}
+            <TimeSeriesQueryBuilder
+              parameters={tagParameters}
+              value={value.filters as FilterNodeInput | undefined}
+              onChange={(filter) => updateValue({ filters: filter })}
+            />
+          </div>
+        )}
 
       {/* ACTIONS */}
       <div className="d-flex justify-content-end gap-2 mt-3">
-        <button
-          className="btn btn-outline-light"
-          onClick={onExport}
-        >
+        <button className="btn btn-outline-light" onClick={onExport}>
           Download
         </button>
 

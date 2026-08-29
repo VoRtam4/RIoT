@@ -10,9 +10,14 @@
  * @ingroup riot_frontend
  */
 import type { PageStateCodec } from "../../../app/navigation/usePageState";
+import {
+  isSearchMode,
+  type SearchMode,
+} from "../../../utils/reactSelectSearch";
 
 export type ApiDocsQueryState = {
   q: string;
+  qMode: SearchMode;
   feature: string | null;
   op: string | null;
   tech: "graphql" | "rest" | "websocket" | null;
@@ -25,9 +30,11 @@ function nonEmpty(value: string | null) {
 export const apiDocsPageStateCodec: PageStateCodec<ApiDocsQueryState, null> = {
   decodeQuery(searchParams) {
     const tech = searchParams.get("tech");
+    const qMode = searchParams.get("qMode");
 
     return {
       q: searchParams.get("q") ?? "",
+      qMode: qMode && isSearchMode(qMode) ? qMode : "or",
       feature: nonEmpty(searchParams.get("feature")),
       op: nonEmpty(searchParams.get("op")),
       tech:
@@ -40,6 +47,7 @@ export const apiDocsPageStateCodec: PageStateCodec<ApiDocsQueryState, null> = {
     const searchParams = new URLSearchParams();
 
     if (query.q.trim()) searchParams.set("q", query.q);
+    if (query.qMode !== "or") searchParams.set("qMode", query.qMode);
     if (query.feature) searchParams.set("feature", query.feature);
     if (query.op) searchParams.set("op", query.op);
     if (query.tech) searchParams.set("tech", query.tech);

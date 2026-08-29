@@ -14,6 +14,7 @@ import Select from "react-select";
 import {
   buildOptionSearchText,
   filterSelectOption,
+  type SearchMode,
 } from "../../../utils/reactSelectSearch";
 import { virtualizedSelectProps } from "../../../utils/reactSelectVirtualized";
 import UrlSyncedSearchInput from "../../../components/UrlSyncedSearchInput";
@@ -24,15 +25,16 @@ export type ModeFilter = "ALL_MODES" | "all" | "selected";
 
 type Props = {
   sdTypes: Array<{
-    id: string | number;
     label?: string | null;
     uid?: string | null;
   }>;
   selectedSdType: string | null;
   search: string;
+  searchMode: SearchMode;
   sort: SortOption;
   mode: ModeFilter;
   onSearchChange: (v: string) => void;
+  onSearchModeChange: (v: SearchMode) => void;
   onSortChange: (v: SortOption) => void;
   onModeChange: (v: ModeFilter) => void;
   onSdTypeChange: (v: string | null) => void;
@@ -48,22 +50,20 @@ export default function KpiFilters({
   sdTypes,
   selectedSdType,
   search,
+  searchMode,
   sort,
   mode,
   onSearchChange,
+  onSearchModeChange,
   onSortChange,
   onModeChange,
   onSdTypeChange,
 }: Props) {
   const sdTypeOptions: Option[] = useMemo(() => {
     return sdTypes.map((sdType) => ({
-      value: String(sdType.id),
-      label: sdType.label ?? sdType.uid ?? String(sdType.id),
-      searchText: buildOptionSearchText(
-        sdType.label,
-        sdType.uid,
-        String(sdType.id),
-      ),
+      value: String(sdType.uid ?? ""),
+      label: sdType.label ?? sdType.uid ?? "",
+      searchText: buildOptionSearchText(sdType.label, sdType.uid),
     }));
   }, [sdTypes]);
 
@@ -84,9 +84,11 @@ export default function KpiFilters({
         <div className="col-md-3">
           <label className="form-label">Search</label>
           <UrlSyncedSearchInput
-            placeholder="Name or KPI ID..."
+            placeholder="Name or KPI UID..."
             value={search}
             onChange={onSearchChange}
+            mode={searchMode}
+            onModeChange={onSearchModeChange}
           />
         </div>
 
@@ -95,7 +97,9 @@ export default function KpiFilters({
           <Select<Option, false>
             classNamePrefix="react-select"
             options={sdTypeOptions}
-            value={sdTypeOptions.find((o) => o.value === selectedSdType) || null}
+            value={
+              sdTypeOptions.find((o) => o.value === selectedSdType) || null
+            }
             onChange={(v) => {
               if (!v) return;
               onSdTypeChange(v.value);

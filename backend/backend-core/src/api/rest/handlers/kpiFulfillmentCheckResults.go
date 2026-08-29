@@ -18,6 +18,7 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
+	"github.com/go-chi/chi/v5"
 )
 
 func GetKPIResults(w http.ResponseWriter, r *http.Request) {
@@ -40,11 +41,8 @@ func GetKPIResultsByKPI(w http.ResponseWriter, r *http.Request) {
 	if principal == nil {
 		return
 	}
-	kpiID, ok := parseID(w, r)
-	if !ok {
-		return
-	}
-	result := domainLogicLayer.GetKPIFulfillmentCheckResultsByKPI(principal.UserID, kpiID)
+	uid := chi.URLParam(r, "uid")
+	result := domainLogicLayer.GetKPIFulfillmentCheckResultsByKPIUID(principal.UserID, uid)
 	if result.IsFailure() {
 		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
 		return

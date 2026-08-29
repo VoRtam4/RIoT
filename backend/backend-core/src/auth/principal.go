@@ -36,6 +36,8 @@ type Principal struct {
 	UserID            uint32
 	AllowedOperations map[string]bool
 	APIKeyID          *uint32
+	SessionID         *uint
+	SessionUID        *string
 	SynchronizedAt    time.Time
 	ClientIP          string
 }
@@ -71,15 +73,22 @@ func AuthenticatePrincipal(w http.ResponseWriter, r *http.Request) (*Principal, 
 		return nil, fmt.Errorf("not authenticated")
 		//return buildGuestPrincipal(clientIP)
 	}
-	if err := ApplyAuthenticationResult(w, authResult.GetPayload()); err != nil {
+	authPayload := authResult.GetPayload()
+	if err := ApplyAuthenticationResult(w, authPayload); err != nil {
 		return nil, err
 	}
-	userIDStr := authResult.GetPayload().UserID
+	userIDStr := authPayload.UserID
 	userIDUint, err := strconv.ParseUint(userIDStr, 10, 32)
 	if err != nil {
 		return nil, fmt.Errorf("invalid userID")
 	}
-	return buildUserPrincipal(uint32(userIDUint), clientIP)
+	principal, err := buildUserPrincipal(uint32(userIDUint), clientIP)
+	if err != nil {
+		return nil, err
+	}
+	principal.SessionID = authPayload.SessionID
+	principal.SessionUID = authPayload.SessionUID
+	return principal, nil
 }
 
 func CanAccessOperation(principal *Principal, resource string, operation string) bool {
@@ -108,15 +117,30 @@ func buildAPIKeyPrincipal(apiKey dllModel.APIKey, clientIP string) (*Principal, 
 	if apiKey.UserID == nil {
 		return nil, fmt.Errorf("api key missing user id")
 	}
+	userResult := domainLogicLayer.LoadUserByID(*apiKey.UserID)
+	if userResult.IsFailure() {
+		return nil, userResult.GetError()
+	}
+	if userResult.GetPayload().Disabled {
+		return nil, fmt.Errorf("user disabled")
+	}
+	if !allowAPIKeyRequest(apiKey.UID, apiKey.RateLimit) {
+		return nil, fmt.Errorf("api key rate limit exceeded")
+	}
 	id := apiKey.ID.GetPayload()
 	allowed, err := buildAllowedOperationsForAPIKey(*apiKey.UserID, apiKey.Permissions)
 	if err != nil {
+		return nil, err
+	}
+	if err := domainLogicLayer.TouchAPIKeyLastUsedAt(id); err != nil {
 		return nil, err
 	}
 	return &Principal{
 		Type:              PrincipalAPIKey,
 		UserID:            *apiKey.UserID,
 		APIKeyID:          &id,
+		SessionID:         nil,
+		SessionUID:        nil,
 		AllowedOperations: allowed,
 		SynchronizedAt:    time.Now(),
 		ClientIP:          clientIP,
@@ -124,6 +148,13 @@ func buildAPIKeyPrincipal(apiKey dllModel.APIKey, clientIP string) (*Principal, 
 }
 
 func buildUserPrincipal(userID uint32, clientIP string) (*Principal, error) {
+	userResult := domainLogicLayer.LoadUserByID(userID)
+	if userResult.IsFailure() {
+		return nil, userResult.GetError()
+	}
+	if userResult.GetPayload().Disabled {
+		return nil, fmt.Errorf("user disabled")
+	}
 	permsResult := domainLogicLayer.LoadUserRole(userID)
 	if permsResult.IsFailure() {
 		return nil, permsResult.GetError()
@@ -137,6 +168,8 @@ func buildUserPrincipal(userID uint32, clientIP string) (*Principal, error) {
 		UserID:            userID,
 		AllowedOperations: allowed,
 		APIKeyID:          nil,
+		SessionID:         nil,
+		SessionUID:        nil,
 		SynchronizedAt:    time.Now(),
 		ClientIP:          clientIP,
 	}, nil
@@ -147,6 +180,9 @@ func buildGuestPrincipal(clientIP string) (*Principal, error) {
 		Type:              PrincipalGuest,
 		UserID:            0,
 		AllowedOperations: RolePermissions[RoleGuest],
+		APIKeyID:          nil,
+		SessionID:         nil,
+		SessionUID:        nil,
 		SynchronizedAt:    time.Now(),
 		ClientIP:          clientIP,
 	}, nil

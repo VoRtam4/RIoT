@@ -14,12 +14,15 @@ import ApiDocsFeatureCard from "./APIDocsFeatureCard";
 import VirtualizedList from "../../../components/virtualization/VirtualizedList";
 import EmptyStateNotice from "../../../components/EmptyStateNotice";
 import UrlSyncedSearchInput from "../../../components/UrlSyncedSearchInput";
+import type { SearchMode } from "../../../utils/reactSelectSearch";
 
 type Props = {
   features: ApiFeatureDoc[];
   selectedFeatureId: string | null;
   search: string;
+  searchMode: SearchMode;
   onSearchChange: (value: string) => void;
+  onSearchModeChange: (value: SearchMode) => void;
   onSelectFeature: (id: string | null) => void;
 };
 
@@ -27,7 +30,9 @@ export default function ApiDocsSidebar({
   features,
   selectedFeatureId,
   search,
+  searchMode,
   onSearchChange,
+  onSearchModeChange,
   onSelectFeature,
 }: Props) {
   const selectedIndex = features.findIndex(
@@ -45,6 +50,8 @@ export default function ApiDocsSidebar({
           placeholder="For example KPI, API keys, history..."
           value={search}
           onChange={onSearchChange}
+          mode={searchMode}
+          onModeChange={onSearchModeChange}
         />
       </div>
 

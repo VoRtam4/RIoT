@@ -23,17 +23,12 @@ func GetRawDataPointsBySDType(c *connection.Client, msg sharedModel.WebSocketMes
 	if principal == nil {
 		return
 	}
-	payload, ok := msg.Payload.(map[string]any)
+	uid, ok := parseUIDPayload(msg.Payload)
 	if !ok {
-		sendError(c, msg.ID, "invalid payload")
+		sendError(c, msg.ID, "invalid sdTypeUID")
 		return
 	}
-	sdTypeID, ok := parseID(payload)
-	if !ok {
-		sendError(c, msg.ID, "invalid sdTypeID")
-		return
-	}
-	result := domainLogicLayer.GetRawDataPointsBySDType(sdTypeID)
+	result := domainLogicLayer.GetRawDataPointsBySDTypeUID(uid)
 	if result.IsFailure() {
 		sendError(c, msg.ID, result.GetError().Error())
 		return
@@ -46,17 +41,12 @@ func GetRawDataPoint(c *connection.Client, msg sharedModel.WebSocketMessage) {
 	if principal == nil {
 		return
 	}
-	payload, ok := msg.Payload.(map[string]any)
+	uid, ok := parseUIDPayload(msg.Payload)
 	if !ok {
-		sendError(c, msg.ID, "invalid payload")
+		sendError(c, msg.ID, "invalid sdInstanceUID")
 		return
 	}
-	sdInstanceID, ok := parseID(payload)
-	if !ok {
-		sendError(c, msg.ID, "invalid sdInstanceID")
-		return
-	}
-	result := domainLogicLayer.GetRawDataPoint(sdInstanceID)
+	result := domainLogicLayer.GetRawDataPointBySDInstanceUID(uid)
 	if result.IsFailure() {
 		sendError(c, msg.ID, result.GetError().Error())
 		return

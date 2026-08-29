@@ -30,9 +30,7 @@ export function redirectToLoginForExpiredSession() {
   useAuthStore.getState().logout();
 
   const redirect = window.location.href;
-  window.location.replace(
-    `/login?redirect=${encodeURIComponent(redirect)}`,
-  );
+  window.location.replace(`/login?redirect=${encodeURIComponent(redirect)}`);
 }
 
 export function isUnauthorizedRuntimeError(error: unknown): boolean {

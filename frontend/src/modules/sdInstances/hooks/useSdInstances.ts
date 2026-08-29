@@ -16,10 +16,12 @@ import {
 } from "../../../generated/graphql";
 
 export const useSdInstances = () => {
-  const { data, loading, error, refetch } =
-    useQuery<SdInstancesQuery>(SdInstancesDocument, {
+  const { data, loading, error, refetch } = useQuery<SdInstancesQuery>(
+    SdInstancesDocument,
+    {
       fetchPolicy: "cache-and-network",
-    });
+    },
+  );
 
   const sdInstances = data?.sdInstances ?? [];
 

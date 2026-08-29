@@ -12,9 +12,15 @@
 type Group = any;
 
 type SDParam = {
-  id: string | number;
+  id?: string | number;
   denotation: string;
   type: "number" | "string" | "boolean";
+};
+
+type ParameterReferenceValue = {
+  mode: "parameter";
+  comparedSDParameterSpecification?: string;
+  comparedRecordOffset?: number;
 };
 
 export function mapQueryToKPINodes(query: Group, parameters: SDParam[]) {
@@ -28,6 +34,13 @@ export function mapQueryToKPINodes(query: Group, parameters: SDParam[]) {
 
   const findParam = (field: string) =>
     parameters.find((p) => p.denotation === normalizeField(field));
+
+  const isParameterReferenceValue = (
+    value: unknown,
+  ): value is ParameterReferenceValue =>
+    !!value &&
+    typeof value === "object" &&
+    (value as ParameterReferenceValue).mode === "parameter";
 
   const mapOperatorToNodeType = (operator: string, type: SDParam["type"]) => {
     switch (type) {
@@ -105,7 +118,6 @@ export function mapQueryToKPINodes(query: Group, parameters: SDParam[]) {
       id: nodeID,
       parentNodeID,
       type: nodeType,
-      sdParameterID: String(param.id),
       sdParameterSpecification: param.denotation,
     };
 
@@ -119,9 +131,35 @@ export function mapQueryToKPINodes(query: Group, parameters: SDParam[]) {
       return;
     }
 
+    const parameterReference = isParameterReferenceValue(rule.value)
+      ? rule.value
+      : null;
+
+    const referenceFields = parameterReference
+      ? {
+          referenceMode: "parameter",
+          comparedSDParameterSpecification:
+            parameterReference.comparedSDParameterSpecification ?? "",
+          comparedRecordOffset: Number(
+            parameterReference.comparedRecordOffset ?? 0,
+          ),
+        }
+      : {
+          referenceMode: "literal",
+        };
+
+    if (parameterReference) {
+      nodes.push({
+        ...base,
+        ...referenceFields,
+      });
+      return;
+    }
+
     if (param.type === "number") {
       nodes.push({
         ...base,
+        ...referenceFields,
         numericReferenceValue:
           rule.value === "" || rule.value === null || rule.value === undefined
             ? 0
@@ -133,6 +171,7 @@ export function mapQueryToKPINodes(query: Group, parameters: SDParam[]) {
     if (param.type === "boolean") {
       nodes.push({
         ...base,
+        ...referenceFields,
         booleanReferenceValue: rule.value === true || rule.value === "true",
       });
       return;
@@ -140,6 +179,7 @@ export function mapQueryToKPINodes(query: Group, parameters: SDParam[]) {
 
     nodes.push({
       ...base,
+      ...referenceFields,
       stringReferenceValue: String(rule.value ?? ""),
     });
   };

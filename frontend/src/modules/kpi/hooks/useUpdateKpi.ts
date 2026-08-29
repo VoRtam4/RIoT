@@ -24,12 +24,12 @@ export const useUpdateKpi = () => {
   >(UpdateKpiDefinitionDocument);
 
   const updateKpi = async (
-    id: string,
-    previousSdTypeID: string,
+    uid: string,
+    previousSdTypeUID: string,
     input: UpdateKpiDefinitionMutationVariables["input"],
   ) => {
     const res = await mutation({
-      variables: { id, input },
+      variables: { uid, input },
     });
 
     const updated = res.data?.updateKPIDefinition ?? null;
@@ -37,10 +37,10 @@ export const useUpdateKpi = () => {
     if (updated) {
       const store = useKpiDefinitionsBySdTypeStore.getState();
 
-      await store.refresh(previousSdTypeID);
+      await store.refresh(previousSdTypeUID);
 
-      if (input.sdTypeID && input.sdTypeID !== previousSdTypeID) {
-        await store.refresh(input.sdTypeID);
+      if (input.sdTypeUID && input.sdTypeUID !== previousSdTypeUID) {
+        await store.refresh(input.sdTypeUID);
       }
     }
 

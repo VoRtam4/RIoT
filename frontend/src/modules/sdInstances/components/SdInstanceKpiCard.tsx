@@ -16,31 +16,23 @@ import Typography from "@mui/material/Typography";
 
 type Props = {
   kpi: {
-    id: string;
+    uid?: string | null;
     label?: string | null;
   };
   selected: boolean;
   onClick: () => void;
 };
 
-export default function SdInstanceKpiCard({
-  kpi,
-  selected,
-  onClick,
-}: Props) {
+export default function SdInstanceKpiCard({ kpi, selected, onClick }: Props) {
   return (
     <Card
       sx={{
         flexShrink: 0,
         height: "100%",
         overflow: "hidden",
-        backgroundColor: selected
-          ? "var(--border-input)"
-          : "var(--bg-card)",
+        backgroundColor: selected ? "var(--border-input)" : "var(--bg-card)",
         "&:hover": {
-          backgroundColor: selected
-          ? "var(--border-input)"
-          : "var(--border)",
+          backgroundColor: selected ? "var(--border-input)" : "var(--border)",
         },
       }}
     >
@@ -69,7 +61,7 @@ export default function SdInstanceKpiCard({
               WebkitLineClamp: 2,
             }}
           >
-            {kpi.label || kpi.id}
+            {kpi.label || kpi.uid || "\u00A0"}
           </Typography>
         </CardContent>
       </CardActionArea>

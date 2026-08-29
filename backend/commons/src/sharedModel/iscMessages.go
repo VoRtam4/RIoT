@@ -36,11 +36,11 @@ type KPIFulfillmentCheckResultTupleISCMessage struct {
 }
 
 type KPIFulfillmentCheckResultISCMessage struct {
-	SDTypeUID       string    `json:"sdTypeUID"`
-	SDInstanceUID   string    `json:"sdInstanceUID"`
-	KPIDefinitionID uint32    `json:"kpiDefinitionID"`
-	EventTime       time.Time `json:"eventTime"`
-	Fulfilled       bool      `json:"fulfilled"`
+	SDTypeUID        string    `json:"sdTypeUID"`
+	SDInstanceUID    string    `json:"sdInstanceUID"`
+	KPIDefinitionUID string    `json:"kpiDefinitionUID"`
+	EventTime        time.Time `json:"eventTime"`
+	Fulfilled        bool      `json:"fulfilled"`
 }
 
 type KPIFulfillmentCacheBootstrapISCMessage struct {
@@ -118,16 +118,16 @@ type SDParameter struct {
 }
 
 type KPIReprocessRequestISCMessage struct {
-	JobID           string    `json:"jobId"`
-	Wait            bool      `json:"wait"`
-	KPIDefinitionID uint32    `json:"kpiDefinitionID"`
-	SDTypeUID       string    `json:"sdTypeUID"`
-	SDInstanceUIDs  []string  `json:"sdInstanceUIDs,omitempty"`
-	To              time.Time `json:"to"`
+	JobID            string    `json:"jobId"`
+	Wait             bool      `json:"wait"`
+	KPIDefinitionUID string    `json:"kpiDefinitionUID"`
+	SDTypeUID        string    `json:"sdTypeUID"`
+	SDInstanceUIDs   []string  `json:"sdInstanceUIDs,omitempty"`
+	To               time.Time `json:"to"`
 }
 
 type KPIDeleteResultsRequestISCMessage struct {
-	JobID           string `json:"jobId"`
-	SDTypeUID       string `json:"sdTypeID"`
-	KPIDefinitionID uint32 `json:"kpiDefinitionID"`
+	JobID            string `json:"jobId"`
+	SDTypeUID        string `json:"sdTypeUID"`
+	KPIDefinitionUID string `json:"kpiDefinitionUID"`
 }

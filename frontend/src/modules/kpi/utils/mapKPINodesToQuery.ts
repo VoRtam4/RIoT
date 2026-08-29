@@ -14,7 +14,7 @@ import type { RuleGroupType } from "react-querybuilder";
 type Node = any;
 
 type Param = {
-  id: string | number;
+  id?: string | number;
   denotation: string;
   role?: string;
 };
@@ -56,6 +56,14 @@ function mapNodeTypeToOperator(type: string): string {
 }
 
 function extractValue(node: Node): any {
+  if (String(node.referenceMode).toLowerCase() === "parameter") {
+    return {
+      mode: "parameter",
+      comparedSDParameterSpecification: node.comparedSDParameterSpecification,
+      comparedRecordOffset: node.comparedRecordOffset ?? 0,
+    };
+  }
+
   if (node.numericReferenceValue !== undefined) {
     return String(node.numericReferenceValue);
   }

@@ -12,7 +12,10 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import Select, { type SingleValue } from "react-select";
-import { matchesSearchText } from "../../../utils/reactSelectSearch";
+import {
+  matchesSearchText,
+  type SearchMode,
+} from "../../../utils/reactSelectSearch";
 import { virtualizedSelectProps } from "../../../utils/reactSelectVirtualized";
 
 import Box from "@mui/material/Box";
@@ -24,20 +27,21 @@ import EmptyStateNotice from "../../../components/EmptyStateNotice";
 import UrlSyncedSearchInput from "../../../components/UrlSyncedSearchInput";
 
 type Instance = {
-  id: string;
   label?: string | null;
   uid?: string | null;
 };
 
 type Props = {
   instances?: Instance[];
-  selectedInstanceId?: string | null;
+  selectedInstanceUID?: string | null;
   loading?: boolean;
   search: string;
+  searchMode: SearchMode;
   sort: KpiDetailSidebarSort;
   onSearchChange: (value: string) => void;
+  onSearchModeChange: (value: SearchMode) => void;
   onSortChange: (value: KpiDetailSidebarSort) => void;
-  onSelect: (id: string) => void;
+  onSelect: (uid: string) => void;
 };
 
 type SortOption = {
@@ -47,11 +51,13 @@ type SortOption = {
 
 export default function KpiInstanceSidebar({
   instances = [],
-  selectedInstanceId,
+  selectedInstanceUID,
   loading,
   search,
+  searchMode,
   sort,
   onSearchChange,
+  onSearchModeChange,
   onSortChange,
   onSelect,
 }: Props) {
@@ -72,7 +78,7 @@ export default function KpiInstanceSidebar({
 
     if (search.trim()) {
       result = result.filter((i) =>
-        matchesSearchText(search, i.label, i.uid),
+        matchesSearchText(search, searchMode, i.label, i.uid),
       );
     }
 
@@ -87,14 +93,14 @@ export default function KpiInstanceSidebar({
     });
 
     return result;
-  }, [instances, search, sort]);
+  }, [instances, search, searchMode, sort]);
 
   const selectedIndex = useMemo(
     () =>
       filtered.findIndex(
-        (inst) => String(inst.id) === String(selectedInstanceId),
+        (inst) => String(inst.uid) === String(selectedInstanceUID),
       ),
-    [filtered, selectedInstanceId],
+    [filtered, selectedInstanceUID],
   );
 
   if (loading) {
@@ -114,10 +120,10 @@ export default function KpiInstanceSidebar({
         overflow: "hidden",
       }}
     >
-      <h5 className="mb-3">Devices</h5>
+      <h5 className="mb-2">Devices</h5>
 
       {/* SORT */}
-      <div className="mb-3">
+      <div className="mb-2">
         <label className="form-label">Sort</label>
         <Select<SortOption, false>
           classNamePrefix="react-select"
@@ -133,12 +139,14 @@ export default function KpiInstanceSidebar({
       </div>
 
       {/* SEARCH */}
-      <div className="mb-3">
+      <div className="mb-2">
         <label className="form-label">Search</label>
         <UrlSyncedSearchInput
           placeholder="Search..."
           value={search}
           onChange={onSearchChange}
+          mode={searchMode}
+          onModeChange={onSearchModeChange}
         />
       </div>
 
@@ -166,10 +174,10 @@ export default function KpiInstanceSidebar({
           }
           renderItem={(inst) => (
             <KpiInstanceCard
-              key={inst.id}
+              key={inst.uid ?? inst.label ?? ""}
               instance={inst}
-              selected={String(inst.id) === String(selectedInstanceId)}
-              onClick={() => onSelect(String(inst.id))}
+              selected={String(inst.uid) === String(selectedInstanceUID)}
+              onClick={() => inst.uid && onSelect(String(inst.uid))}
             />
           )}
         />
@@ -178,10 +186,10 @@ export default function KpiInstanceSidebar({
       {/* BUTTON */}
       <button
         className="btn btn-outline-light mt-3 w-100"
-        disabled={!selectedInstanceId}
+        disabled={!selectedInstanceUID}
         onClick={() => {
-          if (!selectedInstanceId) return;
-          navigate(`/sd-instance/${selectedInstanceId}`);
+          if (!selectedInstanceUID) return;
+          navigate(`/sd-instance/${selectedInstanceUID}`);
         }}
       >
         Device detail

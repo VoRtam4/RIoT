@@ -13,7 +13,9 @@ package dllModel
 
 type Role struct {
 	ID          uint32
+	UID         string
 	Label       string
+	System      bool
 	Permissions []Permission
 }
 

@@ -27,7 +27,7 @@ export const useAuth = () => {
     },
   );
 
-  const userId = data?.userConfig?.userID ?? null;
+  const userId = data?.userConfig?.userUID ?? null;
 
   useEffect(() => {
     if (userId) {

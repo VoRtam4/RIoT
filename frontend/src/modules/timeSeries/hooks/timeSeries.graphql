@@ -26,7 +26,7 @@ query TimeSeriesRead($request: TimeSeriesReadInput!) {
     nextCursor {
       time
       sdInstanceUID
-      kpiDefinitionID
+      kpiDefinitionUID
     }
     error
   }
@@ -34,7 +34,7 @@ query TimeSeriesRead($request: TimeSeriesReadInput!) {
 
 mutation StartTimeSeriesExport($input: TimeSeriesReadInput!) {
   startTimeSeriesExport(input: $input) {
-    id
+    uid
     status
     downloadUrl
     createdAt
@@ -43,9 +43,9 @@ mutation StartTimeSeriesExport($input: TimeSeriesReadInput!) {
   }
 }
 
-mutation CancelTimeSeriesExport($id: ID!) {
-  cancelTimeSeriesExport(id: $id) {
-    id
+mutation CancelTimeSeriesExport($uid: String!) {
+  cancelTimeSeriesExport(uid: $uid) {
+    uid
     status
     downloadUrl
     createdAt
@@ -54,9 +54,9 @@ mutation CancelTimeSeriesExport($id: ID!) {
   }
 }
 
-query TimeSeriesExport($id: ID!) {
-  timeSeriesExport(id: $id) {
-    id
+query TimeSeriesExport($uid: String!) {
+  timeSeriesExport(uid: $uid) {
+    uid
     status
     downloadUrl
     createdAt
@@ -67,7 +67,7 @@ query TimeSeriesExport($id: ID!) {
 
 subscription OnTimeSeriesExportUpdated($filter: TimeSeriesExportFilter!) {
   onTimeSeriesExportUpdated(filter: $filter) {
-    id
+    uid
     status
     downloadUrl
     createdAt
@@ -94,7 +94,7 @@ query TimeSeriesReadAggregateKpi($request: TimeSeriesReadAggregateKPIInput!) {
     nextCursor {
       time
       sdInstanceUID
-      kpiDefinitionID
+      kpiDefinitionUID
     }
     error
   }

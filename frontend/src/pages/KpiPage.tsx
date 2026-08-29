@@ -21,14 +21,11 @@ import { kpiPageStateCodec } from "../modules/kpi/state/kpiPageState";
 export default function KpiPage() {
   const navigate = useNavigate();
 
-  const {
-    sdTypes,
-    loading: sdTypesLoading,
-  } = useSdTypes();
+  const { sdTypes, loading: sdTypesLoading } = useSdTypes();
   const { query, setPageState } = usePageState(kpiPageStateCodec);
 
   const activeSdType = useMemo(() => {
-    return query.sdType ?? (sdTypes[0] ? String(sdTypes[0].id) : null);
+    return query.sdType ?? (sdTypes[0] ? String(sdTypes[0].uid) : null);
   }, [query.sdType, sdTypes]);
 
   useEffect(() => {
@@ -38,7 +35,7 @@ export default function KpiPage() {
       {
         query: {
           ...query,
-          sdType: String(sdTypes[0].id),
+          sdType: String(sdTypes[0].uid),
         },
         entry: null,
       },
@@ -46,7 +43,8 @@ export default function KpiPage() {
     );
   }, [query, sdTypes, setPageState]);
 
-  const { entry, loading: kpisLoading, } = useKpiDefinitionsBySdType(activeSdType);
+  const { entry, loading: kpisLoading } =
+    useKpiDefinitionsBySdType(activeSdType);
 
   const loading = sdTypesLoading || (query.sdType !== null && kpisLoading);
 
@@ -57,6 +55,7 @@ export default function KpiPage() {
         sdTypes={sdTypes}
         selectedSdType={activeSdType}
         search={query.q}
+        searchMode={query.qMode}
         sort={query.sort}
         mode={query.mode}
         onSearchChange={(q) =>
@@ -65,6 +64,18 @@ export default function KpiPage() {
               query: {
                 ...query,
                 q,
+              },
+              entry: null,
+            },
+            { replace: true },
+          )
+        }
+        onSearchModeChange={(qMode) =>
+          setPageState(
+            {
+              query: {
+                ...query,
+                qMode,
               },
               entry: null,
             },

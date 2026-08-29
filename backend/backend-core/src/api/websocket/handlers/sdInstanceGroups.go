@@ -34,17 +34,12 @@ func GetSDInstanceGroup(c *connection.Client, msg sharedModel.WebSocketMessage) 
 	if principal := AuthorizeOperation(c, msg, auth.ResourceSDInstances, auth.OperationRead); principal == nil {
 		return
 	}
-	payload, ok := msg.Payload.(map[string]any)
+	uid, ok := parseUIDPayload(msg.Payload)
 	if !ok {
-		sendError(c, msg.ID, "invalid payload")
+		sendError(c, msg.ID, "invalid uid")
 		return
 	}
-	id, ok := parseID(payload)
-	if !ok {
-		sendError(c, msg.ID, "invalid id")
-		return
-	}
-	result := domainLogicLayer.GetSDInstanceGroup(id)
+	result := domainLogicLayer.GetSDInstanceGroupByUID(uid)
 	if result.IsFailure() {
 		sendError(c, msg.ID, result.GetError().Error())
 		return
@@ -78,9 +73,9 @@ func UpdateSDInstanceGroup(c *connection.Client, msg sharedModel.WebSocketMessag
 		sendError(c, msg.ID, "invalid payload")
 		return
 	}
-	id, ok := parseID(payload)
+	uid, ok := parseUIDPayload(payload)
 	if !ok {
-		sendError(c, msg.ID, "invalid id")
+		sendError(c, msg.ID, "invalid uid")
 		return
 	}
 	inputRaw, ok := payload["input"]
@@ -94,7 +89,7 @@ func UpdateSDInstanceGroup(c *connection.Client, msg sharedModel.WebSocketMessag
 		sendError(c, msg.ID, "invalid input")
 		return
 	}
-	result := domainLogicLayer.UpdateSDInstanceGroup(id, input)
+	result := domainLogicLayer.UpdateSDInstanceGroup(uid, input)
 	if result.IsFailure() {
 		sendError(c, msg.ID, result.GetError().Error())
 		return
@@ -106,17 +101,12 @@ func DeleteSDInstanceGroup(c *connection.Client, msg sharedModel.WebSocketMessag
 	if principal := AuthorizeOperation(c, msg, auth.ResourceSDInstances, auth.OperationDelete); principal == nil {
 		return
 	}
-	payload, ok := msg.Payload.(map[string]any)
+	uid, ok := parseUIDPayload(msg.Payload)
 	if !ok {
-		sendError(c, msg.ID, "invalid payload")
+		sendError(c, msg.ID, "invalid uid")
 		return
 	}
-	id, ok := parseID(payload)
-	if !ok {
-		sendError(c, msg.ID, "invalid id")
-		return
-	}
-	if err := domainLogicLayer.DeleteSDInstanceGroup(id); err != nil {
+	if err := domainLogicLayer.DeleteSDInstanceGroup(uid); err != nil {
 		sendError(c, msg.ID, err.Error())
 		return
 	}

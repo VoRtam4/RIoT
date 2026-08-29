@@ -9,11 +9,7 @@
  *
  * @ingroup riot_frontend
  */
-import {
-  useRef,
-  useState,
-  useLayoutEffect,
-} from "react";
+import { useRef, useState, useLayoutEffect } from "react";
 
 type Props<T> = {
   items: T[];
@@ -106,9 +102,7 @@ export default function VirtualizedCardGrid<T>({
   const rowCount = Math.ceil(items.length / columnCount);
 
   const visibleRowStart = Math.floor(size.scrollTop / rowHeight);
-  const visibleRowEnd = Math.ceil(
-    (size.scrollTop + size.height) / rowHeight,
-  );
+  const visibleRowEnd = Math.ceil((size.scrollTop + size.height) / rowHeight);
 
   const startRow = Math.max(0, visibleRowStart - overscan);
   const endRow = Math.min(rowCount, visibleRowEnd + overscan);

@@ -20,6 +20,12 @@ const (
 )
 
 const (
+	RoleAdminUID = "role:admin"
+	RoleUserUID  = "role:user"
+	RoleGuestUID = "role:guest"
+)
+
+const (
 	OperationRead      = "read"
 	OperationCreate    = "create"
 	OperationUpdate    = "update"
@@ -40,8 +46,10 @@ const (
 
 	ResourceTimeSeries = "time_series"
 
-	ResourceAPIKeys = "api_keys"
-	ResourceRoles   = "roles"
+	ResourceAPIKeys  = "api_keys"
+	ResourceRoles    = "roles"
+	ResourceUsers    = "users"
+	ResourceSessions = "sessions"
 )
 
 var RolePermissions = map[string]map[string]bool{
@@ -79,7 +87,16 @@ var RolePermissions = map[string]map[string]bool{
 		ResourceAPIKeys + "." + OperationDelete: true,
 
 		ResourceRoles + "." + OperationRead:   true,
+		ResourceRoles + "." + OperationCreate: true,
 		ResourceRoles + "." + OperationUpdate: true,
+		ResourceRoles + "." + OperationDelete: true,
+
+		ResourceUsers + "." + OperationRead:   true,
+		ResourceUsers + "." + OperationUpdate: true,
+		ResourceUsers + "." + OperationDelete: true,
+
+		ResourceSessions + "." + OperationRead:   true,
+		ResourceSessions + "." + OperationUpdate: true,
 	},
 
 	RoleUser: {
@@ -109,6 +126,9 @@ var RolePermissions = map[string]map[string]bool{
 		ResourceAPIKeys + "." + OperationDelete: true,
 
 		ResourceRoles + "." + OperationRead: true,
+
+		ResourceSessions + "." + OperationRead:   true,
+		ResourceSessions + "." + OperationUpdate: true,
 	},
 	RoleGuest: {},
 }
@@ -119,6 +139,19 @@ func GetAllRoleUIDs() []string {
 		uids = append(uids, uid)
 	}
 	return uids
+}
+
+func SystemRoleUID(roleLabel string) string {
+	switch roleLabel {
+	case RoleAdmin:
+		return RoleAdminUID
+	case RoleUser:
+		return RoleUserUID
+	case RoleGuest:
+		return RoleGuestUID
+	default:
+		return ""
+	}
 }
 
 func FormatPermissionLabel(permission string) string {

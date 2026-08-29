@@ -54,22 +54,30 @@ const (
 	SELECTED SDInstanceMode = "selected"
 )
 
+type KPIReferenceMode string
+
+const (
+	KPIReferenceModeLiteral   KPIReferenceMode = "literal"
+	KPIReferenceModeParameter KPIReferenceMode = "parameter"
+)
+
 type KPIDefinition struct {
-	ID                    *uint32        `json:"id,omitempty"`
-	Label                 string         `json:"label"`
-	UserID                *uint32        `json:"userID,omitempty"`
-	SDTypeID              uint32         `json:"sdTypeID"`
-	SDTypeSpecification   string         `json:"sdTypeSpecification"`
-	UserIdentifier        string         `json:"userIdentifier"`
-	RootNode              KPINode        `json:"rootNode"`
-	SDInstanceMode        SDInstanceMode `json:"sdInstanceMode"`
-	SelectedSDInstanceIDs []uint32       `json:"selectedSDInstanceUIDs"`
+	ID                     *uint32        `json:"id,omitempty"`
+	UID                    *string        `json:"uid,omitempty"`
+	Label                  string         `json:"label"`
+	UserID                 *uint32        `json:"userID,omitempty"`
+	SDTypeID               uint32         `json:"sdTypeID"`
+	SDTypeSpecification    string         `json:"sdTypeSpecification"`
+	UserIdentifier         string         `json:"userIdentifier"`
+	RootNode               KPINode        `json:"rootNode"`
+	SDInstanceMode         SDInstanceMode `json:"sdInstanceMode"`
+	SelectedSDInstanceIDs  []uint32       `json:"selectedSDInstanceIDs"`
+	SelectedSDInstanceUIDs []string       `json:"selectedSDInstanceUIDs"`
 }
 
 type KPIDefinitionMPU struct {
-	ID                     *uint32        `json:"id,omitempty"`
-	UserID                 uint32         `json:"userID,omitempty"`
-	SDTypeUID              string         `json:"sdTypeSpecification"`
+	UID                    string         `json:"uid"`
+	SDTypeUID              string         `json:"sdTypeUID"`
 	RootNode               KPINode        `json:"rootNode"`
 	SDInstanceMode         SDInstanceMode `json:"sdInstanceMode"`
 	SelectedSDInstanceUIDs []string       `json:"selectedSDInstanceUIDs"`
@@ -80,9 +88,11 @@ type KPINode interface {
 }
 
 type StringEQAtomKPINode struct {
-	SDParameterID            uint32 `json:"sdParameterID"`
-	SDParameterSpecification string `json:"sdParameterSpecification"`
-	ReferenceValue           string `json:"referenceValue"`
+	SDParameterSpecification         string           `json:"sdParameterSpecification"`
+	ReferenceValue                   string           `json:"referenceValue"`
+	ReferenceMode                    KPIReferenceMode `json:"referenceMode,omitempty"`
+	ComparedSDParameterSpecification string           `json:"comparedSDParameterSpecification,omitempty"`
+	ComparedRecordOffset             *int             `json:"comparedRecordOffset,omitempty"`
 }
 
 func (*StringEQAtomKPINode) GetType() KPINodeType {
@@ -90,9 +100,11 @@ func (*StringEQAtomKPINode) GetType() KPINodeType {
 }
 
 type StringNEQAtomKPINode struct {
-	SDParameterID            uint32 `json:"sdParameterID"`
-	SDParameterSpecification string `json:"sdParameterSpecification"`
-	ReferenceValue           string `json:"referenceValue"`
+	SDParameterSpecification         string           `json:"sdParameterSpecification"`
+	ReferenceValue                   string           `json:"referenceValue"`
+	ReferenceMode                    KPIReferenceMode `json:"referenceMode,omitempty"`
+	ComparedSDParameterSpecification string           `json:"comparedSDParameterSpecification,omitempty"`
+	ComparedRecordOffset             *int             `json:"comparedRecordOffset,omitempty"`
 }
 
 func (*StringNEQAtomKPINode) GetType() KPINodeType {
@@ -100,7 +112,6 @@ func (*StringNEQAtomKPINode) GetType() KPINodeType {
 }
 
 type StringExistsAtomKPINode struct {
-	SDParameterID            uint32 `json:"sdParameterID"`
 	SDParameterSpecification string `json:"sdParameterSpecification"`
 }
 
@@ -109,7 +120,6 @@ func (*StringExistsAtomKPINode) GetType() KPINodeType {
 }
 
 type StringNotExistsAtomKPINode struct {
-	SDParameterID            uint32 `json:"sdParameterID"`
 	SDParameterSpecification string `json:"sdParameterSpecification"`
 }
 
@@ -118,9 +128,11 @@ func (*StringNotExistsAtomKPINode) GetType() KPINodeType {
 }
 
 type BooleanEQAtomKPINode struct {
-	SDParameterID            uint32 `json:"sdParameterID"`
-	SDParameterSpecification string `json:"sdParameterSpecification"`
-	ReferenceValue           bool   `json:"referenceValue"`
+	SDParameterSpecification         string           `json:"sdParameterSpecification"`
+	ReferenceValue                   bool             `json:"referenceValue"`
+	ReferenceMode                    KPIReferenceMode `json:"referenceMode,omitempty"`
+	ComparedSDParameterSpecification string           `json:"comparedSDParameterSpecification,omitempty"`
+	ComparedRecordOffset             *int             `json:"comparedRecordOffset,omitempty"`
 }
 
 func (*BooleanEQAtomKPINode) GetType() KPINodeType {
@@ -128,9 +140,11 @@ func (*BooleanEQAtomKPINode) GetType() KPINodeType {
 }
 
 type BooleanNEQAtomKPINode struct {
-	SDParameterID            uint32 `json:"sdParameterID"`
-	SDParameterSpecification string `json:"sdParameterSpecification"`
-	ReferenceValue           bool   `json:"referenceValue"`
+	SDParameterSpecification         string           `json:"sdParameterSpecification"`
+	ReferenceValue                   bool             `json:"referenceValue"`
+	ReferenceMode                    KPIReferenceMode `json:"referenceMode,omitempty"`
+	ComparedSDParameterSpecification string           `json:"comparedSDParameterSpecification,omitempty"`
+	ComparedRecordOffset             *int             `json:"comparedRecordOffset,omitempty"`
 }
 
 func (*BooleanNEQAtomKPINode) GetType() KPINodeType {
@@ -138,7 +152,6 @@ func (*BooleanNEQAtomKPINode) GetType() KPINodeType {
 }
 
 type BooleanExistsAtomKPINode struct {
-	SDParameterID            uint32 `json:"sdParameterID"`
 	SDParameterSpecification string `json:"sdParameterSpecification"`
 }
 
@@ -147,7 +160,6 @@ func (*BooleanExistsAtomKPINode) GetType() KPINodeType {
 }
 
 type BooleanNotExistsAtomKPINode struct {
-	SDParameterID            uint32 `json:"sdParameterID"`
 	SDParameterSpecification string `json:"sdParameterSpecification"`
 }
 
@@ -156,9 +168,11 @@ func (*BooleanNotExistsAtomKPINode) GetType() KPINodeType {
 }
 
 type NumericEQAtomKPINode struct {
-	SDParameterID            uint32  `json:"sdParameterID"`
-	SDParameterSpecification string  `json:"sdParameterSpecification"`
-	ReferenceValue           float64 `json:"referenceValue"`
+	SDParameterSpecification         string           `json:"sdParameterSpecification"`
+	ReferenceValue                   float64          `json:"referenceValue"`
+	ReferenceMode                    KPIReferenceMode `json:"referenceMode,omitempty"`
+	ComparedSDParameterSpecification string           `json:"comparedSDParameterSpecification,omitempty"`
+	ComparedRecordOffset             *int             `json:"comparedRecordOffset,omitempty"`
 }
 
 func (*NumericEQAtomKPINode) GetType() KPINodeType {
@@ -166,9 +180,11 @@ func (*NumericEQAtomKPINode) GetType() KPINodeType {
 }
 
 type NumericNEQAtomKPINode struct {
-	SDParameterID            uint32  `json:"sdParameterID"`
-	SDParameterSpecification string  `json:"sdParameterSpecification"`
-	ReferenceValue           float64 `json:"referenceValue"`
+	SDParameterSpecification         string           `json:"sdParameterSpecification"`
+	ReferenceValue                   float64          `json:"referenceValue"`
+	ReferenceMode                    KPIReferenceMode `json:"referenceMode,omitempty"`
+	ComparedSDParameterSpecification string           `json:"comparedSDParameterSpecification,omitempty"`
+	ComparedRecordOffset             *int             `json:"comparedRecordOffset,omitempty"`
 }
 
 func (*NumericNEQAtomKPINode) GetType() KPINodeType {
@@ -176,9 +192,11 @@ func (*NumericNEQAtomKPINode) GetType() KPINodeType {
 }
 
 type NumericGTAtomKPINode struct {
-	SDParameterID            uint32  `json:"sdParameterID"`
-	SDParameterSpecification string  `json:"sdParameterSpecification"`
-	ReferenceValue           float64 `json:"referenceValue"`
+	SDParameterSpecification         string           `json:"sdParameterSpecification"`
+	ReferenceValue                   float64          `json:"referenceValue"`
+	ReferenceMode                    KPIReferenceMode `json:"referenceMode,omitempty"`
+	ComparedSDParameterSpecification string           `json:"comparedSDParameterSpecification,omitempty"`
+	ComparedRecordOffset             *int             `json:"comparedRecordOffset,omitempty"`
 }
 
 func (*NumericGTAtomKPINode) GetType() KPINodeType {
@@ -186,9 +204,11 @@ func (*NumericGTAtomKPINode) GetType() KPINodeType {
 }
 
 type NumericGEQAtomKPINode struct {
-	SDParameterID            uint32  `json:"sdParameterID"`
-	SDParameterSpecification string  `json:"sdParameterSpecification"`
-	ReferenceValue           float64 `json:"referenceValue"`
+	SDParameterSpecification         string           `json:"sdParameterSpecification"`
+	ReferenceValue                   float64          `json:"referenceValue"`
+	ReferenceMode                    KPIReferenceMode `json:"referenceMode,omitempty"`
+	ComparedSDParameterSpecification string           `json:"comparedSDParameterSpecification,omitempty"`
+	ComparedRecordOffset             *int             `json:"comparedRecordOffset,omitempty"`
 }
 
 func (*NumericGEQAtomKPINode) GetType() KPINodeType {
@@ -196,9 +216,11 @@ func (*NumericGEQAtomKPINode) GetType() KPINodeType {
 }
 
 type NumericLTAtomKPINode struct {
-	SDParameterID            uint32  `json:"sdParameterID"`
-	SDParameterSpecification string  `json:"sdParameterSpecification"`
-	ReferenceValue           float64 `json:"referenceValue"`
+	SDParameterSpecification         string           `json:"sdParameterSpecification"`
+	ReferenceValue                   float64          `json:"referenceValue"`
+	ReferenceMode                    KPIReferenceMode `json:"referenceMode,omitempty"`
+	ComparedSDParameterSpecification string           `json:"comparedSDParameterSpecification,omitempty"`
+	ComparedRecordOffset             *int             `json:"comparedRecordOffset,omitempty"`
 }
 
 func (*NumericLTAtomKPINode) GetType() KPINodeType {
@@ -206,9 +228,11 @@ func (*NumericLTAtomKPINode) GetType() KPINodeType {
 }
 
 type NumericLEQAtomKPINode struct {
-	SDParameterID            uint32  `json:"sdParameterID"`
-	SDParameterSpecification string  `json:"sdParameterSpecification"`
-	ReferenceValue           float64 `json:"referenceValue"`
+	SDParameterSpecification         string           `json:"sdParameterSpecification"`
+	ReferenceValue                   float64          `json:"referenceValue"`
+	ReferenceMode                    KPIReferenceMode `json:"referenceMode,omitempty"`
+	ComparedSDParameterSpecification string           `json:"comparedSDParameterSpecification,omitempty"`
+	ComparedRecordOffset             *int             `json:"comparedRecordOffset,omitempty"`
 }
 
 func (*NumericLEQAtomKPINode) GetType() KPINodeType {
@@ -216,7 +240,6 @@ func (*NumericLEQAtomKPINode) GetType() KPINodeType {
 }
 
 type NumericExistsAtomKPINode struct {
-	SDParameterID            uint32 `json:"sdParameterID"`
 	SDParameterSpecification string `json:"sdParameterSpecification"`
 }
 
@@ -225,7 +248,6 @@ func (*NumericExistsAtomKPINode) GetType() KPINodeType {
 }
 
 type NumericNotExistsAtomKPINode struct {
-	SDParameterID            uint32 `json:"sdParameterID"`
 	SDParameterSpecification string `json:"sdParameterSpecification"`
 }
 

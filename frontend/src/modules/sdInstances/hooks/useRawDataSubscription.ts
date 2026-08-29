@@ -16,17 +16,17 @@ import {
 } from "../../../generated/graphql";
 
 export const useRawDataSubscription = (
-  sdTypeID?: string,
-  sdInstanceID?: string | null,
+  sdTypeUID?: string,
+  sdInstanceUID?: string | null,
 ) => {
   const { data } = useSubscription(OnRawDataPointArrivedDocument, {
     variables: {
       filter: {
-        sdTypeIDs: sdTypeID ? [sdTypeID] : undefined,
-        sdInstanceIDs: sdInstanceID ? [sdInstanceID] : undefined,
+        sdTypeUIDs: sdTypeUID ? [sdTypeUID] : undefined,
+        sdInstanceUIDs: sdInstanceUID ? [sdInstanceUID] : undefined,
       },
     },
-    skip: !sdTypeID || !sdInstanceID,
+    skip: !sdTypeUID || !sdInstanceUID,
   });
 
   const latest: RawDataPoint | undefined = data?.onRawDataPointArrived?.[0];

@@ -18,6 +18,7 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
+	"github.com/go-chi/chi/v5"
 )
 
 func GetSDInstanceGroups(w http.ResponseWriter, r *http.Request) {
@@ -36,11 +37,8 @@ func GetSDInstanceGroup(w http.ResponseWriter, r *http.Request) {
 	if principal := authorizeOperation(w, r, auth.ResourceSDInstances, auth.OperationRead); principal == nil {
 		return
 	}
-	id, ok := parseID(w, r)
-	if !ok {
-		return
-	}
-	result := domainLogicLayer.GetSDInstanceGroup(id)
+	uid := chi.URLParam(r, "uid")
+	result := domainLogicLayer.GetSDInstanceGroupByUID(uid)
 	if result.IsFailure() {
 		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
 		return
@@ -70,16 +68,13 @@ func UpdateSDInstanceGroup(w http.ResponseWriter, r *http.Request) {
 	if principal := authorizeOperation(w, r, auth.ResourceSDInstances, auth.OperationUpdate); principal == nil {
 		return
 	}
-	id, ok := parseID(w, r)
-	if !ok {
-		return
-	}
+	uid := chi.URLParam(r, "uid")
 	var input graphQLModel.SDInstanceGroupInput
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	result := domainLogicLayer.UpdateSDInstanceGroup(id, input)
+	result := domainLogicLayer.UpdateSDInstanceGroup(uid, input)
 	if result.IsFailure() {
 		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
 		return
@@ -91,11 +86,8 @@ func DeleteSDInstanceGroup(w http.ResponseWriter, r *http.Request) {
 	if principal := authorizeOperation(w, r, auth.ResourceSDInstances, auth.OperationDelete); principal == nil {
 		return
 	}
-	id, ok := parseID(w, r)
-	if !ok {
-		return
-	}
-	err := domainLogicLayer.DeleteSDInstanceGroup(id)
+	uid := chi.URLParam(r, "uid")
+	err := domainLogicLayer.DeleteSDInstanceGroup(uid)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

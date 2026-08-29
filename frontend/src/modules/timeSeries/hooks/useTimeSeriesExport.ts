@@ -20,14 +20,14 @@ export const useTimeSeriesExport = () => {
   const client = useApolloClient();
 
   const getTimeSeriesExport = async (
-    id: TimeSeriesExportQueryVariables["id"],
+    uid: TimeSeriesExportQueryVariables["uid"],
   ) => {
     const res = await client.query<
       TimeSeriesExportQuery,
       TimeSeriesExportQueryVariables
     >({
       query: TimeSeriesExportDocument,
-      variables: { id },
+      variables: { uid },
       fetchPolicy: "no-cache",
     });
 

@@ -61,36 +61,75 @@ const (
 type TimeSeriesRawRecord struct {
 	EventTime     time.Time              `json:"eventTime"`
 	SDInstanceUID string                 `json:"sdInstanceUID"`
-	SDTypeUID     string                 `json:"sdTypeID"`
+	SDTypeUID     string                 `json:"sdTypeUID"`
 	Fields        map[string]interface{} `json:"fields"`
 	Tags          map[string]string      `json:"tags"`
 }
 
 type TimeSeriesKPIResultRecord struct {
-	JobID           string            `json:"jobId"`
-	EventTime       time.Time         `json:"eventTime"`
-	SDInstanceUID   string            `json:"sdInstanceUID"`
-	SDTypeUID       string            `json:"sdTypeID"`
-	KPIDefinitionID uint32            `json:"kpiDefinitionID"`
-	Fulfilled       bool              `json:"fulfilled"`
-	Tags            map[string]string `json:"tags"`
+	JobID            string            `json:"jobId"`
+	EventTime        time.Time         `json:"eventTime"`
+	SDInstanceUID    string            `json:"sdInstanceUID"`
+	SDTypeUID        string            `json:"sdTypeUID"`
+	KPIDefinitionUID string            `json:"kpiDefinitionUID"`
+	Fulfilled        bool              `json:"fulfilled"`
+	Tags             map[string]string `json:"tags"`
+}
+
+type TimeSeriesRecordOperation string
+
+const (
+	TimeSeriesRecordOperationNone   TimeSeriesRecordOperation = "none"
+	TimeSeriesRecordOperationUpsert TimeSeriesRecordOperation = "upsert"
+	TimeSeriesRecordOperationDelete TimeSeriesRecordOperation = "delete"
+)
+
+type TimeSeriesRecordNeighborhoodRequest struct {
+	SDTypeUID     string    `json:"sdTypeUID"`
+	SDInstanceUID string    `json:"sdInstanceUID"`
+	EventTime     time.Time `json:"eventTime"`
+}
+
+type TimeSeriesRecordNeighborhoodResponse struct {
+	Previous         *TimeSeriesDataPoint `json:"previous,omitempty"`
+	PreviousKPIState map[string]bool      `json:"previousKPIState,omitempty"`
+	SameTimestamp    *TimeSeriesDataPoint `json:"sameTimestamp,omitempty"`
+	Next             *TimeSeriesDataPoint `json:"next,omitempty"`
+	Error            string               `json:"error,omitempty"`
+}
+
+type TimeSeriesLateRecordCorrection struct {
+	CorrectionID string `json:"correctionId"`
+
+	SDTypeUID     string    `json:"sdTypeUID"`
+	SDInstanceUID string    `json:"sdInstanceUID"`
+	EventTime     time.Time `json:"eventTime"`
+
+	CurrentOperation   TimeSeriesRecordOperation `json:"currentOperation"`
+	SuccessorOperation TimeSeriesRecordOperation `json:"successorOperation"`
+
+	CurrentRawRecord *TimeSeriesRawRecord `json:"currentRawRecord,omitempty"`
+	SuccessorRawTime *time.Time           `json:"successorRawTime,omitempty"`
+
+	CurrentKPIRecords   []TimeSeriesKPIResultRecord `json:"currentKPIRecords,omitempty"`
+	SuccessorKPIRecords []TimeSeriesKPIResultRecord `json:"successorKPIRecords,omitempty"`
 }
 
 type TimeSeriesReprocessRequest struct {
-	SDTypeUID      string    `json:"SDTypeID"`
+	SDTypeUID      string    `json:"sdTypeUID"`
 	SDInstanceUIDs []string  `json:"sdInstanceUID,omitempty"`
 	To             time.Time `json:"to"`
 	Batch          int       `json:"batch"`
 }
 
 type TimeSeriesReprocessReadRequest struct {
-	JobID           string    `json:"jobId"`
-	Wait            bool      `json:"wait"`
-	KPIDefinitionID uint32    `json:"kpiDefinitionID"`
-	SDTypeUID       string    `json:"SDTypeID"`
-	SDInstanceUIDs  []string  `json:"sdInstanceUIDs,omitempty"`
-	To              time.Time `json:"to"`
-	Batch           int       `json:"batch"`
+	JobID            string    `json:"jobId"`
+	Wait             bool      `json:"wait"`
+	KPIDefinitionUID string    `json:"kpiDefinitionUID"`
+	SDTypeUID        string    `json:"sdTypeUID"`
+	SDInstanceUIDs   []string  `json:"sdInstanceUIDs,omitempty"`
+	To               time.Time `json:"to"`
+	Batch            int       `json:"batch"`
 }
 
 type TimeSeriesReprocessReadResponse struct {
@@ -106,19 +145,19 @@ type TimeSeriesDataPoint struct {
 }
 
 type TimeSeriesReadRequest struct {
-	JobID            uint32            `json:"jobId,omitempty"`
-	Type             TimeSeriesType    `json:"type"`
-	SDTypeUID        string            `json:"SDTypeID,omitempty"`
-	SDInstanceUIDs   []string          `json:"sdInstanceUIDs,omitempty"`
-	KPIDefinitionIDs []uint32          `json:"kpiDefinitionIDs,omitempty"`
-	From             *time.Time        `json:"from,omitempty"`
-	To               *time.Time        `json:"to,omitempty"`
-	AggregateSeconds *int              `json:"aggregateSeconds,omitempty"`
-	Limit            *int              `json:"limit,omitempty"`
-	SortDesc         *bool             `json:"sortDesc,omitempty"`
-	Batch            *int              `json:"batch,omitempty"`
-	Filters          *FilterNode       `json:"filters,omitempty"`
-	Cursor           *TimeSeriesCursor `json:"cursor,omitempty"`
+	JobID             uint32            `json:"jobId,omitempty"`
+	Type              TimeSeriesType    `json:"type"`
+	SDTypeUID         string            `json:"sdTypeUID,omitempty"`
+	SDInstanceUIDs    []string          `json:"sdInstanceUIDs,omitempty"`
+	KPIDefinitionUIDs []string          `json:"kpiDefinitionUIDs,omitempty"`
+	From              *time.Time        `json:"from,omitempty"`
+	To                *time.Time        `json:"to,omitempty"`
+	AggregateSeconds  *int              `json:"aggregateSeconds,omitempty"`
+	Limit             *int              `json:"limit,omitempty"`
+	SortDesc          *bool             `json:"sortDesc,omitempty"`
+	Batch             *int              `json:"batch,omitempty"`
+	Filters           *FilterNode       `json:"filters,omitempty"`
+	Cursor            *TimeSeriesCursor `json:"cursor,omitempty"`
 }
 
 type TimeSeriesReadCancelRequest struct {
@@ -126,14 +165,14 @@ type TimeSeriesReadCancelRequest struct {
 }
 
 type TimeSeriesDistinctTagValuesRequest struct {
-	Type             TimeSeriesType `json:"type"`
-	SDTypeUID        string         `json:"SDTypeID,omitempty"`
-	SDInstanceUIDs   []string       `json:"sdInstanceUIDs,omitempty"`
-	KPIDefinitionIDs []uint32       `json:"kpiDefinitionIDs,omitempty"`
-	From             *time.Time     `json:"from,omitempty"`
-	To               *time.Time     `json:"to,omitempty"`
-	Tag              string         `json:"tag"`
-	Filters          *FilterNode    `json:"filters,omitempty"`
+	Type              TimeSeriesType `json:"type"`
+	SDTypeUID         string         `json:"sdTypeUID,omitempty"`
+	SDInstanceUIDs    []string       `json:"sdInstanceUIDs,omitempty"`
+	KPIDefinitionUIDs []string       `json:"kpiDefinitionUIDs,omitempty"`
+	From              *time.Time     `json:"from,omitempty"`
+	To                *time.Time     `json:"to,omitempty"`
+	Tag               string         `json:"tag"`
+	Filters           *FilterNode    `json:"filters,omitempty"`
 }
 
 type TimeSeriesDistinctTagValuesResponse struct {
@@ -158,9 +197,9 @@ type TimeSeriesParameter struct { // Tohle Je potřeba, ale získám z Relační
 }
 
 type TimeSeriesCursor struct {
-	Time            time.Time `json:"time"`
-	SDInstanceUID   string    `json:"sdInstanceUID"`
-	KPIDefinitionID *uint32   `json:"kpiDefinitionID,omitempty"`
+	Time             time.Time `json:"time"`
+	SDInstanceUID    string    `json:"sdInstanceUID"`
+	KPIDefinitionUID *string   `json:"kpiDefinitionUID,omitempty"`
 }
 
 type FilterRule struct {
@@ -182,9 +221,9 @@ type QueryPlan struct {
 	From time.Time
 	To   time.Time
 
-	SDTypeUID        string
-	SDInstanceUIDs   []string
-	KPIDefinitionIDs []uint32
+	SDTypeUID         string
+	SDInstanceUIDs    []string
+	KPIDefinitionUIDs []string
 
 	Limit    int
 	Batch    int

@@ -22,6 +22,7 @@ import (
 func ToDLLModelUser(userEntity dbModel.UserEntity) dllModel.User {
 	return dllModel.User{
 		ID:                     sharedUtils.NewOptionalOf[uint](userEntity.Model.ID),
+		UID:                    userEntity.UID,
 		RoleID:                 uint32(userEntity.RoleID),
 		Username:               userEntity.Username,
 		Email:                  userEntity.Email,
@@ -30,6 +31,9 @@ func ToDLLModelUser(userEntity dbModel.UserEntity) dllModel.User {
 		OAuth2Provider:         sharedUtils.NewOptionalFromPointer[string](userEntity.OAuth2Provider),
 		OAuth2ProviderIssuedID: sharedUtils.NewOptionalFromPointer[string](userEntity.OAuth2ProviderIssuedID),
 		LastLoginAt:            sharedUtils.NewOptionalFromPointer[time.Time](userEntity.LastLoginAt),
+		Disabled:               userEntity.Disabled,
+		DisabledAt:             sharedUtils.NewOptionalFromPointer[time.Time](userEntity.DisabledAt),
+		DisabledReason:         sharedUtils.NewOptionalFromPointer[string](userEntity.DisabledReason),
 		Sessions:               sharedUtils.Map(userEntity.Sessions, ToDLLModelUserSession),
 		// TODO: Implement 'Invocations', 'UserConfig' and other possibly missing fields as needed
 	}
@@ -38,12 +42,15 @@ func ToDLLModelUser(userEntity dbModel.UserEntity) dllModel.User {
 func ToDLLModelUserSession(userSessionEntity dbModel.UserSessionEntity) dllModel.UserSession {
 	return dllModel.UserSession{
 		ID:               sharedUtils.NewOptionalOf(userSessionEntity.ID),
+		UID:              userSessionEntity.UID,
 		UserID:           userSessionEntity.UserID,
 		RefreshTokenHash: userSessionEntity.RefreshTokenHash,
 		ExpiresAt:        userSessionEntity.ExpiresAt,
 		Revoked:          userSessionEntity.Revoked,
 		IPAddress:        userSessionEntity.IPAddress,
 		UserAgent:        userSessionEntity.UserAgent,
+		CreatedAt:        userSessionEntity.CreatedAt,
+		UpdatedAt:        userSessionEntity.UpdatedAt,
 	}
 }
 

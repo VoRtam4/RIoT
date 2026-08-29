@@ -10,7 +10,10 @@
  * @ingroup riot_frontend
  */
 import type { PageStateCodec } from "../../../app/navigation/usePageState";
-import type { FilterNodeInput, TimeSeriesReadInput } from "../../../generated/graphql";
+import type {
+  FilterNodeInput,
+  TimeSeriesReadInput,
+} from "../../../generated/graphql";
 import {
   minusDaysLocal,
   nowLocal,
@@ -21,9 +24,9 @@ export type TimeSeriesSort = "DESC" | "ASC" | "NONE";
 
 export type TimeSeriesDraftState = {
   type: "raw" | "kpi";
-  sdTypeID: string | null;
-  sdInstanceIDs: string[];
-  kpiDefinitionIDs: string[];
+  sdTypeUID: string | null;
+  sdInstanceUIDs: string[];
+  kpiDefinitionUIDs: string[];
   from?: string;
   to?: string;
   sort: TimeSeriesSort;
@@ -34,8 +37,8 @@ export type TimeSeriesDraftState = {
 
 export type TimeSeriesEntryState = {
   v: 1;
-  sdInstanceIDs: string[];
-  kpiDefinitionIDs: string[];
+  sdInstanceUIDs: string[];
+  kpiDefinitionUIDs: string[];
 };
 
 const sortValues = new Set<TimeSeriesSort>(["DESC", "ASC", "NONE"]);
@@ -95,9 +98,9 @@ export function decodeTimeSeriesFilter(
 export function createDefaultTimeSeriesDraft(): TimeSeriesDraftState {
   return {
     type: "raw",
-    sdTypeID: null,
-    sdInstanceIDs: [],
-    kpiDefinitionIDs: [],
+    sdTypeUID: null,
+    sdInstanceUIDs: [],
+    kpiDefinitionUIDs: [],
     from: toUTCString(minusDaysLocal(1)),
     to: toUTCString(nowLocal()),
     sort: "DESC",
@@ -111,8 +114,8 @@ function normalizeEntry(state: unknown): TimeSeriesEntryState {
   if (!state || typeof state !== "object") {
     return {
       v: 1,
-      sdInstanceIDs: [],
-      kpiDefinitionIDs: [],
+      sdInstanceUIDs: [],
+      kpiDefinitionUIDs: [],
     };
   }
 
@@ -120,23 +123,23 @@ function normalizeEntry(state: unknown): TimeSeriesEntryState {
 
   return {
     v: 1,
-    sdInstanceIDs: Array.isArray(candidate.sdInstanceIDs)
-      ? candidate.sdInstanceIDs.map(String)
+    sdInstanceUIDs: Array.isArray(candidate.sdInstanceUIDs)
+      ? candidate.sdInstanceUIDs.map(String)
       : [],
-    kpiDefinitionIDs: Array.isArray(candidate.kpiDefinitionIDs)
-      ? candidate.kpiDefinitionIDs.map(String)
+    kpiDefinitionUIDs: Array.isArray(candidate.kpiDefinitionUIDs)
+      ? candidate.kpiDefinitionUIDs.map(String)
       : [],
   };
 }
 
 export function mergeTimeSeriesDraft(
-  query: Omit<TimeSeriesDraftState, "sdInstanceIDs" | "kpiDefinitionIDs">,
+  query: Omit<TimeSeriesDraftState, "sdInstanceUIDs" | "kpiDefinitionUIDs">,
   entry: TimeSeriesEntryState,
 ): TimeSeriesDraftState {
   return {
     ...query,
-    sdInstanceIDs: entry.sdInstanceIDs,
-    kpiDefinitionIDs: entry.kpiDefinitionIDs,
+    sdInstanceUIDs: entry.sdInstanceUIDs,
+    kpiDefinitionUIDs: entry.kpiDefinitionUIDs,
   };
 }
 
@@ -145,22 +148,20 @@ export function draftToTimeSeriesInput(
 ): TimeSeriesReadInput {
   return {
     type: draft.type,
-    sdTypeID: draft.sdTypeID ?? undefined,
-    sdInstanceIDs: draft.sdInstanceIDs,
-    kpiDefinitionIDs:
-      draft.type === "kpi" ? draft.kpiDefinitionIDs : undefined,
+    sdTypeUID: draft.sdTypeUID ?? undefined,
+    sdInstanceUIDs: draft.sdInstanceUIDs,
+    kpiDefinitionUIDs:
+      draft.type === "kpi" ? draft.kpiDefinitionUIDs : undefined,
     from: draft.from,
     to: draft.to,
     filters: draft.filters,
-    sortDesc:
-      draft.sort === "NONE" ? undefined : draft.sort === "DESC",
-    limit:
-      draft.sort === "NONE" ? undefined : (draft.limit ?? 100),
+    sortDesc: draft.sort === "NONE" ? undefined : draft.sort === "DESC",
+    limit: draft.sort === "NONE" ? undefined : (draft.limit ?? 100),
   };
 }
 
 export const timeSeriesPageStateCodec: PageStateCodec<
-  Omit<TimeSeriesDraftState, "sdInstanceIDs" | "kpiDefinitionIDs">,
+  Omit<TimeSeriesDraftState, "sdInstanceUIDs" | "kpiDefinitionUIDs">,
   TimeSeriesEntryState
 > = {
   decodeQuery(searchParams) {
@@ -173,7 +174,7 @@ export const timeSeriesPageStateCodec: PageStateCodec<
     return {
       ...defaults,
       type: type === "kpi" ? "kpi" : "raw",
-      sdTypeID: nonEmpty(searchParams.get("sdType")),
+      sdTypeUID: nonEmpty(searchParams.get("sdType")),
       from: nonEmpty(searchParams.get("from")) ?? defaults.from,
       to: nonEmpty(searchParams.get("to")) ?? defaults.to,
       sort:
@@ -192,7 +193,7 @@ export const timeSeriesPageStateCodec: PageStateCodec<
     const searchParams = new URLSearchParams();
 
     searchParams.set("type", query.type);
-    if (query.sdTypeID) searchParams.set("sdType", query.sdTypeID);
+    if (query.sdTypeUID) searchParams.set("sdType", query.sdTypeUID);
     if (query.from) searchParams.set("from", query.from);
     if (query.to) searchParams.set("to", query.to);
     if (query.sort !== "DESC") searchParams.set("sort", query.sort);
@@ -214,8 +215,8 @@ export const timeSeriesPageStateCodec: PageStateCodec<
   encodeEntry(entry) {
     return {
       v: 1,
-      sdInstanceIDs: entry.sdInstanceIDs,
-      kpiDefinitionIDs: entry.kpiDefinitionIDs,
+      sdInstanceUIDs: entry.sdInstanceUIDs,
+      kpiDefinitionUIDs: entry.kpiDefinitionUIDs,
     };
   },
 };

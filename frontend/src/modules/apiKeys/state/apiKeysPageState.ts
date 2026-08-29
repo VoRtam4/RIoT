@@ -10,12 +10,17 @@
  * @ingroup riot_frontend
  */
 import type { PageStateCodec } from "../../../app/navigation/usePageState";
+import {
+  isSearchMode,
+  type SearchMode,
+} from "../../../utils/reactSelectSearch";
 
 export type ApiKeysFilter = "all" | "active" | "inactive";
 export type ApiKeysSort = "label_asc" | "label_desc";
 
 export type ApiKeysQueryState = {
   q: string;
+  qMode: SearchMode;
   filter: ApiKeysFilter;
   sort: ApiKeysSort;
   selected: string | null;
@@ -23,7 +28,6 @@ export type ApiKeysQueryState = {
 
 const filterValues = new Set<ApiKeysFilter>(["all", "active", "inactive"]);
 const sortValues = new Set<ApiKeysSort>(["label_asc", "label_desc"]);
-
 function nonEmpty(value: string | null) {
   return value && value.trim() ? value : null;
 }
@@ -32,9 +36,11 @@ export const apiKeysPageStateCodec: PageStateCodec<ApiKeysQueryState, null> = {
   decodeQuery(searchParams) {
     const filter = searchParams.get("filter");
     const sort = searchParams.get("sort");
+    const qMode = searchParams.get("qMode");
 
     return {
       q: searchParams.get("q") ?? "",
+      qMode: qMode && isSearchMode(qMode) ? qMode : "or",
       filter:
         filter && filterValues.has(filter as ApiKeysFilter)
           ? (filter as ApiKeysFilter)
@@ -50,6 +56,7 @@ export const apiKeysPageStateCodec: PageStateCodec<ApiKeysQueryState, null> = {
     const searchParams = new URLSearchParams();
 
     if (query.q.trim()) searchParams.set("q", query.q);
+    if (query.qMode !== "or") searchParams.set("qMode", query.qMode);
     if (query.filter !== "all") searchParams.set("filter", query.filter);
     if (query.sort !== "label_asc") searchParams.set("sort", query.sort);
     if (query.selected) searchParams.set("selected", query.selected);

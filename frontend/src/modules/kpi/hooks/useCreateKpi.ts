@@ -32,10 +32,8 @@ export const useCreateKpi = () => {
 
     const created = res.data?.createKPIDefinition ?? null;
 
-    if (created && input.sdTypeID) {
-      await useKpiDefinitionsBySdTypeStore
-        .getState()
-        .refresh(input.sdTypeID);
+    if (created && input.sdTypeUID) {
+      await useKpiDefinitionsBySdTypeStore.getState().refresh(input.sdTypeUID);
     }
 
     return created;

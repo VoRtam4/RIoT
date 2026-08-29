@@ -19,8 +19,10 @@ import (
 
 func ToDLLModelRole(role dbModel.RoleEntity) dllModel.Role {
 	return dllModel.Role{
-		ID:    role.ID,
-		Label: role.Label,
+		ID:     role.ID,
+		UID:    role.UID,
+		Label:  role.Label,
+		System: role.System,
 		Permissions: sharedUtils.Map(role.Permissions, func(p dbModel.PermissionEntity) dllModel.Permission {
 			return dllModel.Permission{
 				UID:   p.UID,

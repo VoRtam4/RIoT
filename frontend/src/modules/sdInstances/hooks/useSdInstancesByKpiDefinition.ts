@@ -17,16 +17,16 @@ import {
 } from "../../../generated/graphql";
 
 export const useSdInstancesByKpiDefinition = (
-  kpiDefinitionID: string | null,
+  kpiDefinitionUID: string | null,
   enabled: boolean,
 ) => {
   const { data, loading, error, refetch } = useQuery<
     SdInstancesByKpiDefinitionQuery,
     SdInstancesByKpiDefinitionQueryVariables
   >(SdInstancesByKpiDefinitionDocument, {
-    skip: !enabled || !kpiDefinitionID,
+    skip: !enabled || !kpiDefinitionUID,
     variables: {
-      id: kpiDefinitionID ?? "",
+      uid: kpiDefinitionUID ?? "",
     },
     fetchPolicy: "cache-and-network",
   });

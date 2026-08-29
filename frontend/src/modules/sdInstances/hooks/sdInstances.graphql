@@ -10,34 +10,31 @@
 
 query SdInstances {
   sdInstances {
-    id
     uid
     label
   }
 }
 
-query SdInstancesByType($id: ID!) {
-  sdInstancesByType(id: $id) {
-    id
+query SdInstancesByType($uid: String!) {
+  sdInstancesByType(uid: $uid) {
     uid
     label
     type {
-      id
+      uid
     }
   }
 }
 
-query SdInstancesByKpiDefinition($id: ID!) {
-  sdInstancesByKpiDefinition(id: $id) {
-    id
+query SdInstancesByKpiDefinition($uid: String!) {
+  sdInstancesByKpiDefinition(uid: $uid) {
     uid
     label
   }
 }
 
-query RawDataPoint($id: ID!) {
-  rawDataPoint(id: $id) {
-    sdInstanceID
+query RawDataPoint($uid: String!) {
+  rawDataPoint(uid: $uid) {
+    sdInstanceUID
     payload
     eventTime
   }
@@ -45,26 +42,23 @@ query RawDataPoint($id: ID!) {
 
 subscription OnRawDataPointArrived($filter: RawDataPointArrivedFilter) {
   onRawDataPointArrived(filter: $filter) {
-    sdTypeID
-    sdInstanceID
+    sdTypeUID
+    sdInstanceUID
     payload
     eventTime
   }
 }
 
-query SdInstance($id: ID!) {
-  sdInstance(id: $id) {
-    id
+query SdInstance($uid: String!) {
+  sdInstance(uid: $uid) {
     uid
     label
     confirmedByUser
     userIdentifier
     type {
-      id
       uid
       label
       parameters {
-        id
         label
         denotation
         type

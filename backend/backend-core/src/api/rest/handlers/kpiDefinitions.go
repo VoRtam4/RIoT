@@ -18,6 +18,7 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/auth"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/domainLogicLayer"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
+	"github.com/go-chi/chi/v5"
 )
 
 func GetKPIDefinitions(w http.ResponseWriter, r *http.Request) {
@@ -38,11 +39,8 @@ func GetKPIDefinition(w http.ResponseWriter, r *http.Request) {
 	if principal == nil {
 		return
 	}
-	id, ok := parseID(w, r)
-	if !ok {
-		return
-	}
-	result := domainLogicLayer.GetKPIDefinition(principal.UserID, id)
+	uid := chi.URLParam(r, "uid")
+	result := domainLogicLayer.GetKPIDefinition(principal.UserID, uid)
 	if result.IsFailure() {
 		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
 		return
@@ -55,11 +53,8 @@ func GetKPIDefinitionsBySDType(w http.ResponseWriter, r *http.Request) {
 	if principal == nil {
 		return
 	}
-	sdTypeID, ok := parseID(w, r)
-	if !ok {
-		return
-	}
-	result := domainLogicLayer.GetKPIDefinitionsBySDType(principal.UserID, sdTypeID)
+	uid := chi.URLParam(r, "uid")
+	result := domainLogicLayer.GetKPIDefinitionsBySDType(principal.UserID, uid)
 	if result.IsFailure() {
 		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
 		return
@@ -72,11 +67,8 @@ func GetKPIDefinitionsBySDInstace(w http.ResponseWriter, r *http.Request) {
 	if principal == nil {
 		return
 	}
-	sdInstanceID, ok := parseID(w, r)
-	if !ok {
-		return
-	}
-	result := domainLogicLayer.GetKPIDefinitionsBySDInstance(principal.UserID, sdInstanceID)
+	uid := chi.URLParam(r, "uid")
+	result := domainLogicLayer.GetKPIDefinitionsBySDInstance(principal.UserID, uid)
 	if result.IsFailure() {
 		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
 		return
@@ -109,17 +101,14 @@ func UpdateKPIDefinition(w http.ResponseWriter, r *http.Request) {
 	if principal == nil {
 		return
 	}
-	id, ok := parseID(w, r)
-	if !ok {
-		return
-	}
+	uid := chi.URLParam(r, "uid")
 	var input graphQLModel.KPIDefinitionInput
 	err := json.NewDecoder(r.Body).Decode(&input)
 	if err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	result := domainLogicLayer.UpdateKPIDefinition(principal.UserID, id, input)
+	result := domainLogicLayer.UpdateKPIDefinition(principal.UserID, uid, input)
 	if result.IsFailure() {
 		http.Error(w, result.GetError().Error(), http.StatusInternalServerError)
 		return
@@ -132,11 +121,8 @@ func DeleteKPIDefinition(w http.ResponseWriter, r *http.Request) {
 	if principal == nil {
 		return
 	}
-	id, ok := parseID(w, r)
-	if !ok {
-		return
-	}
-	err := domainLogicLayer.DeleteKPIDefinition(principal.UserID, id)
+	uid := chi.URLParam(r, "uid")
+	err := domainLogicLayer.DeleteKPIDefinition(principal.UserID, uid)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -14,8 +14,8 @@ package sharedModel
 import "time"
 
 type KPIKey struct {
-	SDInstanceUID   string
-	KPIDefinitionID uint32
+	SDInstanceUID    string
+	KPIDefinitionUID string
 }
 
 type RawState struct {

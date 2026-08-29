@@ -24,7 +24,8 @@ export const buildColumns = (parameters: TimeSeriesParameterLike[]) => {
 
       if (role === "meta") {
         return (
-          p.denotation === "sdInstanceUID" || p.denotation === "kpiDefinitionID"
+          p.denotation === "sdInstanceUID" ||
+          p.denotation === "kpiDefinitionUID"
         );
       }
 

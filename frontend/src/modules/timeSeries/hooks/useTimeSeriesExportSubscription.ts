@@ -15,14 +15,14 @@ import {
   type TimeSeriesExport,
 } from "../../../generated/graphql";
 
-export const useTimeSeriesExportSubscription = (id?: string | null) => {
+export const useTimeSeriesExportSubscription = (uid?: string | null) => {
   const { data } = useSubscription(OnTimeSeriesExportUpdatedDocument, {
     variables: {
       filter: {
-        ids: id ? [id] : undefined,
+        uids: uid ? [uid] : undefined,
       },
     },
-    skip: !id,
+    skip: !uid,
   });
 
   const latest: TimeSeriesExport | undefined = data?.onTimeSeriesExportUpdated;

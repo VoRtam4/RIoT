@@ -137,7 +137,7 @@ export default function APIKeyForm({
       <div className="d-flex justify-content-end gap-2 mt-3">
         {mode === "detail" && (
           <button className="btn btn-outline-danger" onClick={onDelete}>
-            Smazat
+            Delete
           </button>
         )}
 

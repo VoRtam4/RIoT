@@ -19,9 +19,8 @@ import Chip from "@mui/material/Chip";
 
 type Props = {
   kpi: {
-    id: string;
+    uid?: string | null;
     label?: string | null;
-    sdTypeID: string;
     sdInstanceMode?: any;
   };
 };
@@ -40,7 +39,7 @@ export default function KpiCard({ kpi }: Props) {
       }}
     >
       <CardActionArea
-        onClick={() => navigate(`/kpi/${kpi.id}`)}
+        onClick={() => kpi.uid && navigate(`/kpi/${kpi.uid}`)}
         sx={{
           height: "100%",
           display: "flex",
@@ -65,7 +64,7 @@ export default function KpiCard({ kpi }: Props) {
               sx={{ opacity: 0.7 }}
               className="color-label"
             >
-              {kpi.id ?? "\u00A0"}
+              {kpi.uid ?? "\u00A0"}
             </Typography>
 
             <Box sx={{ mt: 1 }}>

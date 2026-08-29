@@ -18,18 +18,24 @@ const featurePermissionResource: Record<string, string> = {
   "device-groups": "sd_instances",
   "time-series": "time_series",
   "api-keys": "api_keys",
+  users: "users",
   "user-config": "user_config",
   roles: "roles",
 };
 
-export function getRequiredPermissionLabel(featureId: string, actionId: string) {
+export function getRequiredPermissionLabel(
+  featureId: string,
+  actionId: string,
+) {
   const resource = featurePermissionResource[featureId];
 
   if (!resource) {
     return "Unknown Permission";
   }
 
-  return formatPermissionLabel(`${resource}.${inferPermissionOperation(actionId)}`);
+  return formatPermissionLabel(
+    `${resource}.${inferPermissionOperation(actionId)}`,
+  );
 }
 
 function inferPermissionOperation(actionId: string) {
@@ -41,7 +47,17 @@ function inferPermissionOperation(actionId: string) {
     return "create";
   }
 
-  if (actionId.startsWith("update-") || actionId === "assign-role") {
+  if (actionId.startsWith("clone-")) {
+    return "create";
+  }
+
+  if (
+    actionId.startsWith("update-") ||
+    actionId.startsWith("disable-") ||
+    actionId.startsWith("enable-") ||
+    actionId.startsWith("revoke-") ||
+    actionId === "assign-role"
+  ) {
     return "update";
   }
 

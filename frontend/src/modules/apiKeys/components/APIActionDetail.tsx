@@ -45,7 +45,10 @@ export default function ActionDetail({ feature, action, variant }: Props) {
       <div className="api-docs-meta-grid mb-3">
         <MetaSection title="Interface URL" value={interfaceUrl} />
 
-        <MetaSection title="Required Permission" value={requiredPermissionLabel} />
+        <MetaSection
+          title="Required Permission"
+          value={requiredPermissionLabel}
+        />
       </div>
 
       <CodeSection

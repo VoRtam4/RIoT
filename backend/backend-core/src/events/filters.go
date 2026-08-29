@@ -16,6 +16,7 @@ import (
 
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/db/dbClient"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
+	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 )
 
 func BuildSDInstanceRegisteredFilter(_ uint32, filter *graphQLModel.SDInstanceRegisteredFilter) (func(graphQLModel.SDInstance) bool, error) {
@@ -23,68 +24,73 @@ func BuildSDInstanceRegisteredFilter(_ uint32, filter *graphQLModel.SDInstanceRe
 	if filter == nil {
 		return func(_ graphQLModel.SDInstance) bool { return true }, nil
 	}
-	var allowedInstanceIDs map[uint32]struct{}
-	var allowedTypeIDs map[uint32]struct{}
-	if len(filter.SdInstanceIDs) > 0 {
-		allowedInstanceIDs = make(map[uint32]struct{})
-		instanceTypeIDs := make(map[uint32]struct{})
-		for _, id := range filter.SdInstanceIDs {
-			res := db.LoadSDInstance(id)
+	var allowedInstanceUIDs map[string]struct{}
+	var allowedTypeUIDs map[string]struct{}
+	instanceTypeUIDs := make(map[string]struct{})
+	if len(filter.SdInstanceUIDs) > 0 {
+		allowedInstanceUIDs = make(map[string]struct{})
+		for _, uid := range filter.SdInstanceUIDs {
+			res := db.LoadSDInstanceBasedOnUID(uid)
 			if res.IsFailure() {
-				return nil, fmt.Errorf("sdInstance not found: %d", id)
+				return nil, res.GetError()
 			}
-			instance := res.GetPayload()
-			allowedInstanceIDs[id] = struct{}{}
-			instanceTypeIDs[instance.SDType.ID.GetPayload()] = struct{}{}
+			instanceOptional := res.GetPayload()
+			if instanceOptional.IsEmpty() {
+				return nil, fmt.Errorf("sdInstance not found: %s", uid)
+			}
+			instance := instanceOptional.GetPayload()
+			if instance.ID.IsEmpty() {
+				return nil, fmt.Errorf("sdInstance loaded by UID has no internal ID: %s", uid)
+			}
+			allowedInstanceUIDs[instance.UID] = struct{}{}
+			instanceTypeUIDs[instance.SDType.UID] = struct{}{}
 		}
-		if len(filter.SdTypeIDs) > 0 {
-			allowedTypeIDs = make(map[uint32]struct{})
-			for _, typeID := range filter.SdTypeIDs {
-				res := db.LoadSDType(typeID)
-				if res.IsFailure() {
-					return nil, fmt.Errorf("sdType not found: %d", typeID)
-				}
-				allowedTypeIDs[typeID] = struct{}{}
+	}
+	if len(filter.SdTypeUIDs) > 0 {
+		allowedTypeUIDs = make(map[string]struct{})
+		for _, uid := range filter.SdTypeUIDs {
+			res := db.LoadSDTypeBasedOnUID(uid)
+			if res.IsFailure() {
+				return nil, res.GetError()
 			}
-			for t := range instanceTypeIDs {
-				if _, ok := allowedTypeIDs[t]; !ok {
-					return nil, fmt.Errorf("sdInstances do not belong to provided sdTypeIDs")
-				}
+			sdType := res.GetPayload()
+			if sdType.ID.IsEmpty() {
+				return nil, fmt.Errorf("sdType loaded by UID has no internal ID: %s", uid)
 			}
+			allowedTypeUIDs[sdType.UID] = struct{}{}
+		}
+	}
+	if len(instanceTypeUIDs) > 0 {
+		if allowedTypeUIDs == nil {
+			allowedTypeUIDs = instanceTypeUIDs
 		} else {
-			allowedTypeIDs = instanceTypeIDs
-		}
-	}
-	if len(filter.SdTypeIDs) > 0 && allowedTypeIDs == nil {
-		allowedTypeIDs = make(map[uint32]struct{})
-		for _, typeID := range filter.SdTypeIDs {
-			res := db.LoadSDType(typeID)
-			if res.IsFailure() {
-				return nil, fmt.Errorf("sdType not found: %d", typeID)
+			for t := range instanceTypeUIDs {
+				if _, ok := allowedTypeUIDs[t]; !ok {
+					return nil, fmt.Errorf("sdInstances do not belong to provided sdTypes")
+				}
 			}
-			allowedTypeIDs[typeID] = struct{}{}
 		}
 	}
-	if allowedInstanceIDs == nil && allowedTypeIDs == nil {
+	if allowedInstanceUIDs == nil && allowedTypeUIDs == nil {
 		return func(_ graphQLModel.SDInstance) bool { return true }, nil
 	}
-	if allowedInstanceIDs != nil && allowedTypeIDs == nil {
+	if allowedInstanceUIDs != nil && allowedTypeUIDs == nil {
 		return func(inst graphQLModel.SDInstance) bool {
-			_, ok := allowedInstanceIDs[inst.Type.ID]
+			_, ok := allowedInstanceUIDs[inst.UID]
 			return ok
 		}, nil
 	}
-	if allowedInstanceIDs == nil && allowedTypeIDs != nil {
+	if allowedInstanceUIDs == nil && allowedTypeUIDs != nil {
 		return func(inst graphQLModel.SDInstance) bool {
-			_, ok := allowedTypeIDs[inst.Type.ID]
+			_, ok := allowedTypeUIDs[inst.Type.UID]
 			return ok
 		}, nil
 	}
 	return func(inst graphQLModel.SDInstance) bool {
-		if _, ok := allowedTypeIDs[inst.Type.ID]; !ok {
+		if _, ok := allowedTypeUIDs[inst.Type.UID]; !ok {
 			return false
 		}
-		_, ok := allowedInstanceIDs[inst.ID]
+		_, ok := allowedInstanceUIDs[inst.UID]
 		return ok
 	}, nil
 }
@@ -95,68 +101,74 @@ func BuildRawDataPointArrivedFilter(_ uint32, filter *graphQLModel.RawDataPointA
 	if filter == nil {
 		return func(_ []graphQLModel.RawDataPoint) bool { return true }, nil
 	}
-	var allowedInstanceIDs map[uint32]struct{}
-	var allowedTypeIDs map[uint32]struct{}
-	if len(filter.SdInstanceIDs) > 0 {
-		allowedInstanceIDs = make(map[uint32]struct{})
-		instanceTypeIDs := make(map[uint32]struct{})
-
-		for _, id := range filter.SdInstanceIDs {
-			res := db.LoadSDInstance(id)
-			if res.IsFailure() {
-				return nil, fmt.Errorf("sdInstance not found: %d", id)
-			}
-			inst := res.GetPayload()
-			allowedInstanceIDs[id] = struct{}{}
-			instanceTypeIDs[inst.SDType.ID.GetPayload()] = struct{}{}
+	var allowedInstanceUIDs map[string]struct{}
+	var allowedTypeUIDs map[string]struct{}
+	instanceTypeUIDs := make(map[string]struct{})
+	if len(filter.SdInstanceUIDs) > 0 {
+		if allowedInstanceUIDs == nil {
+			allowedInstanceUIDs = make(map[string]struct{})
 		}
-
-		if len(filter.SdTypeIDs) > 0 {
-			allowedTypeIDs = make(map[uint32]struct{})
-			for _, t := range filter.SdTypeIDs {
-				res := db.LoadSDType(t)
-				if res.IsFailure() {
-					return nil, fmt.Errorf("sdType not found: %d", t)
-				}
-				allowedTypeIDs[t] = struct{}{}
+		for _, uid := range filter.SdInstanceUIDs {
+			res := db.LoadSDInstanceBasedOnUID(uid)
+			if res.IsFailure() {
+				return nil, res.GetError()
 			}
-
-			for t := range instanceTypeIDs {
-				if _, ok := allowedTypeIDs[t]; !ok {
-					return nil, fmt.Errorf("sdInstances do not belong to provided sdTypeIDs")
-				}
+			instanceOptional := res.GetPayload()
+			if instanceOptional.IsEmpty() {
+				return nil, fmt.Errorf("sdInstance not found: %s", uid)
 			}
+			instance := instanceOptional.GetPayload()
+			if instance.ID.IsEmpty() {
+				return nil, fmt.Errorf("sdInstance loaded by UID has no internal ID: %s", uid)
+			}
+			allowedInstanceUIDs[instance.UID] = struct{}{}
+			instanceTypeUIDs[instance.SDType.UID] = struct{}{}
+		}
+	}
+	if len(filter.SdTypeUIDs) > 0 {
+		if allowedTypeUIDs == nil {
+			allowedTypeUIDs = make(map[string]struct{})
+		}
+		for _, uid := range filter.SdTypeUIDs {
+			res := db.LoadSDTypeBasedOnUID(uid)
+			if res.IsFailure() {
+				return nil, res.GetError()
+			}
+			sdType := res.GetPayload()
+			if sdType.ID.IsEmpty() {
+				return nil, fmt.Errorf("sdType loaded by UID has no internal ID: %s", uid)
+			}
+			allowedTypeUIDs[sdType.UID] = struct{}{}
+		}
+	}
+	if len(instanceTypeUIDs) > 0 {
+		if allowedTypeUIDs == nil {
+			allowedTypeUIDs = instanceTypeUIDs
 		} else {
-			allowedTypeIDs = instanceTypeIDs
-		}
-	}
-	if len(filter.SdTypeIDs) > 0 && allowedTypeIDs == nil {
-		allowedTypeIDs = make(map[uint32]struct{})
-		for _, t := range filter.SdTypeIDs {
-			res := db.LoadSDType(t)
-			if res.IsFailure() {
-				return nil, fmt.Errorf("sdType not found: %d", t)
+			for t := range instanceTypeUIDs {
+				if _, ok := allowedTypeUIDs[t]; !ok {
+					return nil, fmt.Errorf("sdInstances do not belong to provided sdTypes")
+				}
 			}
-			allowedTypeIDs[t] = struct{}{}
 		}
 	}
-	if allowedInstanceIDs == nil && allowedTypeIDs == nil {
+	if allowedInstanceUIDs == nil && allowedTypeUIDs == nil {
 		return func(_ []graphQLModel.RawDataPoint) bool { return true }, nil
 	}
-	if allowedInstanceIDs != nil && allowedTypeIDs == nil {
+	if allowedInstanceUIDs != nil && allowedTypeUIDs == nil {
 		return func(arr []graphQLModel.RawDataPoint) bool {
 			for _, p := range arr {
-				if _, ok := allowedInstanceIDs[p.SdInstanceID]; ok {
+				if _, ok := allowedInstanceUIDs[p.SdInstanceUID]; ok {
 					return true
 				}
 			}
 			return false
 		}, nil
 	}
-	if allowedInstanceIDs == nil && allowedTypeIDs != nil {
+	if allowedInstanceUIDs == nil && allowedTypeUIDs != nil {
 		return func(arr []graphQLModel.RawDataPoint) bool {
 			for _, p := range arr {
-				if _, ok := allowedTypeIDs[p.SdTypeID]; ok {
+				if _, ok := allowedTypeUIDs[p.SdTypeUID]; ok {
 					return true
 				}
 			}
@@ -165,10 +177,10 @@ func BuildRawDataPointArrivedFilter(_ uint32, filter *graphQLModel.RawDataPointA
 	}
 	return func(arr []graphQLModel.RawDataPoint) bool {
 		for _, p := range arr {
-			if _, ok := allowedTypeIDs[p.SdTypeID]; !ok {
+			if _, ok := allowedTypeUIDs[p.SdTypeUID]; !ok {
 				continue
 			}
-			if _, ok := allowedInstanceIDs[p.SdInstanceID]; ok {
+			if _, ok := allowedInstanceUIDs[p.SdInstanceUID]; ok {
 				return true
 			}
 		}
@@ -182,49 +194,74 @@ func BuildKPIFulfillmentCheckedFilter(userID uint32, filter *graphQLModel.KPIFul
 	if userKPIsResult.IsFailure() {
 		return nil, userKPIsResult.GetError()
 	}
-	userKPISet := make(map[uint32]struct{})
+	userKPISet := make(map[string]struct{})
 	for _, k := range userKPIsResult.GetPayload() {
-		if k.ID != nil {
-			userKPISet[*k.ID] = struct{}{}
+		if k.UID != nil {
+			userKPISet[*k.UID] = struct{}{}
 		}
 	}
-	var allowedInstanceIDs map[uint32]struct{}
-	var allowedTypeIDs map[uint32]struct{}
-	var allowedKPIIDs map[uint32]struct{}
-	if filter != nil && len(filter.SdInstanceIDs) > 0 {
-		allowedInstanceIDs = make(map[uint32]struct{})
-		for _, id := range filter.SdInstanceIDs {
-			res := db.LoadSDInstance(id)
+	var allowedInstanceUIDs map[string]struct{}
+	var allowedTypeUIDs map[string]struct{}
+	var allowedKPIUIDs map[string]struct{}
+	if filter != nil && len(filter.SdInstanceUIDs) > 0 {
+		if allowedInstanceUIDs == nil {
+			allowedInstanceUIDs = make(map[string]struct{})
+		}
+		for _, uid := range filter.SdInstanceUIDs {
+			res := db.LoadSDInstanceBasedOnUID(uid)
 			if res.IsFailure() {
-				return nil, fmt.Errorf("sdInstance not found: %d", id)
+				return nil, res.GetError()
 			}
-			allowedInstanceIDs[id] = struct{}{}
+			instanceOptional := res.GetPayload()
+			if instanceOptional.IsEmpty() {
+				return nil, fmt.Errorf("sdInstance not found: %s", uid)
+			}
+			instance := instanceOptional.GetPayload()
+			if instance.ID.IsEmpty() {
+				return nil, fmt.Errorf("sdInstance loaded by UID has no internal ID: %s", uid)
+			}
+			allowedInstanceUIDs[instance.UID] = struct{}{}
 		}
 	}
-	if filter != nil && len(filter.SdTypeIDs) > 0 {
-		allowedTypeIDs = make(map[uint32]struct{})
-		for _, t := range filter.SdTypeIDs {
-			res := db.LoadSDType(t)
+	if filter != nil && len(filter.SdTypeUIDs) > 0 {
+		if allowedTypeUIDs == nil {
+			allowedTypeUIDs = make(map[string]struct{})
+		}
+		for _, uid := range filter.SdTypeUIDs {
+			res := db.LoadSDTypeBasedOnUID(uid)
 			if res.IsFailure() {
-				return nil, fmt.Errorf("sdType not found: %d", t)
+				return nil, res.GetError()
 			}
-			allowedTypeIDs[t] = struct{}{}
+			sdType := res.GetPayload()
+			if sdType.ID.IsEmpty() {
+				return nil, fmt.Errorf("sdType loaded by UID has no internal ID: %s", uid)
+			}
+			allowedTypeUIDs[sdType.UID] = struct{}{}
 		}
 	}
-	if filter != nil && len(filter.KpiDefinitions) > 0 {
-		allowedKPIIDs = make(map[uint32]struct{})
-
-		for _, id := range filter.KpiDefinitions {
-			if _, ok := userKPISet[id]; !ok {
-				return nil, fmt.Errorf("kpiDefinition not accessible: %d", id)
+	if filter != nil && len(filter.KpiDefinitionUIDs) > 0 {
+		if allowedKPIUIDs == nil {
+			allowedKPIUIDs = make(map[string]struct{})
+		}
+		for _, uid := range filter.KpiDefinitionUIDs {
+			res := db.LoadKPIDefinitionByUID(userID, uid)
+			if res.IsFailure() {
+				return nil, res.GetError()
 			}
-			allowedKPIIDs[id] = struct{}{}
+			kpiDefinition := res.GetPayload()
+			if kpiDefinition.ID == nil {
+				return nil, fmt.Errorf("kpiDefinition loaded by UID has no internal ID: %s", uid)
+			}
+			if kpiDefinition.UID == nil {
+				return nil, fmt.Errorf("kpiDefinition loaded by UID has no UID: %s", uid)
+			}
+			allowedKPIUIDs[*kpiDefinition.UID] = struct{}{}
 		}
 	}
-	if filter == nil || (allowedInstanceIDs == nil && allowedTypeIDs == nil && allowedKPIIDs == nil) {
+	if filter == nil || (allowedInstanceUIDs == nil && allowedTypeUIDs == nil && allowedKPIUIDs == nil) {
 		return func(arr []graphQLModel.KPIFulfillmentCheckResult) bool {
 			for _, p := range arr {
-				if _, ok := userKPISet[p.KpiDefinitionID]; ok {
+				if _, ok := userKPISet[p.KpiDefinitionUID]; ok {
 					return true
 				}
 			}
@@ -233,21 +270,21 @@ func BuildKPIFulfillmentCheckedFilter(userID uint32, filter *graphQLModel.KPIFul
 	}
 	return func(arr []graphQLModel.KPIFulfillmentCheckResult) bool {
 		for _, p := range arr {
-			if _, ok := userKPISet[p.KpiDefinitionID]; !ok {
+			if _, ok := userKPISet[p.KpiDefinitionUID]; !ok {
 				continue
 			}
-			if allowedInstanceIDs != nil {
-				if _, ok := allowedInstanceIDs[p.SdInstanceID]; !ok {
+			if allowedInstanceUIDs != nil {
+				if _, ok := allowedInstanceUIDs[p.SdInstanceUID]; !ok {
 					continue
 				}
 			}
-			if allowedTypeIDs != nil {
-				if _, ok := allowedTypeIDs[p.SdTypeID]; !ok {
+			if allowedTypeUIDs != nil {
+				if _, ok := allowedTypeUIDs[p.SdTypeUID]; !ok {
 					continue
 				}
 			}
-			if allowedKPIIDs != nil {
-				if _, ok := allowedKPIIDs[p.KpiDefinitionID]; !ok {
+			if allowedKPIUIDs != nil {
+				if _, ok := allowedKPIUIDs[p.KpiDefinitionUID]; !ok {
 					continue
 				}
 			}
@@ -258,15 +295,19 @@ func BuildKPIFulfillmentCheckedFilter(userID uint32, filter *graphQLModel.KPIFul
 }
 
 func BuildTimeSeriesExportFilter(filter *graphQLModel.TimeSeriesExportFilter) (func(graphQLModel.TimeSeriesExport) bool, error) {
-	if filter == nil || len(filter.Ids) == 0 {
-		return nil, fmt.Errorf("timeSeries export subscription requires at least one id")
+	if filter == nil || len(filter.Uids) == 0 {
+		return nil, fmt.Errorf("timeSeries export subscription requires at least one uid")
 	}
-	allowedIDs := make(map[uint32]struct{}, len(filter.Ids))
-	for _, id := range filter.Ids {
-		allowedIDs[id] = struct{}{}
+	allowedUIDs := make(map[string]struct{}, len(filter.Uids))
+	for _, uid := range filter.Uids {
+		normalizedUID, _, normalizeErr := sharedUtils.NormalizePrefixedUID(uid, "exp", "time series export")
+		if normalizeErr != nil {
+			return nil, normalizeErr
+		}
+		allowedUIDs[normalizedUID] = struct{}{}
 	}
 	return func(export graphQLModel.TimeSeriesExport) bool {
-		_, ok := allowedIDs[export.ID]
+		_, ok := allowedUIDs[export.UID]
 		return ok
 	}, nil
 }

@@ -32,7 +32,7 @@ import {
 import { virtualizedSelectProps } from "../../../utils/reactSelectVirtualized";
 
 type Props = {
-  kpiId?: string;
+  kpiUID?: string;
 };
 
 type Option = {
@@ -41,36 +41,57 @@ type Option = {
   searchText?: string;
 };
 
-export default function KpiEditorForm({ kpiId }: Props) {
+function extractScopedUIDSuffix(
+  uid: string | null | undefined,
+  scopeUID: string | null | undefined,
+  childPrefix: string,
+) {
+  const trimmedUID = String(uid ?? "").trim();
+  const trimmedScopeUID = String(scopeUID ?? "").trim();
+  const prefix = `${trimmedScopeUID}.${childPrefix}:`;
+  if (trimmedScopeUID && trimmedUID.startsWith(prefix)) {
+    return trimmedUID.slice(prefix.length);
+  }
+  const childOnlyPrefix = `${childPrefix}:`;
+  if (trimmedUID.startsWith(childOnlyPrefix)) {
+    return trimmedUID.slice(childOnlyPrefix.length);
+  }
+  return trimmedUID;
+}
+
+export default function KpiEditorForm({ kpiUID }: Props) {
   const navigate = useNavigate();
-  const isEdit = !!kpiId;
+  const isEdit = !!kpiUID;
 
   const { sdTypes, loading: sdTypesLoading } = useSdTypes();
   const { createKpi } = useCreateKpi();
   const { updateKpi } = useUpdateKpi();
   const { deleteKpi } = useDeleteKpi();
-  const { kpi, loading: kpiLoading } = useKpiDefinition(kpiId);
+  const { kpi, loading: kpiLoading } = useKpiDefinition(kpiUID);
 
   const [label, setLabel] = useState("");
-  const [sdTypeID, setSdTypeID] = useState<string | null>(null);
+  const [uidSuffix, setUidSuffix] = useState("");
+  const [sdTypeUID, setSdTypeUID] = useState<string | null>(null);
   const [mode, setMode] = useState<"all" | "selected">("all");
-  const [selectedInstanceIds, setSelectedInstanceIds] = useState<string[]>([]);
+  const [selectedInstanceUIDs, setSelectedInstanceUIDs] = useState<string[]>(
+    [],
+  );
   const [query, setQuery] = useState<any>(null);
   const [initialQuery, setInitialQuery] = useState<any>(null);
 
   const selectedType = useMemo(
-    () => sdTypes.find((t) => String(t.id) === String(sdTypeID)),
-    [sdTypes, sdTypeID],
+    () => sdTypes.find((t) => String(t.uid) === String(sdTypeUID)),
+    [sdTypes, sdTypeUID],
   );
 
   const { entry: instancesEntry, loading: instancesLoading } =
-    useSdInstancesByType(sdTypeID);
+    useSdInstancesByType(selectedType?.uid ?? null);
 
   const parameters = useMemo(() => {
     if (!selectedType) return [];
 
     return selectedType.parameters.map((p) => ({
-      id: String(p.id),
+      id: String(p.denotation),
       denotation: p.denotation,
       label: p.label,
       role: String(p.role).toLowerCase() === "tag" ? "tag" : "field",
@@ -92,9 +113,9 @@ export default function KpiEditorForm({ kpiId }: Props) {
   const sdTypeOptions: Option[] = useMemo(
     () =>
       sdTypes.map((t) => ({
-        value: String(t.id),
-        label: t.label ?? "",
-        searchText: buildOptionSearchText(t.label, t.uid, String(t.id)),
+        value: String(t.uid),
+        label: t.label || t.uid || "",
+        searchText: buildOptionSearchText(t.label, t.uid),
       })),
     [sdTypes],
   );
@@ -107,36 +128,37 @@ export default function KpiEditorForm({ kpiId }: Props) {
   const instanceOptions: Option[] = useMemo(
     () =>
       (instancesEntry?.rawSortedAsc ?? []).map((i) => ({
-        value: String(i.id),
+        value: String(i.uid),
         label: i.label || i.uid,
-        searchText: buildOptionSearchText(i.label, i.uid, String(i.id)),
+        searchText: buildOptionSearchText(i.label, i.uid),
       })),
     [instancesEntry],
   );
 
   const selectedInstanceOptions = useMemo(() => {
-    return selectedInstanceIds.map((id) => {
-      const found = instanceOptions.find((o) => o.value === id);
-      return found ?? { value: id, label: id };
+    return selectedInstanceUIDs.map((uid) => {
+      const found = instanceOptions.find((o) => o.value === uid);
+      return found ?? { value: uid, label: uid };
     });
-  }, [selectedInstanceIds, instanceOptions]);
+  }, [selectedInstanceUIDs, instanceOptions]);
 
   useEffect(() => {
     if (!kpi) return;
     if (!sdTypes.length) return;
 
-    const nextSdTypeID = String(kpi.sdTypeID);
-    const type = sdTypes.find((t) => String(t.id) === nextSdTypeID);
+    const type = sdTypes.find((t) => String(t.uid) === String(kpi.sdTypeUID));
     if (!type) return;
+    const nextSdTypeUID = String(type.uid);
 
     setLabel(kpi.label ?? "");
-    setSdTypeID(nextSdTypeID);
+    setUidSuffix(extractScopedUIDSuffix(kpi.uid, nextSdTypeUID, "kpi"));
+    setSdTypeUID(nextSdTypeUID);
 
     const backendMode = String(kpi.sdInstanceMode).toLowerCase();
     setMode(backendMode === "selected" ? "selected" : "all");
 
-    setSelectedInstanceIds(
-      (kpi.selectedSDInstanceIDs ?? []).map((id) => String(id)),
+    setSelectedInstanceUIDs(
+      (kpi.selectedSDInstanceUIDs ?? []).map((uid) => String(uid)),
     );
 
     const mappedQuery = mapKPINodesToQuery(
@@ -150,10 +172,10 @@ export default function KpiEditorForm({ kpiId }: Props) {
   useEffect(() => {
     if (isEdit) return;
     if (!sdTypes.length) return;
-    if (sdTypeID) return;
+    if (sdTypeUID) return;
 
-    setSdTypeID(String(sdTypes[0].id));
-  }, [sdTypes, isEdit, sdTypeID]);
+    setSdTypeUID(String(sdTypes[0].uid));
+  }, [sdTypes, isEdit, sdTypeUID]);
 
   const hasRules = (q: any): boolean => {
     if (!q || !Array.isArray(q.rules)) return false;
@@ -164,7 +186,7 @@ export default function KpiEditorForm({ kpiId }: Props) {
     });
   };
 
-  if (sdTypesLoading || kpiLoading || (sdTypeID && instancesLoading)) {
+  if (sdTypesLoading || kpiLoading || (sdTypeUID && instancesLoading)) {
     return (
       <div className="d-flex vh-100 justify-content-center align-items-center">
         <div className="spinner-border text-primary" />
@@ -173,7 +195,7 @@ export default function KpiEditorForm({ kpiId }: Props) {
   }
 
   const handleSubmit = async () => {
-    if (!sdTypeID || !selectedType) {
+    if (!sdTypeUID || !selectedType) {
       toast.error("Select an SD type");
       return;
     }
@@ -185,7 +207,12 @@ export default function KpiEditorForm({ kpiId }: Props) {
       return;
     }
 
-    if (mode === "selected" && selectedInstanceIds.length === 0) {
+    if (uidSuffix.includes(".") || uidSuffix.includes(":")) {
+      toast.error("KPI UID suffix cannot contain dot or colon");
+      return;
+    }
+
+    if (mode === "selected" && selectedInstanceUIDs.length === 0) {
       toast.error("Select at least one instance");
       return;
     }
@@ -193,29 +220,29 @@ export default function KpiEditorForm({ kpiId }: Props) {
     const nodes = mapQueryToKPINodes(finalQuery, selectedType.parameters);
 
     const input = {
+      uid: uidSuffix.trim() || undefined,
       label,
-      sdTypeID,
       sdTypeUID: selectedType.uid,
       userIdentifier: "",
       nodes,
       sdInstanceMode: mode,
-      selectedSDInstanceIDs: mode === "selected" ? selectedInstanceIds : [],
+      selectedSDInstanceUIDs: mode === "selected" ? selectedInstanceUIDs : [],
     };
 
     try {
       let result;
 
-      if (isEdit && kpiId) {
-        result = await updateKpi(kpiId, kpi?.sdTypeID ?? "0", input);
+      if (isEdit && kpiUID) {
+        result = await updateKpi(kpiUID, kpi?.sdTypeUID ?? "", input);
         toast.success("KPI updated");
       } else {
         result = await createKpi(input);
         toast.success("KPI created");
       }
 
-      if (!result?.id) throw new Error("Missing ID");
+      if (!result?.uid) throw new Error("Missing UID");
 
-      navigate(`/kpi/${result.id}`);
+      navigate(`/kpi/${result.uid}`);
     } catch (e) {
       console.error(e);
       toast.error("Failed to save KPI");
@@ -223,13 +250,13 @@ export default function KpiEditorForm({ kpiId }: Props) {
   };
 
   const handleDelete = async () => {
-    if (!kpiId) return;
+    if (!kpiUID) return;
 
     const confirmed = window.confirm("Do you really want to delete KPI?");
     if (!confirmed) return;
 
     try {
-      const ok = await deleteKpi(kpiId, kpi?.sdTypeID ?? "0");
+      const ok = await deleteKpi(kpiUID, kpi?.sdTypeUID ?? "");
 
       if (!ok) throw new Error("Delete failed");
 
@@ -259,12 +286,15 @@ export default function KpiEditorForm({ kpiId }: Props) {
             classNamePrefix="react-select"
             options={sdTypeOptions}
             value={
-              sdTypeOptions.find((o) => o.value === String(sdTypeID)) ?? null
+              sdTypeOptions.find((o) => o.value === String(sdTypeUID)) ?? null
             }
             onChange={(v) => {
               const value = v ? v.value : null;
-              setSdTypeID(value);
-              setSelectedInstanceIds([]);
+              setSdTypeUID(value);
+              setUidSuffix((current) =>
+                extractScopedUIDSuffix(current, sdTypeUID, "kpi"),
+              );
+              setSelectedInstanceUIDs([]);
               setQuery(null);
               setInitialQuery(null);
             }}
@@ -273,6 +303,21 @@ export default function KpiEditorForm({ kpiId }: Props) {
             filterOption={filterSelectOption}
             {...virtualizedSelectProps}
           />
+        </div>
+
+        <div className="col-md-6">
+          <label className="form-label">UID</label>
+          <div className="input-group">
+            <span className="input-group-text">
+              {sdTypeUID ? `${sdTypeUID}.kpi:` : "sdt:type.kpi:"}
+            </span>
+            <input
+              className="form-control"
+              value={uidSuffix}
+              onChange={(e) => setUidSuffix(e.target.value)}
+              placeholder="uid-suffix"
+            />
+          </div>
         </div>
 
         <div className="col-md-6">
@@ -299,7 +344,7 @@ export default function KpiEditorForm({ kpiId }: Props) {
               options={instanceOptions}
               value={selectedInstanceOptions}
               onChange={(v: MultiValue<Option>) => {
-                setSelectedInstanceIds(v.map((item) => item.value));
+                setSelectedInstanceUIDs(v.map((item) => item.value));
               }}
               closeMenuOnSelect={false}
               filterOption={filterSelectOption}
@@ -309,7 +354,7 @@ export default function KpiEditorForm({ kpiId }: Props) {
         )}
       </div>
 
-      {sdTypeID && parameters.length > 0 && (
+      {sdTypeUID && parameters.length > 0 && (
         <div className="mt-4">
           <label className="form-label">Rules</label>
           <KpiQueryBuilder
@@ -322,10 +367,7 @@ export default function KpiEditorForm({ kpiId }: Props) {
 
       <div className="d-flex justify-content-end gap-2 mt-4">
         {isEdit && (
-          <button
-            className="btn btn-outline-danger"
-            onClick={handleDelete}
-          >
+          <button className="btn btn-outline-danger" onClick={handleDelete}>
             Delete
           </button>
         )}

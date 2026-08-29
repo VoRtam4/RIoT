@@ -26,6 +26,7 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/rabbitmq"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedConstants"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedModel"
+	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 	"github.com/google/uuid"
 	"github.com/rabbitmq/amqp091-go"
 )
@@ -36,6 +37,13 @@ type timeSeriesRPCSession struct {
 	messages      <-chan amqp091.Delivery
 	correlationID string
 	replyTo       string
+}
+
+type resolvedTimeSeriesInput struct {
+	sdTypeUID         string
+	sdInstanceUIDs    []string
+	kpiDefinitionUIDs []string
+	kpiDefinitionIDs  []uint32
 }
 
 func newTimeSeriesRPCSession(correlationID string) (*timeSeriesRPCSession, error) {
@@ -97,38 +105,59 @@ func (s *timeSeriesRPCSession) PublishDistinctTagValuesRequest(req sharedModel.T
 }
 
 func buildTimeSeriesReadRequest(userID uint32, input graphQLModel.TimeSeriesReadInput) (sharedModel.TimeSeriesReadRequest, error) {
-	sdTypeUID, instanceUIDs, err := resolveAndValidate(userID, input.Type, input.SdTypeID, input.SdInstanceIDs, input.KpiDefinitionIDs)
+	resolved, err := resolveAndValidate(
+		userID,
+		input.Type,
+		input.SdTypeUID,
+		input.SdInstanceUIDs,
+		input.KpiDefinitionUIDs,
+	)
 	if err != nil {
 		return sharedModel.TimeSeriesReadRequest{}, err
 	}
 	if input.Type == graphQLModel.TimeSeriesTypeKpi {
-		if err := validateRequestedKPIDefinitions(userID, input.KpiDefinitionIDs); err != nil {
+		if err := validateRequestedKPIDefinitions(userID, resolved.kpiDefinitionIDs); err != nil {
 			return sharedModel.TimeSeriesReadRequest{}, err
 		}
 	}
-	return gql2dll.ToDLLTimeSeriesReadRequest(input, sdTypeUID, instanceUIDs), nil
+	input.SdInstanceUIDs = resolved.sdInstanceUIDs
+	return gql2dll.ToDLLTimeSeriesReadRequest(input, resolved.sdTypeUID, resolved.kpiDefinitionUIDs), nil
 }
 
 func buildTimeSeriesAggregateReadRequest(userID uint32, input graphQLModel.TimeSeriesReadAggregateKPIInput) (sharedModel.TimeSeriesReadRequest, error) {
-	sdTypeUID, instanceUIDs, err := resolveAndValidate(userID, graphQLModel.TimeSeriesTypeKpi, input.SdTypeID, input.SdInstanceIDs, input.KpiDefinitionIDs)
+	resolved, err := resolveAndValidate(
+		userID,
+		graphQLModel.TimeSeriesTypeKpi,
+		input.SdTypeUID,
+		input.SdInstanceUIDs,
+		input.KpiDefinitionUIDs,
+	)
 	if err != nil {
 		return sharedModel.TimeSeriesReadRequest{}, err
 	}
-	if err := validateRequestedKPIDefinitions(userID, input.KpiDefinitionIDs); err != nil {
+	if err := validateRequestedKPIDefinitions(userID, resolved.kpiDefinitionIDs); err != nil {
 		return sharedModel.TimeSeriesReadRequest{}, err
 	}
-	return gql2dll.ToDLLTimeSeriesReadKPIRequest(input, sdTypeUID, instanceUIDs), nil
+	input.SdInstanceUIDs = resolved.sdInstanceUIDs
+	return gql2dll.ToDLLTimeSeriesReadKPIRequest(input, resolved.sdTypeUID, resolved.kpiDefinitionUIDs), nil
 }
 
 func buildTimeSeriesDistinctTagValuesRequest(userID uint32, input graphQLModel.TimeSeriesDistinctTagValuesInput) (sharedModel.TimeSeriesDistinctTagValuesRequest, error) {
-	sdTypeUID, instanceUIDs, err := resolveAndValidate(userID, input.Type, input.SdTypeID, input.SdInstanceIDs, input.KpiDefinitionIDs)
+	resolved, err := resolveAndValidate(
+		userID,
+		input.Type,
+		input.SdTypeUID,
+		input.SdInstanceUIDs,
+		input.KpiDefinitionUIDs,
+	)
 	if err != nil {
 		return sharedModel.TimeSeriesDistinctTagValuesRequest{}, err
 	}
-	if err := validateDistinctTagInput(userID, input); err != nil {
+	if err := validateDistinctTagInput(input, resolved.sdTypeUID); err != nil {
 		return sharedModel.TimeSeriesDistinctTagValuesRequest{}, err
 	}
-	return gql2dll.ToDLLTimeSeriesDistinctTagValuesRequest(input, sdTypeUID, instanceUIDs), nil
+	input.SdInstanceUIDs = resolved.sdInstanceUIDs
+	return gql2dll.ToDLLTimeSeriesDistinctTagValuesRequest(input, resolved.sdTypeUID, resolved.kpiDefinitionUIDs), nil
 }
 
 func validateRequestedKPIDefinitions(userID uint32, kpiDefinitionIDs []uint32) error {
@@ -142,11 +171,16 @@ func validateRequestedKPIDefinitions(userID uint32, kpiDefinitionIDs []uint32) e
 	return nil
 }
 
-func loadParametersFromDB(timeSeriesType graphQLModel.TimeSeriesType, sdTypeID *uint32) []graphQLModel.TimeSeriesParameter {
-	if sdTypeID == nil {
+func loadParametersFromDB(timeSeriesType graphQLModel.TimeSeriesType, sdTypeUID *string) []graphQLModel.TimeSeriesParameter {
+	if sdTypeUID == nil {
 		return nil
 	}
-	res := dbClient.GetRelationalDatabaseClientInstance().LoadSDType(*sdTypeID)
+	normalizedSDTypeUID, normalizeErr := normalizeSDTypeUID(*sdTypeUID)
+	if normalizeErr != nil {
+		return nil
+	}
+	db := dbClient.GetRelationalDatabaseClientInstance()
+	res := db.LoadSDTypeBasedOnUID(normalizedSDTypeUID)
 	if res.IsFailure() {
 		return nil
 	}
@@ -181,7 +215,7 @@ func loadParametersFromDB(timeSeriesType graphQLModel.TimeSeriesType, sdTypeID *
 	if timeSeriesType == graphQLModel.TimeSeriesTypeKpi {
 		params = append(params,
 			graphQLModel.TimeSeriesParameter{
-				Denotation: "kpiDefinitionID",
+				Denotation: "kpiDefinitionUID",
 				Label:      "KpiDefinition",
 				Role:       graphQLModel.ParameterRoleMeta,
 			},
@@ -242,9 +276,9 @@ func mapToGraphQLResponse(resp sharedModel.TimeSeriesReadResponse, params []grap
 	var cursor *graphQLModel.TimeSeriesCursor
 	if resp.NextCursor != nil {
 		cursor = &graphQLModel.TimeSeriesCursor{
-			Time:            resp.NextCursor.Time.Format(time.RFC3339Nano),
-			SdInstanceUID:   resp.NextCursor.SDInstanceUID,
-			KpiDefinitionID: resp.NextCursor.KPIDefinitionID,
+			Time:             resp.NextCursor.Time.Format(time.RFC3339Nano),
+			SdInstanceUID:    resp.NextCursor.SDInstanceUID,
+			KpiDefinitionUID: resp.NextCursor.KPIDefinitionUID,
 		}
 	}
 	return graphQLModel.TimeSeriesReadResponse{
@@ -258,43 +292,26 @@ func mapToGraphQLResponse(resp sharedModel.TimeSeriesReadResponse, params []grap
 	}
 }
 
-func validateDistinctTagInput(userID uint32, input graphQLModel.TimeSeriesDistinctTagValuesInput) error {
+func validateDistinctTagInput(input graphQLModel.TimeSeriesDistinctTagValuesInput, sdTypeUID string) error {
 	if strings.TrimSpace(input.Tag) == "" {
 		return fmt.Errorf("tag must be specified")
 	}
 
 	db := dbClient.GetRelationalDatabaseClientInstance()
-	var sdType dllModel.SDType
-	var loaded bool
-
-	if input.SdTypeID != nil {
-		res := db.LoadSDType(*input.SdTypeID)
-		if res.IsFailure() {
-			return res.GetError()
-		}
-		sdType = res.GetPayload()
-		loaded = true
-	} else if input.Type == graphQLModel.TimeSeriesTypeKpi && len(input.KpiDefinitionIDs) > 0 {
-		res := db.LoadKPIDefinition(userID, input.KpiDefinitionIDs[0])
-		if res.IsFailure() {
-			return res.GetError()
-		}
-		kpiDefinition := res.GetPayload()
-		sdTypeResult := db.LoadSDType(kpiDefinition.SDTypeID)
-		if sdTypeResult.IsFailure() {
-			return sdTypeResult.GetError()
-		}
-		sdType = sdTypeResult.GetPayload()
-		loaded = true
+	normalizedSDTypeUID, normalizeErr := normalizeSDTypeUID(sdTypeUID)
+	if normalizeErr != nil {
+		return normalizeErr
 	}
-	if !loaded {
-		return fmt.Errorf("unable to resolve sdType for tag validation")
+	sdTypeResult := db.LoadSDTypeBasedOnUID(normalizedSDTypeUID)
+	if sdTypeResult.IsFailure() {
+		return sdTypeResult.GetError()
 	}
+	sdType := sdTypeResult.GetPayload()
 	allowedTags := map[string]bool{
 		"sdInstanceUID": true,
 	}
 	if input.Type == graphQLModel.TimeSeriesTypeKpi {
-		allowedTags["kpiDefinitionID"] = true
+		allowedTags["kpiDefinitionUID"] = true
 	}
 	for _, parameter := range sdType.Parameters {
 		if parameter.Role == dllModel.SDParameterRoleTag {
@@ -314,61 +331,100 @@ func toErrorPtr(err string) *string {
 	return &err
 }
 
-func resolveAndValidate(userID uint32, timeSeriesType graphQLModel.TimeSeriesType, sdTypeIDInput *uint32, sdInstanceIDs []uint32, kpiDefinitionIDs []uint32) (string, []string, error) {
+func resolveAndValidate(userID uint32, timeSeriesType graphQLModel.TimeSeriesType, sdTypeUIDInput *string, sdInstanceUIDInputs []string, kpiDefinitionUIDInputs []string) (resolvedTimeSeriesInput, error) {
 	db := dbClient.GetRelationalDatabaseClientInstance()
 	var sdTypeID *uint32
 	var sdTypeUID string
-	if sdTypeIDInput != nil {
-		res := db.LoadSDType(*sdTypeIDInput)
-		if res.IsFailure() {
-			return "", nil, res.GetError()
+	if sdTypeUIDInput != nil && strings.TrimSpace(*sdTypeUIDInput) != "" {
+		normalizedUID, normalizeErr := normalizeSDTypeUID(*sdTypeUIDInput)
+		if normalizeErr != nil {
+			return resolvedTimeSeriesInput{}, normalizeErr
 		}
-		sdTypeID = sdTypeIDInput
-		sdTypeUID = res.GetPayload().UID
+		res := db.LoadSDTypeBasedOnUID(normalizedUID)
+		if res.IsFailure() {
+			return resolvedTimeSeriesInput{}, res.GetError()
+		}
+		loadedSDType := res.GetPayload()
+		loadedID := loadedSDType.ID.GetPayload()
+		sdTypeID = &loadedID
+		sdTypeUID = loadedSDType.UID
 	}
 	var kpis []sharedModel.KPIDefinition
-	if len(kpiDefinitionIDs) > 0 {
-		for _, id := range kpiDefinitionIDs {
-			res := db.LoadKPIDefinition(userID, id)
-			if res.IsFailure() {
-				return "", nil, res.GetError()
+	kpiDefinitionUIDs := make([]string, 0, len(kpiDefinitionUIDInputs))
+	kpiDefinitionIDs := make([]uint32, 0, len(kpiDefinitionUIDInputs))
+	if len(kpiDefinitionUIDInputs) > 0 {
+		for _, uid := range kpiDefinitionUIDInputs {
+			trimmedUID := strings.TrimSpace(uid)
+			if trimmedUID == "" {
+				return resolvedTimeSeriesInput{}, fmt.Errorf("kpiDefinitionUID must not be empty")
 			}
-			kpis = append(kpis, res.GetPayload())
+			res := db.LoadKPIDefinitionByUID(userID, trimmedUID)
+			if res.IsFailure() {
+				return resolvedTimeSeriesInput{}, res.GetError()
+			}
+			kpi := res.GetPayload()
+			if kpi.ID == nil {
+				return resolvedTimeSeriesInput{}, fmt.Errorf("KPI definition loaded by UID has no internal ID: %s", trimmedUID)
+			}
+			kpis = append(kpis, kpi)
+			kpiDefinitionUIDs = append(kpiDefinitionUIDs, trimmedUID)
+			kpiDefinitionIDs = append(kpiDefinitionIDs, *kpi.ID)
 		}
+	}
+	if len(kpis) > 0 {
 		kpiSDType := kpis[0].SDTypeID
 		for _, kpi := range kpis {
 			if kpi.SDTypeID != kpiSDType {
-				return "", nil, fmt.Errorf("all KPI definitions must belong to the same SDType")
+				return resolvedTimeSeriesInput{}, fmt.Errorf("all KPI definitions must belong to the same SDType")
 			}
 		}
 		if sdTypeID == nil {
 			sdTypeID = &kpiSDType
 			res := db.LoadSDType(kpiSDType)
 			if res.IsFailure() {
-				return "", nil, res.GetError()
+				return resolvedTimeSeriesInput{}, res.GetError()
 			}
 			sdTypeUID = res.GetPayload().UID
 		} else if *sdTypeID != kpiSDType {
-			return "", nil, fmt.Errorf("sdType does not match KPI definitions")
+			return resolvedTimeSeriesInput{}, fmt.Errorf("sdType does not match KPI definitions")
 		}
 	}
 	if timeSeriesType == graphQLModel.TimeSeriesTypeRaw && sdTypeID == nil {
-		return "", nil, fmt.Errorf("sdTypeID must be specified for RAW")
+		return resolvedTimeSeriesInput{}, fmt.Errorf("sdTypeUID must be specified for RAW")
 	}
 	if timeSeriesType == graphQLModel.TimeSeriesTypeKpi && sdTypeID == nil && len(kpis) == 0 {
-		return "", nil, fmt.Errorf("either sdTypeID or kpiDefinitionIDs must be specified")
+		return resolvedTimeSeriesInput{}, fmt.Errorf("either sdTypeUID or kpiDefinitionUIDs must be specified")
 	}
-	instanceUIDs := make([]string, 0, len(sdInstanceIDs))
-	for _, id := range sdInstanceIDs {
-		res := db.LoadSDInstance(id)
+	sdInstanceUIDs := make([]string, 0, len(sdInstanceUIDInputs))
+	for _, uid := range sdInstanceUIDInputs {
+		trimmedUID := strings.TrimSpace(uid)
+		if trimmedUID == "" {
+			return resolvedTimeSeriesInput{}, fmt.Errorf("sdInstanceUID must not be empty")
+		}
+		if sdTypeUID != "" {
+			normalizedUID, _, normalizeErr := sharedUtils.NormalizeScopedUID(trimmedUID, sdTypeUID, "sdi", "SD instance")
+			if normalizeErr != nil {
+				return resolvedTimeSeriesInput{}, normalizeErr
+			}
+			trimmedUID = normalizedUID
+		}
+		res := db.LoadSDInstanceBasedOnUID(trimmedUID)
 		if res.IsFailure() {
-			return "", nil, res.GetError()
+			return resolvedTimeSeriesInput{}, res.GetError()
 		}
-		instance := res.GetPayload()
+		if res.GetPayload().IsEmpty() {
+			return resolvedTimeSeriesInput{}, fmt.Errorf("couldn't find SD instance for UID: %s", trimmedUID)
+		}
+		instance := res.GetPayload().GetPayload()
 		if sdTypeID != nil && instance.SDType.ID.GetPayload() != *sdTypeID {
-			return "", nil, fmt.Errorf("sdInstance %d does not belong to sdType", id)
+			return resolvedTimeSeriesInput{}, fmt.Errorf("sdInstance %s does not belong to sdType", trimmedUID)
 		}
-		instanceUIDs = append(instanceUIDs, instance.UID)
+		sdInstanceUIDs = append(sdInstanceUIDs, instance.UID)
 	}
-	return sdTypeUID, instanceUIDs, nil
+	return resolvedTimeSeriesInput{
+		sdTypeUID:         sdTypeUID,
+		sdInstanceUIDs:    sdInstanceUIDs,
+		kpiDefinitionUIDs: kpiDefinitionUIDs,
+		kpiDefinitionIDs:  kpiDefinitionIDs,
+	}, nil
 }

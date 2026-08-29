@@ -21,9 +21,9 @@ import { colors } from "../../../theme/colors";
 import EmptyStateNotice from "../../../components/EmptyStateNotice";
 
 type Props = {
-  kpiDefinitionID?: string;
-  sdInstanceID?: string | null;
-  sdTypeID?: string | null;
+  kpiDefinitionUID?: string | null;
+  sdInstanceUID?: string | null;
+  sdTypeUID?: string | null;
   from: string;
   to: string;
   onFromChange: (value: string) => void;
@@ -31,8 +31,7 @@ type Props = {
 };
 
 function computeAggregateSeconds(from: string, to: string) {
-  const diff =
-    (new Date(to).getTime() - new Date(from).getTime()) / 1000;
+  const diff = (new Date(to).getTime() - new Date(from).getTime()) / 1000;
 
   if (diff <= 50) return 1;
 
@@ -40,9 +39,9 @@ function computeAggregateSeconds(from: string, to: string) {
 }
 
 export default function KpiResultHistoryPanel({
-  kpiDefinitionID,
-  sdInstanceID,
-  sdTypeID,
+  kpiDefinitionUID,
+  sdInstanceUID,
+  sdTypeUID,
   from,
   to,
   onFromChange,
@@ -60,17 +59,15 @@ export default function KpiResultHistoryPanel({
     return () => clearTimeout(t);
   }, [from, to]);
 
-  const safeInstanceID = sdInstanceID ?? undefined;
+  const safeInstanceUID = sdInstanceUID ?? undefined;
+  const safeKpiDefinitionUID = kpiDefinitionUID ?? undefined;
 
-  const { result } = useKpiResult(kpiDefinitionID, safeInstanceID);
-  const { latest } = useKpiSubscription(kpiDefinitionID, safeInstanceID);
+  const { result } = useKpiResult(safeKpiDefinitionUID, safeInstanceUID);
+  const { latest } = useKpiSubscription(safeKpiDefinitionUID, safeInstanceUID);
 
   const liveResult = latest ?? result;
 
-  const aggregateSeconds = computeAggregateSeconds(
-    debouncedFrom,
-    debouncedTo,
-  );
+  const aggregateSeconds = computeAggregateSeconds(debouncedFrom, debouncedTo);
 
   const tsQuery = useTimeSeriesAggregateKpi(
     {
@@ -78,11 +75,11 @@ export default function KpiResultHistoryPanel({
       to: toUTCString(debouncedTo),
       aggregateSeconds,
 
-      kpiDefinitionIDs: kpiDefinitionID ? [kpiDefinitionID] : [],
-      sdInstanceIDs: sdInstanceID ? [String(sdInstanceID)] : [],
-      sdTypeID: sdTypeID ? String(sdTypeID) : undefined,
+      kpiDefinitionUIDs: safeKpiDefinitionUID ? [safeKpiDefinitionUID] : [],
+      sdInstanceUIDs: safeInstanceUID ? [safeInstanceUID] : [],
+      sdTypeUID: sdTypeUID ? String(sdTypeUID) : undefined,
     },
-    !!kpiDefinitionID && !!sdInstanceID,
+    !!safeKpiDefinitionUID && !!safeInstanceUID,
   );
 
   const chartData = useMemo(() => {
@@ -156,7 +153,7 @@ export default function KpiResultHistoryPanel({
   const x = chartData.map((d) => d.time);
   const y = chartData.map((d) => d.value);
 
-  if (!sdInstanceID || ! kpiDefinitionID) {
+  if (!safeInstanceUID || !safeKpiDefinitionUID) {
     return (
       <div className="h-100 d-flex align-items-center">
         <EmptyStateNotice
@@ -171,7 +168,6 @@ export default function KpiResultHistoryPanel({
     <div className="h-100 d-flex flex-column">
       {/* TOP BAR */}
       <div className="row g-3 mb-3 align-items-center">
-
         {/* STATUS */}
         <div className="col-md-4 d-flex align-items-center gap-2 form-label">
           <div

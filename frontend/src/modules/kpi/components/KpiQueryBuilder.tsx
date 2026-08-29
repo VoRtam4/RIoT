@@ -13,6 +13,7 @@ import { useState, useEffect } from "react";
 import {
   QueryBuilder,
   type ValueSelectorProps,
+  type ValueEditorProps,
   type RuleGroupType,
   type RuleGroupTypeAny,
   type Field,
@@ -38,6 +39,12 @@ type Props = {
   parameters: SDParameter[];
   onChange?: (query: RuleGroupType) => void;
   initialQuery?: RuleGroupType | null;
+};
+
+type ParameterReferenceValue = {
+  mode: "parameter";
+  comparedSDParameterSpecification?: string;
+  comparedRecordOffset?: number;
 };
 
 const MyCombinatorSelector = (props: ValueSelectorProps) => {
@@ -95,6 +102,127 @@ const mapFields = (params: SDParameter[]): Field[] =>
         : undefined,
   }));
 
+const normalizeField = (field: string) =>
+  field?.startsWith("tag.") ? field.slice(4) : field;
+
+const isParameterReferenceValue = (
+  value: unknown,
+): value is ParameterReferenceValue =>
+  !!value &&
+  typeof value === "object" &&
+  (value as ParameterReferenceValue).mode === "parameter";
+
+const KpiValueEditor = ({
+  parameters,
+  ...props
+}: ValueEditorProps & { parameters: SDParameter[] }) => {
+  const selectedParameter = parameters.find(
+    (p) => String(p.denotation ?? p.id) === normalizeField(String(props.field)),
+  );
+  const compatibleParameters = parameters.filter(
+    (p) => p.type === selectedParameter?.type,
+  );
+  const parameterValue = isParameterReferenceValue(props.value)
+    ? props.value
+    : null;
+  const referenceMode = parameterValue ? "parameter" : "literal";
+
+  const setParameterReference = (
+    comparedSpecification: string | undefined,
+    comparedRecordOffset = parameterValue?.comparedRecordOffset ?? 0,
+  ) => {
+    const comparedParameter =
+      compatibleParameters.find(
+        (p) => String(p.denotation ?? p.id) === String(comparedSpecification),
+      ) ??
+      compatibleParameters[0] ??
+      selectedParameter;
+
+    props.handleOnChange({
+      mode: "parameter",
+      comparedSDParameterSpecification:
+        comparedParameter?.denotation ?? String(comparedParameter?.id ?? ""),
+      comparedRecordOffset,
+    });
+  };
+
+  const setReferenceMode = (mode: "literal" | "parameter") => {
+    if (mode === "parameter") {
+      setParameterReference(parameterValue?.comparedSDParameterSpecification);
+      return;
+    }
+    props.handleOnChange(selectedParameter?.type === "boolean" ? "true" : "");
+  };
+
+  const literalValue = parameterValue ? "" : (props.value ?? "");
+
+  return (
+    <div className="d-flex flex-grow-1 gap-2 align-items-center kpi-value-editor">
+      <select
+        className="form-select form-select-sm kpi-reference-mode-select"
+        value={referenceMode}
+        onChange={(e) =>
+          setReferenceMode(e.target.value as "literal" | "parameter")
+        }
+      >
+        <option value="literal">Value</option>
+        <option value="parameter">Parameter</option>
+      </select>
+
+      {parameterValue ? (
+        <>
+          <select
+            className="form-select form-select-sm"
+            value={String(
+              parameterValue.comparedSDParameterSpecification ?? "",
+            )}
+            onChange={(e) => setParameterReference(e.target.value)}
+          >
+            {compatibleParameters.map((p) => (
+              <option
+                key={String(p.denotation ?? p.id)}
+                value={String(p.denotation ?? p.id)}
+              >
+                {p.label ?? p.denotation ?? p.id}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="form-select form-select-sm kpi-record-offset-select"
+            value={String(parameterValue.comparedRecordOffset ?? 0)}
+            onChange={(e) =>
+              setParameterReference(
+                parameterValue.comparedSDParameterSpecification,
+                Number(e.target.value),
+              )
+            }
+          >
+            <option value="0">Current</option>
+            <option value="-1">Previous</option>
+          </select>
+        </>
+      ) : selectedParameter?.type === "boolean" ? (
+        <select
+          className="form-select form-select-sm"
+          value={String(literalValue)}
+          onChange={(e) => props.handleOnChange(e.target.value)}
+        >
+          <option value="true">True</option>
+          <option value="false">False</option>
+        </select>
+      ) : (
+        <input
+          className="form-control form-control-sm"
+          type={selectedParameter?.type === "number" ? "number" : "text"}
+          value={String(literalValue)}
+          onChange={(e) => props.handleOnChange(e.target.value)}
+        />
+      )}
+    </div>
+  );
+};
+
 export default function KpiQueryBuilder({
   parameters,
   onChange,
@@ -112,6 +240,9 @@ export default function KpiQueryBuilder({
   }, [initialQuery]);
 
   const fields = mapFields(parameters);
+  const ValueEditor = (props: ValueEditorProps) => (
+    <KpiValueEditor {...props} parameters={parameters} />
+  );
 
   const handleChange = (q: RuleGroupTypeAny) => {
     const typed = q as RuleGroupType;
@@ -131,6 +262,20 @@ export default function KpiQueryBuilder({
           .drag-handle {
             color: white;
           }
+
+          .kpi-value-editor {
+            min-width: 260px;
+          }
+
+          .kpi-reference-mode-select {
+            width: auto;
+            flex: 0 0 auto;
+          }
+
+          .kpi-record-offset-select {
+            width: auto;
+            flex: 0 0 auto;
+          }
         `}
       </style>
 
@@ -145,6 +290,7 @@ export default function KpiQueryBuilder({
             showNotToggle
             controlElements={{
               combinatorSelector: MyCombinatorSelector,
+              valueEditor: ValueEditor,
             }}
           />
         </QueryBuilderDnD>

@@ -40,7 +40,7 @@ export default function TimeSeriesExportManager() {
   const setActiveExport = useTimeSeriesExportStore((s) => s.setActiveExport);
   const { cancelTimeSeriesExport } = useCancelTimeSeriesExport();
   const { getTimeSeriesExport } = useTimeSeriesExport();
-  const { latest } = useTimeSeriesExportSubscription(activeExport?.id);
+  const { latest } = useTimeSeriesExportSubscription(activeExport?.uid);
   const handledTerminalStateRef = useRef<string | null>(null);
   const syncedAfterSubscribeRef = useRef<string | null>(null);
 
@@ -50,7 +50,7 @@ export default function TimeSeriesExportManager() {
     }
 
     try {
-      const cancelled = await cancelTimeSeriesExport(activeExport.id);
+      const cancelled = await cancelTimeSeriesExport(activeExport.uid);
 
       if (cancelled) {
         setActiveExport(cancelled);
@@ -76,7 +76,7 @@ export default function TimeSeriesExportManager() {
       return;
     }
 
-    const syncKey = activeExport.id;
+    const syncKey = activeExport.uid;
     if (syncedAfterSubscribeRef.current === syncKey) {
       return;
     }
@@ -84,7 +84,7 @@ export default function TimeSeriesExportManager() {
 
     void (async () => {
       try {
-        const currentExport = await getTimeSeriesExport(activeExport.id);
+        const currentExport = await getTimeSeriesExport(activeExport.uid);
         if (currentExport) {
           setActiveExport(currentExport);
         }
@@ -119,7 +119,7 @@ export default function TimeSeriesExportManager() {
       return;
     }
 
-    const stateKey = `${activeExport.id}:${activeExport.status}`;
+    const stateKey = `${activeExport.uid}:${activeExport.status}`;
     if (handledTerminalStateRef.current === stateKey) {
       return;
     }
@@ -162,11 +162,14 @@ export default function TimeSeriesExportManager() {
     }
 
     const handleBeforeUnload = () => {
-      void fetch(`${apiEndpoints.rest}/time-series/export/${activeExport.id}`, {
-        method: "DELETE",
-        credentials: "include",
-        keepalive: true,
-      });
+      void fetch(
+        `${apiEndpoints.rest}/time-series/export/${activeExport.uid}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+          keepalive: true,
+        },
+      );
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);

@@ -16,13 +16,13 @@ import {
   type SdInstanceQueryVariables,
 } from "../../../generated/graphql";
 
-export const useSdInstance = (id?: string | null) => {
+export const useSdInstance = (uid?: string | null) => {
   const { data, loading, error } = useQuery<
     SdInstanceQuery,
     SdInstanceQueryVariables
   >(SdInstanceDocument, {
-    skip: !id,
-    variables: { id: id ?? "" },
+    skip: !uid,
+    variables: { uid: uid ?? "" },
     fetchPolicy: "cache-and-network",
   });
 

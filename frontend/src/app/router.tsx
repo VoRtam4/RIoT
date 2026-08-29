@@ -9,7 +9,7 @@
  *
  * @ingroup riot_frontend
  */
-import { createBrowserRouter } from "react-router-dom";
+import { Navigate, createBrowserRouter } from "react-router-dom";
 import LoginPage from "../pages/LoginPage";
 import DashboardPage from "../pages/DashboardPage";
 import APIKeysPage from "../pages/APIKeysPage";
@@ -52,7 +52,7 @@ export const router = createBrowserRouter([
         element: <KpiPage />,
       },
       {
-        path: "/kpi/:id",
+        path: "/kpi/:uid",
         element: <KpiDetailPage />,
       },
       {
@@ -60,7 +60,7 @@ export const router = createBrowserRouter([
         element: <KpiEditorPage />,
       },
       {
-        path: "/kpi/edit/:id",
+        path: "/kpi/edit/:uid",
         element: <KpiEditorPage />,
       },
       {
@@ -68,13 +68,21 @@ export const router = createBrowserRouter([
         element: <SdInstancePage />,
       },
       {
-        path: "/sd-instance/:id",
+        path: "/sd-instance/:uid",
         element: <SdInstanceDetailPage />,
       },
       {
         path: "/history",
         element: <TimeSeriesPage />,
       },
+      {
+        path: "*",
+        element: <Navigate to="/" replace />,
+      },
     ],
+  },
+  {
+    path: "*",
+    element: <Navigate to="/" replace />,
   },
 ]);

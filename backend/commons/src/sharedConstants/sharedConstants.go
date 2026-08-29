@@ -15,6 +15,8 @@ package sharedConstants
 
 const (
 	BuiltInFanoutExchangeName                             = "amq.fanout"
+	IngestExchangeName                                    = "ingest"
+	IngestQueueNamePrefix                                 = "ingest."
 	MessageProcessingUnitConnectionNotificationsQueueName = "message-processing-unit-connection-notifications"
 	RawDataPointCacheBootstrapQueueName                   = "raw-data-point-cache-bootstrap"
 	KPIFulfillmentCacheBootstrapQueueName                 = "kpi-fulfillment-cache-bootstrap"
@@ -34,8 +36,14 @@ const (
 	TimeSeriesDistinctTagValuesResponseQueueName          = "time-series-distinct-tag-values-response"
 	TimeSeriesReprocessReadRequestQueueName               = "time-series-reprocess-read-request"
 	TimeSeriesReprocessReadResponseQueueName              = "time-series-reprocess-read-response"
+	TimeSeriesRecordNeighborhoodRequestQueueName          = "time-series-record-neighborhood-request"
+	TimeSeriesLateRecordCorrectionQueueName               = "time-series-late-record-correction"
 	KPIReprocessRequestQueueName                          = "kpi-reprocess-requests"
 	TSDBDeleteQueueName                                   = "time-series-delete-requests-tsdb"
 	MPUDeleteQueueName                                    = "time-series-delete-requests-mpu"
 	KPIConfigUpdateQueueName                              = "kpi-config-update"
 )
+
+func IngestQueueName(sdTypeUID string) string {
+	return IngestQueueNamePrefix + sdTypeUID
+}

@@ -18,7 +18,10 @@ import TimeSeriesTable from "../modules/timeSeries/components/TimeSeriesTable";
 import { useTimeSeries } from "../modules/timeSeries/hooks/useTimeSeries";
 import { useStartTimeSeriesExport } from "../modules/timeSeries/hooks/useStartTimeSeriesExport";
 import { useTimeSeriesExportStore } from "../modules/timeSeries/stores/timeSeriesExportStore";
-import { type ExportStatus, type TimeSeriesReadInput } from "../generated/graphql";
+import {
+  type ExportStatus,
+  type TimeSeriesReadInput,
+} from "../generated/graphql";
 import { usePageState } from "../app/navigation/usePageState";
 import {
   draftToTimeSeriesInput,
@@ -36,9 +39,11 @@ export default function TimeSeriesPage() {
   const activeExport = useTimeSeriesExportStore((s) => s.activeExport);
   const setActiveExport = useTimeSeriesExportStore((s) => s.setActiveExport);
   const { startTimeSeriesExport } = useStartTimeSeriesExport();
-  const { query: queryState, entry, setPageState } = usePageState(
-    timeSeriesPageStateCodec,
-  );
+  const {
+    query: queryState,
+    entry,
+    setPageState,
+  } = usePageState(timeSeriesPageStateCodec);
   const draft = useMemo(
     () => mergeTimeSeriesDraft(queryState, entry),
     [entry, queryState],
@@ -64,11 +69,11 @@ export default function TimeSeriesPage() {
   const query = useTimeSeries(applied as TimeSeriesReadInput, !!applied);
 
   const updateDraft = (nextDraft: TimeSeriesDraftState) => {
-    const { sdInstanceIDs, kpiDefinitionIDs, ...nextQuery } = nextDraft;
+    const { sdInstanceUIDs, kpiDefinitionUIDs, ...nextQuery } = nextDraft;
     const nextEntry: TimeSeriesEntryState = {
       v: 1,
-      sdInstanceIDs,
-      kpiDefinitionIDs,
+      sdInstanceUIDs,
+      kpiDefinitionUIDs,
     };
 
     setPageState(

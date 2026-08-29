@@ -16,7 +16,6 @@ import Typography from "@mui/material/Typography";
 
 type Props = {
   instance: {
-    id: string;
     label?: string | null;
     uid?: string | null;
   };
@@ -35,13 +34,9 @@ export default function KpiInstanceCard({
         flexShrink: 0,
         height: "100%",
         overflow: "hidden",
-        backgroundColor: selected
-          ? "var(--border-input)"
-          : "var(--bg-card)",
+        backgroundColor: selected ? "var(--border-input)" : "var(--bg-card)",
         "&:hover": {
-          backgroundColor: selected
-          ? "var(--border-input)"
-          : "var(--border)",
+          backgroundColor: selected ? "var(--border-input)" : "var(--border)",
         },
       }}
     >
@@ -70,7 +65,7 @@ export default function KpiInstanceCard({
               WebkitLineClamp: 2,
             }}
           >
-            {instance.label || instance.uid || instance.id}
+            {instance.label || instance.uid || "\u00A0"}
           </Typography>
         </CardContent>
       </CardActionArea>

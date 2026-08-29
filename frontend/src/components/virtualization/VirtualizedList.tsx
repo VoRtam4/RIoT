@@ -57,7 +57,8 @@ export default function VirtualizedList<T>({
   const shouldVirtualize = items.length >= threshold;
 
   const estimateSize = useCallback(
-    (index: number) => rowHeight + (index === items.length - 1 ? 0 : itemSpacing),
+    (index: number) =>
+      rowHeight + (index === items.length - 1 ? 0 : itemSpacing),
     [itemSpacing, items.length, rowHeight],
   );
   const getScrollElement = useCallback(() => containerRef.current, []);
@@ -121,10 +122,8 @@ export default function VirtualizedList<T>({
     : 0;
   const pinnedItemEnd = pinnedItemStart + rowHeight;
   const viewportEnd = scrollTop + viewportHeight;
-  const pinToTop =
-    shouldEvaluatePinnedItem && pinnedItemStart < scrollTop;
-  const pinToBottom =
-    shouldEvaluatePinnedItem && pinnedItemEnd > viewportEnd;
+  const pinToTop = shouldEvaluatePinnedItem && pinnedItemStart < scrollTop;
+  const pinToBottom = shouldEvaluatePinnedItem && pinnedItemEnd > viewportEnd;
   const shouldRenderPinnedItem = pinToTop || pinToBottom;
 
   const scrollPinnedItemIntoView = useCallback(() => {
@@ -217,59 +216,60 @@ export default function VirtualizedList<T>({
           height: "100%",
         }}
       >
-        {!items.length
-          ? (emptyState ?? null)
-          : !shouldVirtualize
-            ? items.map((item: any, index) => (
+        {!items.length ? (
+          (emptyState ?? null)
+        ) : !shouldVirtualize ? (
+          items.map((item: any, index) => (
+            <div
+              key={item.id ?? index}
+              style={{
+                height:
+                  rowHeight + (index === items.length - 1 ? 0 : itemSpacing),
+              }}
+            >
+              <div
+                style={{
+                  height: rowHeight,
+                  marginBottom: index === items.length - 1 ? 0 : itemSpacing,
+                }}
+              >
+                {renderItem(item, index)}
+              </div>
+            </div>
+          ))
+        ) : (
+          <div
+            style={{
+              height: virtualizer.getTotalSize(),
+              position: "relative",
+              width: "100%",
+            }}
+          >
+            {virtualItems.map((virtualItem) => (
+              <div
+                key={virtualItem.key}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: virtualItem.size,
+                  transform: `translateY(${virtualItem.start}px)`,
+                }}
+              >
                 <div
-                  key={item.id ?? index}
                   style={{
-                    height: rowHeight + (index === items.length - 1 ? 0 : itemSpacing),
+                    height: rowHeight,
+                    marginBottom:
+                      virtualItem.index === items.length - 1 ? 0 : itemSpacing,
                   }}
                 >
-                  <div
-                    style={{
-                      height: rowHeight,
-                      marginBottom: index === items.length - 1 ? 0 : itemSpacing,
-                    }}
-                  >
-                    {renderItem(item, index)}
-                  </div>
+                  {renderItem(items[virtualItem.index], virtualItem.index)}
                 </div>
-              ))
-            : (
-                <div
-                  style={{
-                    height: virtualizer.getTotalSize(),
-                    position: "relative",
-                    width: "100%",
-                  }}
-                >
-                  {virtualItems.map((virtualItem) => (
-                    <div
-                      key={virtualItem.key}
-                      style={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        height: virtualItem.size,
-                        transform: `translateY(${virtualItem.start}px)`,
-                      }}
-                    >
-                      <div
-                        style={{
-                          height: rowHeight,
-                          marginBottom:
-                            virtualItem.index === items.length - 1 ? 0 : itemSpacing,
-                        }}
-                      >
-                        {renderItem(items[virtualItem.index], virtualItem.index)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

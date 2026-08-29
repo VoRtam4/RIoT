@@ -27,7 +27,7 @@ func StreamTimeSeriesAggregateKPI(userID uint32, input graphQLModel.TimeSeriesRe
 	if err != nil {
 		return err
 	}
-	params := loadParametersFromDB(graphQLModel.TimeSeriesTypeKpi, input.SdTypeID)
+	params := loadParametersFromDB(graphQLModel.TimeSeriesTypeKpi, &req.SDTypeUID)
 	return StreamTimeSeriesBase(userID, req, params, onBatch)
 }
 
@@ -36,7 +36,7 @@ func StreamTimeSeries(userID uint32, input graphQLModel.TimeSeriesReadInput, onB
 	if err != nil {
 		return err
 	}
-	params := loadParametersFromDB(input.Type, input.SdTypeID)
+	params := loadParametersFromDB(input.Type, &req.SDTypeUID)
 	return StreamTimeSeriesBase(userID, req, params, onBatch)
 }
 
@@ -77,7 +77,7 @@ func ReadTimeSeriesAggregateKPI(userID uint32, input graphQLModel.TimeSeriesRead
 	if err != nil {
 		return sharedUtils.NewFailureResult[graphQLModel.TimeSeriesReadResponse](err)
 	}
-	params := loadParametersFromDB(graphQLModel.TimeSeriesTypeKpi, input.SdTypeID)
+	params := loadParametersFromDB(graphQLModel.TimeSeriesTypeKpi, &req.SDTypeUID)
 	gqlResp := mapToGraphQLResponse(tsResp, params)
 	return sharedUtils.NewSuccessResult(gqlResp)
 }
@@ -93,7 +93,7 @@ func ReadTimeSeries(userID uint32, input graphQLModel.TimeSeriesReadInput) share
 	if err != nil {
 		return sharedUtils.NewFailureResult[graphQLModel.TimeSeriesReadResponse](err)
 	}
-	params := loadParametersFromDB(input.Type, input.SdTypeID)
+	params := loadParametersFromDB(input.Type, &req.SDTypeUID)
 	gqlResp := mapToGraphQLResponse(tsResp, params)
 	return sharedUtils.NewSuccessResult(gqlResp)
 }

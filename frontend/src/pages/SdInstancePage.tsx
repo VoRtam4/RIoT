@@ -40,7 +40,7 @@ export default function SdInstancesPage() {
       {
         query: {
           ...query,
-          sdType: String(sdTypes[0].id),
+          sdType: String(sdTypes[0].uid),
         },
         entry: null,
       },
@@ -48,8 +48,9 @@ export default function SdInstancesPage() {
     );
   }, [query, sdTypes, setPageState]);
 
-  const { sdInstances, loading: instancesLoading } =
-    useSdInstancesByType(query.sdType);
+  const { sdInstances, loading: instancesLoading } = useSdInstancesByType(
+    query.sdType,
+  );
 
   const filteredInstances = useMemo(() => {
     let result = (sdInstances ?? []).map((instance: any) => ({
@@ -57,29 +58,24 @@ export default function SdInstancesPage() {
       searchText: buildOptionSearchText(
         instance.label,
         instance.uid,
-        String(instance.id),
       ).toLowerCase(),
       sortLabel: (instance.label ?? instance.uid ?? "").toLowerCase(),
     }));
 
     if (debouncedSearch.trim()) {
       result = result.filter(({ searchText }) =>
-        matchesSearchText(debouncedSearch, searchText),
+        matchesSearchText(debouncedSearch, query.qMode, searchText),
       );
     }
 
     if (query.sort === "label_asc") {
-      result.sort((a, b) =>
-        a.sortLabel < b.sortLabel ? -1 : 1,
-      );
+      result.sort((a, b) => (a.sortLabel < b.sortLabel ? -1 : 1));
     } else {
-      result.sort((a, b) =>
-        a.sortLabel > b.sortLabel ? -1 : 1,
-      );
+      result.sort((a, b) => (a.sortLabel > b.sortLabel ? -1 : 1));
     }
 
     return result.map((r) => r.instance);
-  }, [sdInstances, debouncedSearch, query.sort]);
+  }, [sdInstances, debouncedSearch, query.qMode, query.sort]);
 
   const loading = typesLoading || (query.sdType !== null && instancesLoading);
 
@@ -101,12 +97,25 @@ export default function SdInstancesPage() {
           )
         }
         search={query.q}
+        searchMode={query.qMode}
         onSearchChange={(q) =>
           setPageState(
             {
               query: {
                 ...query,
                 q,
+              },
+              entry: null,
+            },
+            { replace: true },
+          )
+        }
+        onSearchModeChange={(qMode) =>
+          setPageState(
+            {
+              query: {
+                ...query,
+                qMode,
               },
               entry: null,
             },
@@ -131,7 +140,7 @@ export default function SdInstancesPage() {
       <SdInstanceList
         instances={filteredInstances}
         loading={loading}
-        onOpen={(id) => navigate(`/sd-instance/${id}`)}
+        onOpen={(uid) => navigate(`/sd-instance/${uid}`)}
       />
     </div>
   );

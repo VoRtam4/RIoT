@@ -13,6 +13,7 @@ package domainLogicLayer
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/db/dbClient"
 	"github.com/MichalBures-OG/bp-bures-RIoT-backend-core/src/model/graphQLModel"
@@ -31,6 +32,22 @@ func GetRawDataPointsBySDType(sdTypeID uint32) sharedUtils.Result[[]graphQLModel
 	return sharedUtils.NewSuccessResult[[]graphQLModel.RawDataPoint](sharedUtils.Map(dbResult.GetPayload(), dll2gql.ToGraphQLModelRawDataPoint))
 }
 
+func GetRawDataPointsBySDTypeUID(sdTypeUID string) sharedUtils.Result[[]graphQLModel.RawDataPoint] {
+	normalizedUID, normalizeErr := normalizeSDTypeUID(sdTypeUID)
+	if normalizeErr != nil {
+		return sharedUtils.NewFailureResult[[]graphQLModel.RawDataPoint](normalizeErr)
+	}
+	sdTypeResult := dbClient.GetRelationalDatabaseClientInstance().LoadSDTypeBasedOnUID(normalizedUID)
+	if sdTypeResult.IsFailure() {
+		return sharedUtils.NewFailureResult[[]graphQLModel.RawDataPoint](sdTypeResult.GetError())
+	}
+	sdType := sdTypeResult.GetPayload()
+	if sdType.ID.IsEmpty() {
+		return sharedUtils.NewFailureResult[[]graphQLModel.RawDataPoint](fmt.Errorf("SD type loaded by UID has no internal ID: %s", normalizedUID))
+	}
+	return GetRawDataPointsBySDType(sdType.ID.GetPayload())
+}
+
 func GetRawDataPoint(sdInstanceID uint32) sharedUtils.Result[sharedUtils.Optional[graphQLModel.RawDataPoint]] {
 	if sdInstanceID == 0 {
 		return sharedUtils.NewFailureResult[sharedUtils.Optional[graphQLModel.RawDataPoint]](fmt.Errorf("invalid sdInstanceID"))
@@ -45,4 +62,24 @@ func GetRawDataPoint(sdInstanceID uint32) sharedUtils.Result[sharedUtils.Optiona
 	}
 	return sharedUtils.NewSuccessResult[sharedUtils.Optional[graphQLModel.RawDataPoint]](
 		sharedUtils.NewOptionalOf(dll2gql.ToGraphQLModelRawDataPoint(opt.GetPayload())))
+}
+
+func GetRawDataPointBySDInstanceUID(sdInstanceUID string) sharedUtils.Result[sharedUtils.Optional[graphQLModel.RawDataPoint]] {
+	trimmedUID := strings.TrimSpace(sdInstanceUID)
+	if trimmedUID == "" {
+		return sharedUtils.NewFailureResult[sharedUtils.Optional[graphQLModel.RawDataPoint]](fmt.Errorf("invalid sdInstanceUID"))
+	}
+	sdInstanceResult := dbClient.GetRelationalDatabaseClientInstance().LoadSDInstanceBasedOnUID(trimmedUID)
+	if sdInstanceResult.IsFailure() {
+		return sharedUtils.NewFailureResult[sharedUtils.Optional[graphQLModel.RawDataPoint]](sdInstanceResult.GetError())
+	}
+	sdInstanceOptional := sdInstanceResult.GetPayload()
+	if sdInstanceOptional.IsEmpty() {
+		return sharedUtils.NewFailureResult[sharedUtils.Optional[graphQLModel.RawDataPoint]](fmt.Errorf("couldn't find SD instance for UID: %s", trimmedUID))
+	}
+	sdInstanceIDOptional := sdInstanceOptional.GetPayload().ID
+	if sdInstanceIDOptional.IsEmpty() {
+		return sharedUtils.NewFailureResult[sharedUtils.Optional[graphQLModel.RawDataPoint]](fmt.Errorf("SD instance loaded by UID has no internal ID: %s", trimmedUID))
+	}
+	return GetRawDataPoint(sdInstanceIDOptional.GetPayload())
 }

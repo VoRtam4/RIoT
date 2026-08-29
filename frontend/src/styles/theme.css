@@ -33,10 +33,15 @@ h6 {
 
 .form-control,
 .form-select,
+.input-group-text,
 .react-select__control {
   background-color: var(--bg-input) !important;
   color: white !important;
   border: 1px solid var(--border-input) !important;
+}
+
+.input-group-text {
+  color: var(--text-main) !important;
 }
 
 ::-webkit-scrollbar {
@@ -116,6 +121,25 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 
 .form-label {
   color: var(--text-main) !important;
+}
+
+.search-mode-input {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+}
+
+.search-mode-input__toggle {
+  flex: 0 0 auto;
+  min-width: 52px;
+  padding-inline: 10px;
+  white-space: nowrap;
+}
+
+.search-mode-input > .form-control {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .queryBuilder {
@@ -218,7 +242,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   padding: 6px 12px;
   background: rgba(255, 255, 255, 0.03);
   color: var(--text-main);
-  transition: border-color 0.15s ease, background-color 0.15s ease,
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
     transform 0.15s ease;
 }
 

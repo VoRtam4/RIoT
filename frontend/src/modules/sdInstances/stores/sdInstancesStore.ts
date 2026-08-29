@@ -33,8 +33,8 @@ type Entry = {
 
 type Store = {
   byType: Record<string, Entry>;
-  ensure: (typeId: string) => Promise<void>;
-  refresh: (typeId: string) => Promise<void>;
+  ensure: (typeUID: string) => Promise<void>;
+  refresh: (typeUID: string) => Promise<void>;
 };
 
 function sort(items: Raw[]) {
@@ -53,30 +53,34 @@ function sort(items: Raw[]) {
 export const useSdInstancesStore = create<Store>((set, get) => ({
   byType: {},
 
-  ensure: async (typeId) => {
-    const entry = get().byType[typeId];
+  ensure: async (typeUID) => {
+    const entry = get().byType[typeUID];
     const now = Date.now();
 
     if (entry?.lastFetchedAt && now - entry.lastFetchedAt < TTL) {
       return;
     }
 
-    if (entry?.error && entry.lastAttemptAt && now - entry.lastAttemptAt < ERROR_RETRY_COOLDOWN) {
+    if (
+      entry?.error &&
+      entry.lastAttemptAt &&
+      now - entry.lastAttemptAt < ERROR_RETRY_COOLDOWN
+    ) {
       return;
     }
 
-    await get().refresh(typeId);
+    await get().refresh(typeUID);
   },
 
-  refresh: async (typeId) => {
-    const existing = get().byType[typeId];
+  refresh: async (typeUID) => {
+    const existing = get().byType[typeUID];
 
     if (existing?.isLoading) return;
 
     set((s) => ({
       byType: {
         ...s.byType,
-        [typeId]: {
+        [typeUID]: {
           ...existing,
           rawSortedAsc: existing?.rawSortedAsc ?? [],
           rawSortedDesc: existing?.rawSortedDesc ?? [],
@@ -94,7 +98,7 @@ export const useSdInstancesStore = create<Store>((set, get) => ({
         SdInstancesByTypeQueryVariables
       >({
         query: SdInstancesByTypeDocument,
-        variables: { id: typeId },
+        variables: { uid: typeUID },
         fetchPolicy: "network-only",
       });
 
@@ -105,7 +109,7 @@ export const useSdInstancesStore = create<Store>((set, get) => ({
       set((s) => ({
         byType: {
           ...s.byType,
-          [typeId]: {
+          [typeUID]: {
             rawSortedAsc,
             rawSortedDesc,
             lastFetchedAt: Date.now(),
@@ -119,8 +123,8 @@ export const useSdInstancesStore = create<Store>((set, get) => ({
       set((s) => ({
         byType: {
           ...s.byType,
-          [typeId]: {
-            ...(s.byType[typeId] ?? {}),
+          [typeUID]: {
+            ...(s.byType[typeUID] ?? {}),
             lastFetchedAt: null,
             lastAttemptAt: Date.now(),
             isLoading: false,

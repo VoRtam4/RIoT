@@ -17,7 +17,6 @@ import Typography from "@mui/material/Typography";
 import Box from "@mui/material/Box";
 
 type Instance = {
-  id: string;
   label?: string | null;
   uid?: string | null;
 };
@@ -33,14 +32,14 @@ export default function SdInstanceCard({ instance }: Props) {
       sx={{
         height: "100%",
         minHeight: 120,
-        backgroundColor: "var(--bg-card)" ,
+        backgroundColor: "var(--bg-card)",
         "&:hover": {
           backgroundColor: "var(--border)",
         },
       }}
     >
       <CardActionArea
-        onClick={() => navigate(`/sd-instance/${instance.id}`)}
+        onClick={() => instance.uid && navigate(`/sd-instance/${instance.uid}`)}
         sx={{
           height: "100%",
           display: "flex",
@@ -57,7 +56,7 @@ export default function SdInstanceCard({ instance }: Props) {
         >
           {/* TITLE */}
           <Typography variant="h6" className="color-label">
-            {instance.label || instance.uid || instance.id}
+            {instance.label || instance.uid || "\u00A0"}
           </Typography>
 
           {/* META */}

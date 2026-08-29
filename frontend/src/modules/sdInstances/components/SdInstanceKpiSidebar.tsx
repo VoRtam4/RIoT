@@ -11,7 +11,10 @@
  */
 import { useMemo } from "react";
 import Select, { type SingleValue } from "react-select";
-import { matchesSearchText } from "../../../utils/reactSelectSearch";
+import {
+  matchesSearchText,
+  type SearchMode,
+} from "../../../utils/reactSelectSearch";
 import { virtualizedSelectProps } from "../../../utils/reactSelectVirtualized";
 
 import Box from "@mui/material/Box";
@@ -23,19 +26,21 @@ import EmptyStateNotice from "../../../components/EmptyStateNotice";
 import UrlSyncedSearchInput from "../../../components/UrlSyncedSearchInput";
 
 type Kpi = {
-  id: string;
+  uid?: string | null;
   label?: string | null;
 };
 
 type Props = {
   kpis?: Kpi[];
-  selectedKpiId?: string | null;
+  selectedKpiUID?: string | null;
   loading?: any;
   search: string;
+  searchMode: SearchMode;
   sort: SdInstanceDetailSidebarSort;
   onSearchChange: (value: string) => void;
+  onSearchModeChange: (value: SearchMode) => void;
   onSortChange: (value: SdInstanceDetailSidebarSort) => void;
-  onSelect: (id: string) => void;
+  onSelect: (uid: string) => void;
   onOpenDetail: () => void;
 };
 
@@ -46,11 +51,13 @@ type SortOption = {
 
 export default function SdInstanceKpiSidebar({
   kpis = [],
-  selectedKpiId,
+  selectedKpiUID,
   loading,
   search,
+  searchMode,
   sort,
   onSearchChange,
+  onSearchModeChange,
   onSortChange,
   onSelect,
   onOpenDetail,
@@ -68,7 +75,7 @@ export default function SdInstanceKpiSidebar({
 
     if (search.trim()) {
       result = result.filter((k) => {
-        return matchesSearchText(search, k.label, String(k.id));
+        return matchesSearchText(search, searchMode, k.label, k.uid);
       });
     }
 
@@ -83,14 +90,12 @@ export default function SdInstanceKpiSidebar({
     });
 
     return result;
-  }, [kpis, search, sort]);
+  }, [kpis, search, searchMode, sort]);
 
   const selectedIndex = useMemo(
     () =>
-      filtered.findIndex(
-        (kpi) => String(kpi.id) === String(selectedKpiId),
-      ),
-    [filtered, selectedKpiId],
+      filtered.findIndex((kpi) => String(kpi.uid) === String(selectedKpiUID)),
+    [filtered, selectedKpiUID],
   );
 
   if (loading) {
@@ -106,10 +111,10 @@ export default function SdInstanceKpiSidebar({
       className="card p-3 d-flex flex-column"
       style={{ height: "100%", minHeight: 0 }}
     >
-      <h5 className="mb-3">KPIs</h5>
+      <h5 className="mb-2">KPIs</h5>
 
       {/* SORT */}
-      <div className="mb-3">
+      <div className="mb-2">
         <label className="form-label">Sort</label>
         <Select<SortOption, false>
           classNamePrefix="react-select"
@@ -125,12 +130,14 @@ export default function SdInstanceKpiSidebar({
       </div>
 
       {/* SEARCH */}
-      <div className="mb-3">
+      <div className="mb-2">
         <label className="form-label">Search</label>
         <UrlSyncedSearchInput
           placeholder="Search..."
           value={search}
           onChange={onSearchChange}
+          mode={searchMode}
+          onModeChange={onSearchModeChange}
         />
       </div>
 
@@ -152,10 +159,10 @@ export default function SdInstanceKpiSidebar({
           }
           renderItem={(kpi) => (
             <SdInstanceKpiCard
-              key={kpi.id}
+              key={kpi.uid ?? kpi.label ?? ""}
               kpi={kpi}
-              selected={String(kpi.id) === String(selectedKpiId)}
-              onClick={() => onSelect(String(kpi.id))}
+              selected={String(kpi.uid) === String(selectedKpiUID)}
+              onClick={() => kpi.uid && onSelect(String(kpi.uid))}
             />
           )}
         />
@@ -164,7 +171,7 @@ export default function SdInstanceKpiSidebar({
       {/* BUTTON */}
       <button
         className="btn btn-outline-light mt-3"
-        disabled={!selectedKpiId}
+        disabled={!selectedKpiUID}
         onClick={onOpenDetail}
       >
         KPI details

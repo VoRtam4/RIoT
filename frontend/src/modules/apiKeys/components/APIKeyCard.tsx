@@ -34,13 +34,9 @@ export default function APIKeyCard({ apiKey, selected, onClick }: Props) {
         flexShrink: 0,
         height: "100%",
         overflow: "hidden",
-        backgroundColor: selected
-          ? "var(--border-input)"
-          : "var(--bg-card)",
+        backgroundColor: selected ? "var(--border-input)" : "var(--bg-card)",
         "&:hover": {
-          backgroundColor: selected
-          ? "var(--border-input)"
-          : "var(--border)",
+          backgroundColor: selected ? "var(--border-input)" : "var(--border)",
         },
       }}
     >
@@ -83,9 +79,7 @@ export default function APIKeyCard({ apiKey, selected, onClick }: Props) {
                 width: 8,
                 height: 8,
                 borderRadius: "50%",
-                backgroundColor: isActive
-                  ? colors.success
-                  : colors.error,
+                backgroundColor: isActive ? colors.success : colors.error,
               }}
             />
 
