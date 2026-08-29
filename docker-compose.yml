@@ -11,10 +11,8 @@
 #  @defgroup riot RIoT
 #  @see README.md
 
-version: '3'
-
 services:
-  riot-frontend:
+  frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -22,11 +20,11 @@ services:
       DEV_ENV: ${DEV_ENV}
       BACKEND_CORE_URL: ${BACKEND_CORE_URL}
     depends_on:
-        - riot-backend-core
+        - backend-core
     ports:
         - "8080:80"
 
-  riot-backend-core:
+  backend-core:
     build:
       context: ./backend
       dockerfile: backend-core/Dockerfile
@@ -47,7 +45,7 @@ services:
       AUTH_REDIRECT_URL: ${AUTH_REDIRECT_URL}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS} # Essentially a API client whitelist TODO: Configure this as needed...
       # SECURE_COOKIES: "" # Comment this out if you are using http instead of https
-      JWT_AUTHENTICATION_MIDDLEWARE_ENABLED: "" # Comment this out if you need unrestricted API access without authentication
+      JWT_AUTHENTICATION_MIDDLEWARE_ENABLED: "" # Set to false only for explicit local unauthenticated API access
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -60,7 +58,7 @@ services:
     #cpu_quota: 1000 # 1% of a single CPU core
     #mem_limit: 32m # 32 MB of RAM
 
-  riot-message-processing-unit:
+  message-processing-unit:
     build:
       context: ./backend
       dockerfile: message-processing-unit/Dockerfile
@@ -70,17 +68,32 @@ services:
       BACKEND_CORE_URL: ${BACKEND_CORE_URL}
       RABBITMQ_URL: ${RABBITMQ_URL}
       MPU_INPUT_WORKERS: ${MPU_INPUT_WORKERS:-1}
+      MPU_INTERNAL_INPUT_BUFFER: ${MPU_INTERNAL_INPUT_BUFFER:-1000}
+      MPU_INPUT_PAUSE_HIGH_WATERMARK_PERCENT: ${MPU_INPUT_PAUSE_HIGH_WATERMARK_PERCENT:-80}
+      MPU_INPUT_RESUME_LOW_WATERMARK_PERCENT: ${MPU_INPUT_RESUME_LOW_WATERMARK_PERCENT:-50}
+      MPU_INPUT_SOURCE_PAUSE_HIGH_WATERMARK_PERCENT: ${MPU_INPUT_SOURCE_PAUSE_HIGH_WATERMARK_PERCENT:-50}
+      MPU_INPUT_SOURCE_RESUME_LOW_WATERMARK_PERCENT: ${MPU_INPUT_SOURCE_RESUME_LOW_WATERMARK_PERCENT:-25}
+      MPU_INPUT_PAUSE_CHECK_INTERVAL_MS: ${MPU_INPUT_PAUSE_CHECK_INTERVAL_MS:-200}
+      MPU_INPUT_TREND_SAMPLE_INTERVAL_MS: ${MPU_INPUT_TREND_SAMPLE_INTERVAL_MS:-5000}
+      MPU_INPUT_WATCH_PRESSURE_THRESHOLD: ${MPU_INPUT_WATCH_PRESSURE_THRESHOLD:-0.1}
+      MPU_INPUT_DROP_CANDIDATE_PRESSURE_THRESHOLD: ${MPU_INPUT_DROP_CANDIDATE_PRESSURE_THRESHOLD:-0.5}
+      MPU_INPUT_DROP_CANDIDATE_BACKLOG_DELTA_THRESHOLD: ${MPU_INPUT_DROP_CANDIDATE_BACKLOG_DELTA_THRESHOLD:-1}
+      MPU_INPUT_STATE_ESCALATION_SAMPLES: ${MPU_INPUT_STATE_ESCALATION_SAMPLES:-3}
+      MPU_INPUT_STATE_RECOVERY_SAMPLES: ${MPU_INPUT_STATE_RECOVERY_SAMPLES:-3}
+      MPU_INPUT_DROPPER_ENABLED: ${MPU_INPUT_DROPPER_ENABLED:-false}
+      MPU_INPUT_DROPPER_GRACE_SAMPLES: ${MPU_INPUT_DROPPER_GRACE_SAMPLES:-3}
       MPU_REPROCESS_WORKERS: ${REPROCESS_WORKERS:-1}
     depends_on:
       rabbitmq:
         condition: service_healthy
-      riot-backend-core:
+      backend-core:
         condition: service_started # 'Backend-core' has to set up the 'RabbitMQ infrastructure'
     #cpu_quota: 1000 # 1% of a single CPU core
     #mem_limit: 32m # 32 MB of RAM
 
   mosquitto:
     image: eclipse-mosquitto:latest
+    profiles: ["dev"]
     ports:
       - "9001:9001"
       - "1883:1883"
@@ -92,18 +105,16 @@ services:
   postgres:
     image: postgres:16
     environment:
-      DEV_ENV: ${DEV_ENV}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB_NAME}
-    ports:
-      - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./pg_backup:/backup
+      - ${RIOT_DOCKER_DATA_DIR:-./docker}/postgres-data:/var/lib/postgresql/data
+      - ${RIOT_DOCKER_DATA_DIR:-./docker}/pg_backup:/backup
 
   pgadmin:
     image: dpage/pgadmin4:latest
+    profiles: ["dev"]
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@pgadmin.com # Not a real e-mail address...
       PGADMIN_DEFAULT_PASSWORD: password
@@ -113,10 +124,7 @@ services:
   influxdb:
     image: influxdb:2.7-alpine
     restart: unless-stopped
-    ports:
-      - "8086:8086"
     environment:
-      - DEV_ENV=${DEV_ENV}
       - DOCKER_INFLUXDB_INIT_MODE=setup
       - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUX_USER}
       - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUX_PASSWORD}
@@ -124,14 +132,14 @@ services:
       - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUX_BUCKET}
       - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN}
     volumes:
-      - ./docker/influxdb-data:/var/lib/influxdb2
+      - ${RIOT_DOCKER_DATA_DIR:-./docker}/influxdb-data:/var/lib/influxdb2
     healthcheck:
       test: [ "CMD", "influx", "ping" ]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  riot-time-series-store:
+  time-series-store:
     build:
       context: ./backend
       dockerfile: time-series-store/Dockerfile
@@ -149,23 +157,17 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
-      riot-backend-core:
+      backend-core:
         condition: service_started # 'Backend-core' has to set up the 'RabbitMQ infrastructure'
 
   rabbitmq:
     image: rabbitmq:3-management
-    container_name: riot-rabbitmq
-    ports:
-      - "5672:5672"    # AMQP
-      - "15672:15672"  # Management UI
-      - "15692:15692"  # Prometheus (nepovinné)
     environment:
-      DEV_ENV: ${DEV_ENV}
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
       RABBITMQ_ERLANG_COOKIE: "my_shared_cookie"
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+      - ${RIOT_DOCKER_DATA_DIR:-./docker}/rabbitmq-data:/var/lib/rabbitmq
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "rabbitmqctl", "status"]
@@ -183,7 +185,6 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DEV_ENV: ${DEV_ENV}
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: password
 
@@ -201,13 +202,7 @@ services:
     ports:
       - "9000:9000"
     environment:
-      DEV_ENV: ${DEV_ENV}
       MQTT_ADDRESS: mosquitto
       MQTT_TOPIC: topic
       MQTT_USERNAME: admin
       MQTT_PASSWORD: password
-
-volumes:
-  rabbitmq_data:
-  postgres_data:
-

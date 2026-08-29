@@ -21,4 +21,7 @@ FROM nginx:stable-alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/templates/default.conf.template
 
+RUN find /usr/share/nginx/html -type f -exec chmod 644 {} \; \
+    && find /usr/share/nginx/html -type d -exec chmod 755 {} \;
+
 CMD ["nginx", "-g", "daemon off;"]

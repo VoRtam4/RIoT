@@ -21,7 +21,7 @@ Hlavní proměnné prostředí používané modulem:
 - `RABBITMQ_URL`: připojovací řetězec k RabbitMQ
 - `ALLOWED_ORIGINS`: povolené originy pro CORS
 - `JWT_SECRET`: tajemství pro podepisování JWT
-- `JWT_AUTHENTICATION_MIDDLEWARE_ENABLED`: zapnutí nebo vypnutí JWT middleware
+- `JWT_AUTHENTICATION_MIDDLEWARE_ENABLED`: zapnutí nebo vypnutí autentizace; pokud není nastaveno, výchozí hodnota je zapnuto
 - `GOOGLE_OAUTH2_CLIENT_ID`: klientský identifikátor pro Google OAuth
 - `GOOGLE_OAUTH2_CLIENT_SECRET`: klientské tajemství pro Google OAuth
 - `AUTH_REDIRECT_URL`: návratová adresa po přihlášení
@@ -56,7 +56,7 @@ Příklad GraphQL požadavku:
 curl http://localhost:9090/graphql \
   -H "Content-Type: application/json" \
   -H "X-API-Key: <API_KEY>" \
-  -d '{"query":"{ sdTypes { id uid label } }"}'
+  -d '{"query":"{ sdTypes { uid label } }"}'
 ```
 
 Příklad připojení k WebSocket API:

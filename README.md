@@ -16,7 +16,6 @@ Tento repozitář obsahuje jádro systému rozšířené v rámci bakalářské 
 - [Message Processing Unit](backend/message-processing-unit/) ([README](backend/message-processing-unit/README.md)) - zpracování příchozích bodů, detekce změn, vyhodnocování KPI a přepočet historických výsledků.
 - [Time Series Store](backend/time-series-store/) ([README](backend/time-series-store/README.md)) - zápis a čtení historických surových a KPI dat v InfluxDB.
 - [Commons](backend/commons/) ([README](backend/commons/README.md)) - sdílené Go modely, RabbitMQ kontrakty, konstanty a pomocné utility používané backendovými službami.
-- [Testing](testing/) ([README](testing/README.md)) - benchmarkový a experimentální testovací nástroj pro ověření ukládání historie, ingestu, reprocessingu a exportů.
 
 Součástí Docker sestavy jsou také podpůrné služby PostgreSQL, InfluxDB, RabbitMQ, Mosquitto, pgAdmin a volitelně monitoring přes Prometheus a Grafanu.
 
@@ -82,7 +81,7 @@ Příklad GraphQL požadavku:
 curl http://localhost:9090/graphql \
   -H "Content-Type: application/json" \
   -H "X-API-Key: <API_KEY>" \
-  -d '{"query":"{ sdTypes { id uid label } }"}'
+  -d '{"query":"{ sdTypes { uid label } }"}'
 ```
 
 Příklad WebSocket požadavku:
@@ -122,25 +121,12 @@ Pro běžné napojení zdroje dat jsou podstatné hlavně tyto fronty:
 
 Navazující interní fronty, například `raw-data-point`, `kpi-fulfillment-check-results`, `time-series-raw-data` a `time-series-kpi-results`, už typicky obsluhují backendové moduly RIoT po zpracování vstupu.
 
-## Testování
-
-Automatizované experimenty a benchmarky jsou ve složce [testing](testing/README.md). Nástroj ověřuje hlavní scénáře práce: přípravu dat, online příjem zpráv, ukládání historie, opětovné vyhodnocení KPI a exporty historických dat.
-
-Základní kontrola prostředí:
-
-```bash
-python testing/runner.py validate
-```
-
-Podrobný přehled příkazů, konfigurace a výstupů je v [testing README](testing/README.md).
-
 ## Vývojové Závislosti
 
 Pro běžné spuštění celé platformy stačí Docker a Docker Compose. Při lokálním vývoji jednotlivých částí se používají také:
 
 - Go pro backendové moduly.
 - Node.js a npm pro frontend.
-- Python pro testovací nástroj.
 
 Přesné příkazy pro lokální vývoj jsou uvedené v README konkrétních modulů.
 

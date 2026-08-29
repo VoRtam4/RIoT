@@ -22,7 +22,6 @@ backend/*downloader
 
 .sync
 apps
-docs
 
 # Ignore local testing artifacts
 testing/.state/
