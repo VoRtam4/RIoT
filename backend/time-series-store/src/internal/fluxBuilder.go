@@ -23,6 +23,57 @@ func (c Influx2Client) buildReprocessFlux(req sharedModel.TimeSeriesReprocessRea
 	return c.buildReprocessFluxWindow(req, time.Unix(0, 0).UTC(), req.To.UTC())
 }
 
+func (c Influx2Client) buildRawPointsFlux(req sharedModel.TimeSeriesRecordNeighborhoodRequest, from time.Time, to time.Time, desc bool, limit int) string {
+	flux := fmt.Sprintf(`
+from(bucket: "%s")
+|> range(start: %s, stop: %s)
+|> filter(fn: (r) => r["_measurement"] == "%s")
+|> filter(fn: (r) => r["sdInstanceUID"] == "%s")
+|> group()
+|> sort(columns: ["_time"], desc: %t)
+`, c.bucket, from.UTC().Format(time.RFC3339Nano), to.UTC().Format(time.RFC3339Nano), fmt.Sprintf("%s_%s", string(sharedModel.TimeSeriesTypeRaw), req.SDTypeUID), req.SDInstanceUID, desc)
+	if limit > 0 {
+		flux += fmt.Sprintf(`|> limit(n: %d)
+`, limit)
+	}
+	return flux
+}
+
+func (c Influx2Client) buildRawTimelineSummaryFlux(req sharedModel.TimeSeriesRecordNeighborhoodRequest) string {
+	base := fmt.Sprintf(`
+from(bucket: "%s")
+|> range(start: 0)
+|> filter(fn: (r) => r["_measurement"] == "%s")
+|> filter(fn: (r) => r["sdInstanceUID"] == "%s")
+|> group()
+`, c.bucket, fmt.Sprintf("%s_%s", string(sharedModel.TimeSeriesTypeRaw), req.SDTypeUID), req.SDInstanceUID)
+	return fmt.Sprintf(`
+firstPoint = %s
+|> first()
+|> set(key: "metric", value: "first")
+
+lastPoint = %s
+|> last()
+|> set(key: "metric", value: "last")
+
+countPoint = %s
+|> count()
+|> set(key: "metric", value: "count")
+
+union(tables: [firstPoint, lastPoint, countPoint])
+`, base, base, base)
+}
+
+func (c Influx2Client) buildKPIStateAtFlux(req sharedModel.TimeSeriesRecordNeighborhoodRequest, timestamp time.Time) string {
+	return fmt.Sprintf(`
+from(bucket: "%s")
+|> range(start: %s, stop: %s)
+|> filter(fn: (r) => r["_measurement"] == "%s")
+|> filter(fn: (r) => r["sdInstanceUID"] == "%s")
+|> filter(fn: (r) => r["_field"] == "fulfilled")
+`, c.bucket, timestamp.UTC().Format(time.RFC3339Nano), timestamp.UTC().Add(time.Nanosecond).Format(time.RFC3339Nano), fmt.Sprintf("%s_%s", string(sharedModel.TimeSeriesTypeKPIResult), req.SDTypeUID), req.SDInstanceUID)
+}
+
 func (c Influx2Client) buildReprocessFluxWindow(req sharedModel.TimeSeriesReprocessReadRequest, from time.Time, to time.Time) string {
 	flux := fmt.Sprintf(`
 from(bucket: "%s")

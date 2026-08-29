@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedModel"
-	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 )
 
 type KPIProcessingOutputs struct {
@@ -25,15 +24,18 @@ type KPIProcessingOutputs struct {
 	TimeSeriesKPIRecord []sharedModel.TimeSeriesKPIResultRecord
 }
 
-func ProcessKPI(messagePayload sharedModel.KPIFulfillmentCheckRequestISCMessage, params map[string]interface{}, eventTime time.Time) KPIProcessingOutputs {
+func ProcessKPI(messagePayload sharedModel.KPIFulfillmentCheckRequestISCMessage, currentRaw map[string]interface{}, previousRaw map[string]interface{}, eventTime time.Time) KPIProcessingOutputs {
 	kpiDefinitionsBySDTypeDenotationMapMutex.RLock()
 	kpiDefinitions := kpiDefinitionsBySDTypeDenotationMap[messagePayload.SDTypeUID]
 	kpiDefinitionsBySDTypeDenotationMapMutex.RUnlock()
 	sdInstanceUID := messagePayload.SDInstanceUID
-	results := sharedUtils.EmptySlice[sharedModel.KPIFulfillmentCheckResultISCMessage]()
-	tsRecords := sharedUtils.EmptySlice[sharedModel.TimeSeriesKPIResultRecord]()
-	_, tags := splitParamsBySDType(messagePayload.SDTypeUID, params)
-	var paramAny any = params
+	results := []sharedModel.KPIFulfillmentCheckResultISCMessage{}
+	tsRecords := []sharedModel.TimeSeriesKPIResultRecord{}
+	_, tags := splitParamsBySDType(messagePayload.SDTypeUID, currentRaw)
+	context := KPIEvaluationContext{
+		CurrentValues:  currentRaw,
+		PreviousValues: previousRaw,
+	}
 	for _, kpiDefinition := range kpiDefinitions {
 		if kpiDefinition.SDInstanceMode != sharedModel.ALL {
 			containsUID := false
@@ -47,15 +49,15 @@ func ProcessKPI(messagePayload sharedModel.KPIFulfillmentCheckRequestISCMessage,
 				continue
 			}
 		}
-		result := CheckKPIFulfillment(kpiDefinition, &paramAny)
+		result := CheckKPIFulfillment(kpiDefinition, context)
 		if result.IsFailure() {
 			continue
 		}
 		value := result.GetPayload()
-		kpiID := sharedUtils.NewOptionalFromPointer(kpiDefinition.ID).GetPayload()
+		kpiUID := kpiDefinition.UID
 		key := sharedModel.KPIKey{
-			SDInstanceUID:   sdInstanceUID,
-			KPIDefinitionID: kpiID,
+			SDInstanceUID:    sdInstanceUID,
+			KPIDefinitionUID: kpiUID,
 		}
 		last, exists := lastKPI.Load(key)
 		if exists {
@@ -72,20 +74,20 @@ func ProcessKPI(messagePayload sharedModel.KPIFulfillmentCheckRequestISCMessage,
 			SynchronizedAt: time.Now(),
 		})
 		results = append(results, sharedModel.KPIFulfillmentCheckResultISCMessage{
-			SDTypeUID:       messagePayload.SDTypeUID,
-			EventTime:       eventTime,
-			SDInstanceUID:   sdInstanceUID,
-			KPIDefinitionID: kpiID,
-			Fulfilled:       value,
+			SDTypeUID:        messagePayload.SDTypeUID,
+			EventTime:        eventTime,
+			SDInstanceUID:    sdInstanceUID,
+			KPIDefinitionUID: kpiUID,
+			Fulfilled:        value,
 		})
 		toStore := sharedModel.TimeSeriesKPIResultRecord{
-			JobID:           "",
-			EventTime:       eventTime,
-			SDInstanceUID:   sdInstanceUID,
-			SDTypeUID:       messagePayload.SDTypeUID,
-			KPIDefinitionID: kpiID,
-			Fulfilled:       value,
-			Tags:            tags,
+			JobID:            "",
+			EventTime:        eventTime,
+			SDInstanceUID:    sdInstanceUID,
+			SDTypeUID:        messagePayload.SDTypeUID,
+			KPIDefinitionUID: kpiUID,
+			Fulfilled:        value,
+			Tags:             tags,
 		}
 		tsRecords = append(tsRecords, toStore)
 	}

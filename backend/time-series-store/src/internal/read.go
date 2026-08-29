@@ -122,13 +122,13 @@ func (c Influx2Client) streamReadRangeChunks(ctx context.Context, plan sharedMod
 
 func (c Influx2Client) DistinctTagValues(req sharedModel.TimeSeriesDistinctTagValuesRequest) ([]string, error) {
 	readReq := sharedModel.TimeSeriesReadRequest{
-		Type:             req.Type,
-		SDTypeUID:        req.SDTypeUID,
-		SDInstanceUIDs:   req.SDInstanceUIDs,
-		KPIDefinitionIDs: req.KPIDefinitionIDs,
-		From:             req.From,
-		To:               req.To,
-		Filters:          req.Filters,
+		Type:              req.Type,
+		SDTypeUID:         req.SDTypeUID,
+		SDInstanceUIDs:    req.SDInstanceUIDs,
+		KPIDefinitionUIDs: req.KPIDefinitionUIDs,
+		From:              req.From,
+		To:                req.To,
+		Filters:           req.Filters,
 	}
 	plan := BuildQueryPlan(readReq)
 	distinctValues := make(map[string]struct{})
@@ -230,15 +230,15 @@ func (c Influx2Client) streamRowsFlux(ctx context.Context, fluxQuery string, pla
 	buildCursorKey := func(tags map[string]string) string {
 		key := tags["sdInstanceUID"]
 		if plan.IsKPI {
-			key += "|" + tags["kpiDefinitionID"]
+			key += "|" + tags["kpiDefinitionUID"]
 		}
 		return key
 	}
 	cursorKey := ""
 	if plan.UseCursor && plan.Cursor != nil {
 		cursorKey = plan.Cursor.SDInstanceUID
-		if plan.IsKPI && plan.Cursor.KPIDefinitionID != nil {
-			cursorKey += "|" + fmt.Sprintf("%d", *plan.Cursor.KPIDefinitionID)
+		if plan.IsKPI && plan.Cursor.KPIDefinitionUID != nil {
+			cursorKey += "|" + *plan.Cursor.KPIDefinitionUID
 		}
 	}
 	shouldSkip := func(p sharedModel.TimeSeriesDataPoint) bool {

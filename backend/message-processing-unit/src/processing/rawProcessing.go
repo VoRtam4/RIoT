@@ -24,9 +24,23 @@ import (
 )
 
 type RawProcessingOutputs struct {
-	SDTypeChanged bool
-	RawMessages   []sharedModel.RawDataPointISCMessage
-	RawRecords    []sharedModel.TimeSeriesRawRecord
+	SDTypeChanged  bool
+	LateRecord     bool
+	RawMessages    []sharedModel.RawDataPointISCMessage
+	RawRecords     []sharedModel.TimeSeriesRawRecord
+	CurrentValues  map[string]interface{}
+	PreviousValues map[string]interface{}
+}
+
+func cloneMap(values map[string]interface{}) map[string]interface{} {
+	if values == nil {
+		return map[string]interface{}{}
+	}
+	clone := make(map[string]interface{}, len(values))
+	for key, value := range values {
+		clone[key] = value
+	}
+	return clone
 }
 
 func ProcessRaw(messagePayload sharedModel.KPIFulfillmentCheckRequestISCMessage, params map[string]interface{}, eventTime time.Time) (RawProcessingOutputs, bool) {
@@ -44,6 +58,8 @@ func ProcessRaw(messagePayload sharedModel.KPIFulfillmentCheckRequestISCMessage,
 	result := processParams(messagePayload.SDTypeUID, params, lastSnapshot.Values)
 	outputs.SDTypeChanged = result.SDTypeChanged
 	newValues := result.Values
+	outputs.CurrentValues = cloneMap(newValues)
+	outputs.PreviousValues = cloneMap(lastSnapshot.Values)
 	changed := result.Changed
 	if exists {
 		lastSnapshot.SynchronizedAt = time.Now()
@@ -53,13 +69,7 @@ func ProcessRaw(messagePayload sharedModel.KPIFulfillmentCheckRequestISCMessage,
 	}
 	fields, tags := splitParamsBySDType(messagePayload.SDTypeUID, newValues)
 	if exists && eventTime.Before(lastSnapshot.EventTime) {
-		outputs.RawRecords = append(outputs.RawRecords, sharedModel.TimeSeriesRawRecord{
-			EventTime:     eventTime,
-			SDInstanceUID: uid,
-			SDTypeUID:     messagePayload.SDTypeUID,
-			Fields:        fields,
-			Tags:          tags,
-		})
+		outputs.LateRecord = true
 		return outputs, true
 	}
 	if !changed {

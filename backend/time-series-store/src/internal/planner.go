@@ -68,7 +68,7 @@ func BuildQueryPlan(req sharedModel.TimeSeriesReadRequest) sharedModel.QueryPlan
 	}
 	plan.SDTypeUID = req.SDTypeUID
 	plan.SDInstanceUIDs = req.SDInstanceUIDs
-	plan.KPIDefinitionIDs = req.KPIDefinitionIDs
+	plan.KPIDefinitionUIDs = req.KPIDefinitionUIDs
 	if plan.IsKPI {
 		plan.Measurement = fmt.Sprintf("%s_%s",
 			string(sharedModel.TimeSeriesTypeKPIResult),
@@ -88,7 +88,7 @@ func BuildQueryPlan(req sharedModel.TimeSeriesReadRequest) sharedModel.QueryPlan
 		plan.Limit = *req.Limit
 	}
 	if plan.IsKPI {
-		plan.NeedGrouping = len(plan.KPIDefinitionIDs) != 1 || len(plan.SDInstanceUIDs) != 1
+		plan.NeedGrouping = len(plan.KPIDefinitionUIDs) != 1 || len(plan.SDInstanceUIDs) != 1
 	} else {
 		plan.NeedGrouping = len(plan.SDInstanceUIDs) != 1
 	}
@@ -113,12 +113,12 @@ func BuildQueryPlan(req sharedModel.TimeSeriesReadRequest) sharedModel.QueryPlan
 			strings.Join(parts, " or "),
 		)
 	}
-	if plan.IsKPI && len(plan.KPIDefinitionIDs) > 0 {
+	if plan.IsKPI && len(plan.KPIDefinitionUIDs) > 0 {
 		plan.HasKPI = true
-		parts := make([]string, 0, len(plan.KPIDefinitionIDs))
-		for _, id := range plan.KPIDefinitionIDs {
+		parts := make([]string, 0, len(plan.KPIDefinitionUIDs))
+		for _, uid := range plan.KPIDefinitionUIDs {
 			parts = append(parts,
-				fmt.Sprintf(`r["kpiDefinitionID"] == "%d"`, id))
+				fmt.Sprintf(`r["kpiDefinitionUID"] == "%s"`, uid))
 		}
 		plan.KPIFilterFlux = fmt.Sprintf(`|> filter(fn: (r) => %s)`, strings.Join(parts, " or "))
 	}

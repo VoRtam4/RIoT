@@ -86,7 +86,10 @@ func ProcessKPIFulfillmentCheckRequestTuple(rabbitMQClient rabbitmq.Client, tupl
 	kpiRecords := make([]sharedModel.TimeSeriesKPIResultRecord, 0, len(requests))
 
 	for _, request := range requests {
-		rawOutputs, kpiOutputs, shouldProcessKPI := processRequestWithInstanceLock(request)
+		rawOutputs, kpiOutputs, shouldProcessKPI, err := processRequestWithInstanceLock(rabbitMQClient, request)
+		if err != nil {
+			return err
+		}
 		if rawOutputs.SDTypeChanged {
 			sdTypeUpdates[request.Message.SDTypeUID] = struct{}{}
 		}
@@ -114,14 +117,20 @@ func ProcessKPIFulfillmentCheckRequestTuple(rabbitMQClient rabbitmq.Client, tupl
 	return nil
 }
 
-func processRequestWithInstanceLock(request normalizedKPICheckRequest) (RawProcessingOutputs, KPIProcessingOutputs, bool) {
+func processRequestWithInstanceLock(rabbitMQClient rabbitmq.Client, request normalizedKPICheckRequest) (RawProcessingOutputs, KPIProcessingOutputs, bool, error) {
 	unlock := lockInstanceForInputProcessing(request.Message.SDInstanceUID)
 	defer unlock()
 
 	rawOutputs, shouldProcessKPI := ProcessRaw(request.Message, request.Params, request.EventTime)
 	if !shouldProcessKPI {
-		return rawOutputs, KPIProcessingOutputs{}, false
+		return rawOutputs, KPIProcessingOutputs{}, false, nil
+	}
+	if rawOutputs.LateRecord {
+		if err := ProcessLateRecord(rabbitMQClient, request.Message, request.Params, request.EventTime); err != nil {
+			return rawOutputs, KPIProcessingOutputs{}, false, err
+		}
+		return rawOutputs, KPIProcessingOutputs{}, false, nil
 	}
 
-	return rawOutputs, ProcessKPI(request.Message, request.Params, request.EventTime), true
+	return rawOutputs, ProcessKPI(request.Message, rawOutputs.CurrentValues, rawOutputs.PreviousValues, request.EventTime), true, nil
 }

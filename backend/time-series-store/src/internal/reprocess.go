@@ -38,7 +38,7 @@ func (c Influx2Client) StreamReprocess(req sharedModel.TimeSeriesReprocessReadRe
 		}
 		<-ch
 	}
-	key := makeKey(req.SDTypeUID, req.KPIDefinitionID)
+	key := makeKey(req.SDTypeUID, req.KPIDefinitionUID)
 	activeReprocessJobs.Store(key, req.JobID)
 	end := req.To.UTC()
 	effectiveFrom, err := c.resolveEffectiveReprocessFrom(req)
@@ -165,8 +165,8 @@ func (c Influx2Client) resolveEffectiveReprocessFrom(req sharedModel.TimeSeriesR
 	return earliest, nil
 }
 
-func makeKey(sdType string, kpiID uint32) string {
-	return fmt.Sprintf("%s|%d", sdType, kpiID)
+func makeKey(sdType string, kpiUID string) string {
+	return fmt.Sprintf("%s|%s", sdType, kpiUID)
 }
 
 func isActive(jobKey string, jobID string) bool {

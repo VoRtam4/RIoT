@@ -74,7 +74,7 @@ func (c Influx2Client) WriteRawBatch(records []sharedModel.TimeSeriesRawRecord) 
 
 func (c Influx2Client) kpiPoint(record sharedModel.TimeSeriesKPIResultRecord) *write.Point {
 	if record.JobID != "" {
-		if !isActive(makeKey(record.SDTypeUID, record.KPIDefinitionID), record.JobID) {
+		if !isActive(makeKey(record.SDTypeUID, record.KPIDefinitionUID), record.JobID) {
 			return nil
 		}
 	}
@@ -83,7 +83,7 @@ func (c Influx2Client) kpiPoint(record sharedModel.TimeSeriesKPIResultRecord) *w
 	}
 	measurement := fmt.Sprintf("%s_%s", string(sharedModel.TimeSeriesTypeKPIResult), record.SDTypeUID)
 	fields := map[string]interface{}{"fulfilled": record.Fulfilled}
-	tags := map[string]string{"sdInstanceUID": record.SDInstanceUID, "kpiDefinitionID": fmt.Sprintf("%d", record.KPIDefinitionID)}
+	tags := map[string]string{"sdInstanceUID": record.SDInstanceUID, "kpiDefinitionUID": record.KPIDefinitionUID}
 	for k, v := range record.Tags {
 		tags[k] = v
 	}
@@ -127,8 +127,8 @@ func (c Influx2Client) DeleteKPI(req sharedModel.KPIDeleteResultsRequestISCMessa
 			close(ch)
 		}()
 	}
-	activeReprocessJobs.Delete(makeKey(req.SDTypeUID, req.KPIDefinitionID))
-	predicate := fmt.Sprintf(`_measurement="%s_%s" AND kpiDefinitionID="%d"`, string(sharedModel.TimeSeriesTypeKPIResult), req.SDTypeUID, req.KPIDefinitionID)
+	activeReprocessJobs.Delete(makeKey(req.SDTypeUID, req.KPIDefinitionUID))
+	predicate := fmt.Sprintf(`_measurement="%s_%s" AND kpiDefinitionUID="%s"`, string(sharedModel.TimeSeriesTypeKPIResult), req.SDTypeUID, req.KPIDefinitionUID)
 	start := time.Unix(0, 0)
 	stop := time.Now().UTC()
 	deleteAPI := c.client.DeleteAPI()

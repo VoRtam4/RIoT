@@ -28,6 +28,7 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedConstants"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedModel"
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
+	"github.com/MichalBures-OG/bp-bures-RIoT-message-processing-unit/src/dispatch"
 	"github.com/MichalBures-OG/bp-bures-RIoT-message-processing-unit/src/processing"
 )
 
@@ -42,27 +43,23 @@ func getWorkerCount(envName string, logPrefix string) int {
 }
 
 func checkForKPIFulfilmentCheckRequests() {
-	workerCount := getWorkerCount("MPU_INPUT_WORKERS", "[MPU][INPUT]")
-	processing.SetInputConcurrency(workerCount)
-	log.Printf("[MPU][INPUT] Starting %d input worker(s)", workerCount)
+	consumerCount := getWorkerCount("MPU_INPUT_WORKERS", "[MPU][INPUT]")
+	log.Printf("[MPU][INPUT] Starting %d legacy input consumer(s) | queue=%s", consumerCount, sharedConstants.KPIFulfillmentCheckRequestsQueueName)
 	var wg sync.WaitGroup
-	for workerID := 1; workerID <= workerCount; workerID++ {
+	for consumerID := 1; consumerID <= consumerCount; consumerID++ {
 		wg.Add(1)
-		go func(workerID int) {
+		go func(consumerID int) {
 			defer wg.Done()
 			for {
 				rabbitMQClient := rabbitmq.NewClient()
-				err := rabbitmq.ConsumeJSONMessages[sharedModel.KPIFulfillmentCheckRequestTupleISCMessage](rabbitMQClient, sharedConstants.KPIFulfillmentCheckRequestsQueueName,
-					func(tuple sharedModel.KPIFulfillmentCheckRequestTupleISCMessage) error {
-						return processing.ProcessKPIFulfillmentCheckRequestTuple(rabbitMQClient, tuple)
-					})
+				err := dispatch.ConsumeInputQueue(rabbitMQClient, sharedConstants.KPIFulfillmentCheckRequestsQueueName, "")
 				rabbitMQClient.Dispose()
 				if err != nil {
-					log.Printf("[MPU][INPUT][worker=%d] Consumption failed from '%s': %s", workerID, sharedConstants.KPIFulfillmentCheckRequestsQueueName, err.Error())
+					log.Printf("[MPU][INPUT][consumer=%d] Consumption failed from '%s': %s", consumerID, sharedConstants.KPIFulfillmentCheckRequestsQueueName, err.Error())
 				}
 				time.Sleep(time.Second)
 			}
-		}(workerID)
+		}(consumerID)
 	}
 	wg.Wait()
 }
@@ -79,7 +76,7 @@ func checkForKPIReprocessRequests() {
 				rabbitMQClient := rabbitmq.NewClient()
 				err := rabbitmq.ConsumeJSONMessages[sharedModel.KPIReprocessRequestISCMessage](rabbitMQClient, sharedConstants.KPIReprocessRequestQueueName,
 					func(req sharedModel.KPIReprocessRequestISCMessage) error {
-						log.Printf("[MPU][REPROCESS][worker=%d] Starting KPI reprocess for KPI definition %d", workerID, req.KPIDefinitionID)
+						log.Printf("[MPU][REPROCESS][worker=%d] Starting KPI reprocess for KPI definition %s", workerID, req.KPIDefinitionUID)
 						return processing.ReprocessKPI(req)
 					},
 				)
@@ -109,6 +106,7 @@ func checkForSDTypeUpdates() {
 		err := rabbitmq.ConsumeJSONMessages[[]sharedModel.SDTypeUpdateISCMessage](rabbitMQClient, sharedConstants.SetOfSDTypesUpdatesQueueName,
 			func(messages []sharedModel.SDTypeUpdateISCMessage) error {
 				processing.UpdateSDType(messages)
+				dispatch.EnsureIngestConsumersForSDTypes(messages)
 				return nil
 			},
 		)
@@ -135,12 +133,15 @@ func checkForKPIDeleteRequests() {
 func main() {
 	log.SetOutput(os.Stderr)
 	log.Println("Waiting for dependencies...")
-	rawBackendCoreURL := sharedUtils.GetEnvironmentVariableValue("BACKEND_CORE_URL").GetPayloadOrDefault("http://riot-backend-core:9090")
+	rawBackendCoreURL := sharedUtils.GetEnvironmentVariableValue("BACKEND_CORE_URL").GetPayloadOrDefault("http://backend-core:9090")
 	parsedBackendCoreURL, err := url.Parse(rawBackendCoreURL)
 	sharedUtils.TerminateOnError(err, fmt.Sprintf("Unable to parse the backend-core URL: %s", rawBackendCoreURL))
 	sharedUtils.TerminateOnError(sharedUtils.WaitForDSs(time.Minute, sharedUtils.NewPairOf(parsedBackendCoreURL.Hostname(), parsedBackendCoreURL.Port())), "Some dependencies of this application are inaccessible")
 	log.Println("Dependencies should be up and running...")
 	processing.InitializeProcessing()
+	dispatch.StartInputProcessingWorkers()
+	go dispatch.LogInputStatsPeriodically(time.Minute)
+	go dispatch.LogInputTrendsPeriodically(dispatch.InputTrendSampleInterval)
 	go checkForKPIDefinitionsBySDTypeDenotationMapUpdates()
 	sharedUtils.TerminateOnError(processing.BootstrapProcessingState(), "Unable to bootstrap processing state")
 	sharedUtils.StartLoggingProfilingInformationPeriodically(time.Minute)

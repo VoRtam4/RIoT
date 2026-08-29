@@ -20,16 +20,21 @@ import (
 	"github.com/MichalBures-OG/bp-bures-RIoT-commons/src/sharedUtils"
 )
 
-func CheckKPIFulfillment(kpiDefinition sharedModel.KPIDefinitionMPU, sdParameterValueMap *any) sharedUtils.Result[bool] {
-	return checkKPINodeFulfillment(kpiDefinition.RootNode, sdParameterValueMap)
+type KPIEvaluationContext struct {
+	CurrentValues  map[string]interface{}
+	PreviousValues map[string]interface{}
 }
 
-func checkKPINodeFulfillment(kpiNode sharedModel.KPINode, sdParameterValueMap *any) sharedUtils.Result[bool] {
-	return getCheckerForKPINode(kpiNode).checkNodeFulfillment(kpiNode, sdParameterValueMap)
+func CheckKPIFulfillment(kpiDefinition sharedModel.KPIDefinitionMPU, context KPIEvaluationContext) sharedUtils.Result[bool] {
+	return checkKPINodeFulfillment(kpiDefinition.RootNode, context)
+}
+
+func checkKPINodeFulfillment(kpiNode sharedModel.KPINode, context KPIEvaluationContext) sharedUtils.Result[bool] {
+	return getCheckerForKPINode(kpiNode).checkNodeFulfillment(kpiNode, context)
 }
 
 type kpiNodeFulfillmentChecker interface {
-	checkNodeFulfillment(kpiNode sharedModel.KPINode, sdParameterValueMap *any) sharedUtils.Result[bool]
+	checkNodeFulfillment(kpiNode sharedModel.KPINode, context KPIEvaluationContext) sharedUtils.Result[bool]
 }
 
 func getCheckerForKPINode(kpiNode sharedModel.KPINode) kpiNodeFulfillmentChecker {
@@ -95,174 +100,159 @@ type numericNotExistsKPINodeFulfillmentChecker struct{}
 
 type logicalOperationKPINodeFulfillmentChecker struct{}
 
-func (_ *stringEQKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, sdParameterValueMap *any) sharedUtils.Result[bool] {
+func (_ *stringEQKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, context KPIEvaluationContext) sharedUtils.Result[bool] {
 	stringEQAtomKPINode := kpiNode.(*sharedModel.StringEQAtomKPINode)
-	actualSDParameterValueResult := getSDParameterValue[string](sdParameterValueMap, stringEQAtomKPINode.SDParameterSpecification)
-	if actualSDParameterValueResult.IsFailure() {
-		return sharedUtils.NewFailureResult[bool](actualSDParameterValueResult.GetError())
-	}
-	actualSDParameterValuePointer := actualSDParameterValueResult.GetPayload()
-	if actualSDParameterValuePointer == nil {
-		return sharedUtils.NewSuccessResult[bool](false)
-	}
-	return sharedUtils.NewSuccessResult[bool](*actualSDParameterValuePointer == stringEQAtomKPINode.ReferenceValue)
+	return compareAtomValues[string](context, stringEQAtomKPINode.SDParameterSpecification, stringEQAtomKPINode.ReferenceMode, stringEQAtomKPINode.ReferenceValue, stringEQAtomKPINode.ComparedSDParameterSpecification, stringEQAtomKPINode.ComparedRecordOffset, func(actual, reference string) bool {
+		return actual == reference
+	})
 }
 
-func (_ *stringNEQKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, sdParameterValueMap *any) sharedUtils.Result[bool] {
+func (_ *stringNEQKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, context KPIEvaluationContext) sharedUtils.Result[bool] {
 	stringNEQAtomKPINode := kpiNode.(*sharedModel.StringNEQAtomKPINode)
-	actualSDParameterValueResult := getSDParameterValue[string](sdParameterValueMap, stringNEQAtomKPINode.SDParameterSpecification)
-	if actualSDParameterValueResult.IsFailure() {
-		return sharedUtils.NewFailureResult[bool](actualSDParameterValueResult.GetError())
-	}
-	actualSDParameterValuePointer := actualSDParameterValueResult.GetPayload()
-	if actualSDParameterValuePointer == nil {
-		return sharedUtils.NewSuccessResult[bool](false)
-	}
-	return sharedUtils.NewSuccessResult[bool](*actualSDParameterValuePointer != stringNEQAtomKPINode.ReferenceValue)
+	return compareAtomValues[string](context, stringNEQAtomKPINode.SDParameterSpecification, stringNEQAtomKPINode.ReferenceMode, stringNEQAtomKPINode.ReferenceValue, stringNEQAtomKPINode.ComparedSDParameterSpecification, stringNEQAtomKPINode.ComparedRecordOffset, func(actual, reference string) bool {
+		return actual != reference
+	})
 }
 
-func (_ *stringExistsKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, sdParameterValueMap *any) sharedUtils.Result[bool] {
+func (_ *stringExistsKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, context KPIEvaluationContext) sharedUtils.Result[bool] {
 	stringExistsAtomKPINode := kpiNode.(*sharedModel.StringExistsAtomKPINode)
-	val, exists := (*sdParameterValueMap).(map[string]any)[stringExistsAtomKPINode.SDParameterSpecification]
+	val, exists := context.CurrentValues[stringExistsAtomKPINode.SDParameterSpecification]
 	return sharedUtils.NewSuccessResult[bool](exists && val != nil)
 }
 
-func (_ *stringNotExistsKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, sdParameterValueMap *any) sharedUtils.Result[bool] {
+func (_ *stringNotExistsKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, context KPIEvaluationContext) sharedUtils.Result[bool] {
 	stringNotExistsAtomKPINode := kpiNode.(*sharedModel.StringNotExistsAtomKPINode)
-	val, exists := (*sdParameterValueMap).(map[string]any)[stringNotExistsAtomKPINode.SDParameterSpecification]
+	val, exists := context.CurrentValues[stringNotExistsAtomKPINode.SDParameterSpecification]
 	return sharedUtils.NewSuccessResult[bool](!exists || val == nil)
 }
 
-func (_ *booleanEQKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, sdParameterValueMap *any) sharedUtils.Result[bool] {
+func (_ *booleanEQKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, context KPIEvaluationContext) sharedUtils.Result[bool] {
 	booleanEQAtomKPINode := kpiNode.(*sharedModel.BooleanEQAtomKPINode)
-	actualSDParameterValueResult := getSDParameterValue[bool](sdParameterValueMap, booleanEQAtomKPINode.SDParameterSpecification)
-	if actualSDParameterValueResult.IsFailure() {
-		return sharedUtils.NewFailureResult[bool](actualSDParameterValueResult.GetError())
-	}
-	actualSDParameterValuePointer := actualSDParameterValueResult.GetPayload()
-	if actualSDParameterValuePointer == nil {
-		return sharedUtils.NewSuccessResult[bool](false)
-	}
-	return sharedUtils.NewSuccessResult[bool](*actualSDParameterValuePointer == booleanEQAtomKPINode.ReferenceValue)
+	return compareAtomValues[bool](context, booleanEQAtomKPINode.SDParameterSpecification, booleanEQAtomKPINode.ReferenceMode, booleanEQAtomKPINode.ReferenceValue, booleanEQAtomKPINode.ComparedSDParameterSpecification, booleanEQAtomKPINode.ComparedRecordOffset, func(actual, reference bool) bool {
+		return actual == reference
+	})
 }
 
-func (_ *booleanNEQKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, sdParameterValueMap *any) sharedUtils.Result[bool] {
+func (_ *booleanNEQKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, context KPIEvaluationContext) sharedUtils.Result[bool] {
 	booleanEQAtomKPINode := kpiNode.(*sharedModel.BooleanNEQAtomKPINode)
-	actualSDParameterValueResult := getSDParameterValue[bool](sdParameterValueMap, booleanEQAtomKPINode.SDParameterSpecification)
-	if actualSDParameterValueResult.IsFailure() {
-		return sharedUtils.NewFailureResult[bool](actualSDParameterValueResult.GetError())
-	}
-	actualSDParameterValuePointer := actualSDParameterValueResult.GetPayload()
-	if actualSDParameterValuePointer == nil {
-		return sharedUtils.NewSuccessResult[bool](false)
-	}
-	return sharedUtils.NewSuccessResult[bool](*actualSDParameterValuePointer != booleanEQAtomKPINode.ReferenceValue)
+	return compareAtomValues[bool](context, booleanEQAtomKPINode.SDParameterSpecification, booleanEQAtomKPINode.ReferenceMode, booleanEQAtomKPINode.ReferenceValue, booleanEQAtomKPINode.ComparedSDParameterSpecification, booleanEQAtomKPINode.ComparedRecordOffset, func(actual, reference bool) bool {
+		return actual != reference
+	})
 }
 
-func (_ *booleanExistsKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, sdParameterValueMap *any) sharedUtils.Result[bool] {
+func (_ *booleanExistsKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, context KPIEvaluationContext) sharedUtils.Result[bool] {
 	booleanExistsAtomKPINode := kpiNode.(*sharedModel.BooleanExistsAtomKPINode)
-	val, exists := (*sdParameterValueMap).(map[string]any)[booleanExistsAtomKPINode.SDParameterSpecification]
+	val, exists := context.CurrentValues[booleanExistsAtomKPINode.SDParameterSpecification]
 	return sharedUtils.NewSuccessResult[bool](exists && val != nil)
 }
 
-func (_ *booleanNotExistsKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, sdParameterValueMap *any) sharedUtils.Result[bool] {
+func (_ *booleanNotExistsKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, context KPIEvaluationContext) sharedUtils.Result[bool] {
 	booleanNotExistsAtomKPINode := kpiNode.(*sharedModel.BooleanNotExistsAtomKPINode)
-	val, exists := (*sdParameterValueMap).(map[string]any)[booleanNotExistsAtomKPINode.SDParameterSpecification]
+	val, exists := context.CurrentValues[booleanNotExistsAtomKPINode.SDParameterSpecification]
 	return sharedUtils.NewSuccessResult[bool](!exists || val == nil)
 }
 
-func (_ *numericEQKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, sdParameterValueMap *any) sharedUtils.Result[bool] {
+func (_ *numericEQKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, context KPIEvaluationContext) sharedUtils.Result[bool] {
 	numericEQAtomKPINode := kpiNode.(*sharedModel.NumericEQAtomKPINode)
-	actualSDParameterValueResult := getSDParameterValue[float64](sdParameterValueMap, numericEQAtomKPINode.SDParameterSpecification)
-	if actualSDParameterValueResult.IsFailure() {
-		return sharedUtils.NewFailureResult[bool](actualSDParameterValueResult.GetError())
-	}
-	actualSDParameterValuePointer := actualSDParameterValueResult.GetPayload()
-	if actualSDParameterValuePointer == nil {
-		return sharedUtils.NewSuccessResult[bool](false)
-	}
-	return sharedUtils.NewSuccessResult[bool](*actualSDParameterValuePointer == numericEQAtomKPINode.ReferenceValue)
+	return compareAtomValues[float64](context, numericEQAtomKPINode.SDParameterSpecification, numericEQAtomKPINode.ReferenceMode, numericEQAtomKPINode.ReferenceValue, numericEQAtomKPINode.ComparedSDParameterSpecification, numericEQAtomKPINode.ComparedRecordOffset, func(actual, reference float64) bool {
+		return actual == reference
+	})
 }
 
-func (_ *numericNEQKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, sdParameterValueMap *any) sharedUtils.Result[bool] {
+func (_ *numericNEQKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, context KPIEvaluationContext) sharedUtils.Result[bool] {
 	numericNEQAtomKPINode := kpiNode.(*sharedModel.NumericNEQAtomKPINode)
-	actualSDParameterValueResult := getSDParameterValue[float64](sdParameterValueMap, numericNEQAtomKPINode.SDParameterSpecification)
-	if actualSDParameterValueResult.IsFailure() {
-		return sharedUtils.NewFailureResult[bool](actualSDParameterValueResult.GetError())
-	}
-	actualSDParameterValuePointer := actualSDParameterValueResult.GetPayload()
-	if actualSDParameterValuePointer == nil {
-		return sharedUtils.NewSuccessResult[bool](false)
-	}
-	return sharedUtils.NewSuccessResult[bool](*actualSDParameterValuePointer != numericNEQAtomKPINode.ReferenceValue)
+	return compareAtomValues[float64](context, numericNEQAtomKPINode.SDParameterSpecification, numericNEQAtomKPINode.ReferenceMode, numericNEQAtomKPINode.ReferenceValue, numericNEQAtomKPINode.ComparedSDParameterSpecification, numericNEQAtomKPINode.ComparedRecordOffset, func(actual, reference float64) bool {
+		return actual != reference
+	})
 }
 
-func (_ *numericGTKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, sdParameterValueMap *any) sharedUtils.Result[bool] {
+func (_ *numericGTKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, context KPIEvaluationContext) sharedUtils.Result[bool] {
 	numericGTAtomKPINode := kpiNode.(*sharedModel.NumericGTAtomKPINode)
-	actualSDParameterValueResult := getSDParameterValue[float64](sdParameterValueMap, numericGTAtomKPINode.SDParameterSpecification)
-	if actualSDParameterValueResult.IsFailure() {
-		return sharedUtils.NewFailureResult[bool](actualSDParameterValueResult.GetError())
-	}
-	actualSDParameterValuePointer := actualSDParameterValueResult.GetPayload()
-	if actualSDParameterValuePointer == nil {
-		return sharedUtils.NewSuccessResult[bool](false)
-	}
-	return sharedUtils.NewSuccessResult[bool](*actualSDParameterValuePointer > numericGTAtomKPINode.ReferenceValue)
+	return compareAtomValues[float64](context, numericGTAtomKPINode.SDParameterSpecification, numericGTAtomKPINode.ReferenceMode, numericGTAtomKPINode.ReferenceValue, numericGTAtomKPINode.ComparedSDParameterSpecification, numericGTAtomKPINode.ComparedRecordOffset, func(actual, reference float64) bool {
+		return actual > reference
+	})
 }
 
-func (_ *numericGEQKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, sdParameterValueMap *any) sharedUtils.Result[bool] {
+func (_ *numericGEQKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, context KPIEvaluationContext) sharedUtils.Result[bool] {
 	numericGEQAtomKPINode := kpiNode.(*sharedModel.NumericGEQAtomKPINode)
-	actualSDParameterValueResult := getSDParameterValue[float64](sdParameterValueMap, numericGEQAtomKPINode.SDParameterSpecification)
-	if actualSDParameterValueResult.IsFailure() {
-		return sharedUtils.NewFailureResult[bool](actualSDParameterValueResult.GetError())
-	}
-	actualSDParameterValuePointer := actualSDParameterValueResult.GetPayload()
-	if actualSDParameterValuePointer == nil {
-		return sharedUtils.NewSuccessResult[bool](false)
-	}
-	return sharedUtils.NewSuccessResult[bool](*actualSDParameterValuePointer >= numericGEQAtomKPINode.ReferenceValue)
+	return compareAtomValues[float64](context, numericGEQAtomKPINode.SDParameterSpecification, numericGEQAtomKPINode.ReferenceMode, numericGEQAtomKPINode.ReferenceValue, numericGEQAtomKPINode.ComparedSDParameterSpecification, numericGEQAtomKPINode.ComparedRecordOffset, func(actual, reference float64) bool {
+		return actual >= reference
+	})
 }
 
-func (_ *numericLTKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, sdParameterValueMap *any) sharedUtils.Result[bool] {
+func (_ *numericLTKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, context KPIEvaluationContext) sharedUtils.Result[bool] {
 	numericLTAtomKPINode := kpiNode.(*sharedModel.NumericLTAtomKPINode)
-	actualSDParameterValueResult := getSDParameterValue[float64](sdParameterValueMap, numericLTAtomKPINode.SDParameterSpecification)
-	if actualSDParameterValueResult.IsFailure() {
-		return sharedUtils.NewFailureResult[bool](actualSDParameterValueResult.GetError())
-	}
-	actualSDParameterValuePointer := actualSDParameterValueResult.GetPayload()
-	if actualSDParameterValuePointer == nil {
-		return sharedUtils.NewSuccessResult[bool](false)
-	}
-	return sharedUtils.NewSuccessResult[bool](*actualSDParameterValuePointer < numericLTAtomKPINode.ReferenceValue)
+	return compareAtomValues[float64](context, numericLTAtomKPINode.SDParameterSpecification, numericLTAtomKPINode.ReferenceMode, numericLTAtomKPINode.ReferenceValue, numericLTAtomKPINode.ComparedSDParameterSpecification, numericLTAtomKPINode.ComparedRecordOffset, func(actual, reference float64) bool {
+		return actual < reference
+	})
 }
 
-func (_ *numericLEQKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, sdParameterValueMap *any) sharedUtils.Result[bool] {
+func (_ *numericLEQKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, context KPIEvaluationContext) sharedUtils.Result[bool] {
 	numericLEQAtomKPINode := kpiNode.(*sharedModel.NumericLEQAtomKPINode)
-	actualSDParameterValueResult := getSDParameterValue[float64](sdParameterValueMap, numericLEQAtomKPINode.SDParameterSpecification)
-	if actualSDParameterValueResult.IsFailure() {
-		return sharedUtils.NewFailureResult[bool](actualSDParameterValueResult.GetError())
-	}
-	actualSDParameterValuePointer := actualSDParameterValueResult.GetPayload()
-	if actualSDParameterValuePointer == nil {
-		return sharedUtils.NewSuccessResult[bool](false)
-	}
-	return sharedUtils.NewSuccessResult[bool](*actualSDParameterValuePointer <= numericLEQAtomKPINode.ReferenceValue)
+	return compareAtomValues[float64](context, numericLEQAtomKPINode.SDParameterSpecification, numericLEQAtomKPINode.ReferenceMode, numericLEQAtomKPINode.ReferenceValue, numericLEQAtomKPINode.ComparedSDParameterSpecification, numericLEQAtomKPINode.ComparedRecordOffset, func(actual, reference float64) bool {
+		return actual <= reference
+	})
 }
 
-func (_ *numericExistsKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, sdParameterValueMap *any) sharedUtils.Result[bool] {
+func (_ *numericExistsKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, context KPIEvaluationContext) sharedUtils.Result[bool] {
 	numericExistsAtomKPINode := kpiNode.(*sharedModel.NumericExistsAtomKPINode)
-	val, exists := (*sdParameterValueMap).(map[string]any)[numericExistsAtomKPINode.SDParameterSpecification]
+	val, exists := context.CurrentValues[numericExistsAtomKPINode.SDParameterSpecification]
 	return sharedUtils.NewSuccessResult[bool](exists && val != nil)
 }
 
-func (_ *numericNotExistsKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, sdParameterValueMap *any) sharedUtils.Result[bool] {
+func (_ *numericNotExistsKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, context KPIEvaluationContext) sharedUtils.Result[bool] {
 	numericNotExistsAtomKPINode := kpiNode.(*sharedModel.NumericNotExistsAtomKPINode)
-	val, exists := (*sdParameterValueMap).(map[string]any)[numericNotExistsAtomKPINode.SDParameterSpecification]
+	val, exists := context.CurrentValues[numericNotExistsAtomKPINode.SDParameterSpecification]
 	return sharedUtils.NewSuccessResult[bool](!exists || val == nil)
 }
 
-func getSDParameterValue[T any](sdParameterValueMap *any, sdParameterSpecification string) sharedUtils.Result[*T] {
-	sdParameterValue, exists := (*sdParameterValueMap).(map[string]any)[sdParameterSpecification]
+func compareAtomValues[T any](context KPIEvaluationContext, actualSDParameterSpecification string, referenceMode sharedModel.KPIReferenceMode, literalReferenceValue T, comparedSDParameterSpecification string, comparedRecordOffset *int, comparison func(T, T) bool) sharedUtils.Result[bool] {
+	actualSDParameterValueResult := getSDParameterValue[T](context.CurrentValues, actualSDParameterSpecification)
+	if actualSDParameterValueResult.IsFailure() {
+		return sharedUtils.NewFailureResult[bool](actualSDParameterValueResult.GetError())
+	}
+	referenceSDParameterValueResult := getReferenceValue[T](context, referenceMode, literalReferenceValue, comparedSDParameterSpecification, comparedRecordOffset)
+	if referenceSDParameterValueResult.IsFailure() {
+		return sharedUtils.NewFailureResult[bool](referenceSDParameterValueResult.GetError())
+	}
+	actualSDParameterValuePointer := actualSDParameterValueResult.GetPayload()
+	referenceSDParameterValuePointer := referenceSDParameterValueResult.GetPayload()
+	if actualSDParameterValuePointer == nil || referenceSDParameterValuePointer == nil {
+		return sharedUtils.NewSuccessResult[bool](false)
+	}
+	return sharedUtils.NewSuccessResult[bool](comparison(*actualSDParameterValuePointer, *referenceSDParameterValuePointer))
+}
+
+func getReferenceValue[T any](context KPIEvaluationContext, referenceMode sharedModel.KPIReferenceMode, literalReferenceValue T, comparedSDParameterSpecification string, comparedRecordOffset *int) sharedUtils.Result[*T] {
+	if referenceMode == "" || referenceMode == sharedModel.KPIReferenceModeLiteral {
+		return sharedUtils.NewSuccessResult(&literalReferenceValue)
+	}
+	if referenceMode != sharedModel.KPIReferenceModeParameter {
+		return sharedUtils.NewFailureResult[*T](fmt.Errorf("unsupported KPI reference mode: %s", referenceMode))
+	}
+	if comparedRecordOffset == nil {
+		return sharedUtils.NewFailureResult[*T](fmt.Errorf("missing compared record offset"))
+	}
+	values, err := valuesByComparedRecordOffset(*comparedRecordOffset, context)
+	if err != nil {
+		return sharedUtils.NewFailureResult[*T](err)
+	}
+	return getSDParameterValue[T](values, comparedSDParameterSpecification)
+}
+
+func valuesByComparedRecordOffset(comparedRecordOffset int, context KPIEvaluationContext) (map[string]interface{}, error) {
+	switch comparedRecordOffset {
+	case 0:
+		return context.CurrentValues, nil
+	case -1:
+		return context.PreviousValues, nil
+	default:
+		return nil, fmt.Errorf("unsupported compared record offset: %d", comparedRecordOffset)
+	}
+}
+
+func getSDParameterValue[T any](sdParameterValueMap map[string]interface{}, sdParameterSpecification string) sharedUtils.Result[*T] {
+	sdParameterValue, exists := sdParameterValueMap[sdParameterSpecification]
 	if !exists || sdParameterValue == nil {
 		return sharedUtils.NewSuccessResult[*T](nil)
 	}
@@ -273,12 +263,12 @@ func getSDParameterValue[T any](sdParameterValueMap *any, sdParameterSpecificati
 	return sharedUtils.NewSuccessResult[*T](&value)
 }
 
-func (_ *logicalOperationKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, sdParameterValueMap *any) sharedUtils.Result[bool] {
+func (_ *logicalOperationKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode sharedModel.KPINode, context KPIEvaluationContext) sharedUtils.Result[bool] {
 	logicalOperationKPINode := kpiNode.(*sharedModel.LogicalOperationKPINode)
 	switch logicalOperationKPINode.Type {
 	case sharedModel.AND:
 		for _, node := range logicalOperationKPINode.ChildNodes {
-			kpiNodeFulfillmentResult := checkKPINodeFulfillment(node, sdParameterValueMap)
+			kpiNodeFulfillmentResult := checkKPINodeFulfillment(node, context)
 			if kpiNodeFulfillmentResult.IsFailure() {
 				return sharedUtils.NewFailureResult[bool](kpiNodeFulfillmentResult.GetError())
 			}
@@ -289,7 +279,7 @@ func (_ *logicalOperationKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode
 		return sharedUtils.NewSuccessResult[bool](true)
 	case sharedModel.OR:
 		for _, node := range logicalOperationKPINode.ChildNodes {
-			kpiNodeFulfillmentResult := checkKPINodeFulfillment(node, sdParameterValueMap)
+			kpiNodeFulfillmentResult := checkKPINodeFulfillment(node, context)
 			if kpiNodeFulfillmentResult.IsFailure() {
 				return sharedUtils.NewFailureResult[bool](kpiNodeFulfillmentResult.GetError())
 			}
@@ -300,7 +290,7 @@ func (_ *logicalOperationKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode
 		return sharedUtils.NewSuccessResult[bool](false)
 	case sharedModel.NOR:
 		for _, node := range logicalOperationKPINode.ChildNodes {
-			kpiNodeFulfillmentResult := checkKPINodeFulfillment(node, sdParameterValueMap)
+			kpiNodeFulfillmentResult := checkKPINodeFulfillment(node, context)
 			if kpiNodeFulfillmentResult.IsFailure() {
 				return sharedUtils.NewFailureResult[bool](kpiNodeFulfillmentResult.GetError())
 			}
@@ -313,7 +303,7 @@ func (_ *logicalOperationKPINodeFulfillmentChecker) checkNodeFulfillment(kpiNode
 		if len(logicalOperationKPINode.ChildNodes) != 1 {
 			return sharedUtils.NewFailureResult[bool](fmt.Errorf("NOT operation must have exactly one child"))
 		}
-		childResult := checkKPINodeFulfillment(logicalOperationKPINode.ChildNodes[0], sdParameterValueMap)
+		childResult := checkKPINodeFulfillment(logicalOperationKPINode.ChildNodes[0], context)
 		if childResult.IsFailure() {
 			return sharedUtils.NewFailureResult[bool](childResult.GetError())
 		}

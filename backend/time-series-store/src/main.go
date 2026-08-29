@@ -49,7 +49,7 @@ func main() {
 		os.Exit(1)
 	}
 	log.Println("Waiting for dependencies...")
-	rawBackendCoreURL := sharedUtils.GetEnvironmentVariableValue("BACKEND_CORE_URL").GetPayloadOrDefault("http://riot-backend-core:9090")
+	rawBackendCoreURL := sharedUtils.GetEnvironmentVariableValue("BACKEND_CORE_URL").GetPayloadOrDefault("http://backend-core:9090")
 	parsedBackendCoreURL, err := url.Parse(rawBackendCoreURL)
 	sharedUtils.TerminateOnError(err, fmt.Sprintf("Unable to parse the backend-core URL: %s", rawBackendCoreURL))
 	parsedInfluxURL, err := url.Parse(environment.InfluxUrl)
@@ -78,6 +78,10 @@ func main() {
 		runConsumerLoop("distinct tag value requests", func() error { return consumeDistinctTagValueRequests(influx) })
 	}, func() {
 		runConsumerLoop("reprocess read requests", func() error { return consumeReprocessReadRequests(influx) })
+	}, func() {
+		runConsumerLoop("record neighborhood requests", func() error { return consumeRecordNeighborhoodRequests(influx) })
+	}, func() {
+		runConsumerLoop("late record corrections", func() error { return consumeLateRecordCorrections(influx) })
 	}, func() {
 		runConsumerLoop("delete requests", func() error { return consumeDeleteRequests(influx) })
 	})
@@ -170,11 +174,8 @@ func handleReadRequest(influx internal.Influx2Client, req sharedModel.TimeSeries
 			SDInstanceUID: p.Tags["sdInstanceUID"],
 		}
 		if plan.IsKPI {
-			if v, ok := p.Tags["kpiDefinitionID"]; ok {
-				if parsed, err := strconv.ParseUint(v, 10, 32); err == nil {
-					kpi := uint32(parsed)
-					cursor.KPIDefinitionID = &kpi
-				}
+			if v, ok := p.Tags["kpiDefinitionUID"]; ok {
+				cursor.KPIDefinitionUID = &v
 			}
 		}
 		return cursor
@@ -346,6 +347,50 @@ func consumeDeleteRequests(influx internal.Influx2Client) error {
 	rabbitMQClient := rabbitmq.NewClient()
 	defer rabbitMQClient.Dispose()
 	return rabbitmq.ConsumeJSONMessages[sharedModel.KPIDeleteResultsRequestISCMessage](rabbitMQClient, sharedConstants.TSDBDeleteQueueName, influx.DeleteKPI)
+}
+
+func consumeRecordNeighborhoodRequests(influx internal.Influx2Client) error {
+	rabbitMQClient := rabbitmq.NewClient()
+	defer rabbitMQClient.Dispose()
+	return rabbitmq.ConsumeJSONMessagesWithAccessToDelivery[sharedModel.TimeSeriesRecordNeighborhoodRequest](
+		rabbitMQClient,
+		sharedConstants.TimeSeriesRecordNeighborhoodRequestQueueName,
+		"",
+		func(req sharedModel.TimeSeriesRecordNeighborhoodRequest, delivery amqp.Delivery) error {
+			ch := rabbitMQClient.GetChannel()
+			send := func(resp sharedModel.TimeSeriesRecordNeighborhoodResponse) error {
+				if delivery.ReplyTo == "" {
+					return fmt.Errorf("missing ReplyTo in request")
+				}
+				jsonData, err := json.Marshal(resp)
+				if err != nil {
+					return err
+				}
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+				return ch.PublishWithContext(ctx, "", delivery.ReplyTo, false, false, amqp.Publishing{
+					ContentType:   "application/json",
+					Body:          jsonData,
+					CorrelationId: delivery.CorrelationId,
+				})
+			}
+			response, err := influx.GetRecordNeighborhood(req)
+			if err != nil {
+				return send(sharedModel.TimeSeriesRecordNeighborhoodResponse{Error: err.Error()})
+			}
+			return send(response)
+		},
+	)
+}
+
+func consumeLateRecordCorrections(influx internal.Influx2Client) error {
+	rabbitMQClient := rabbitmq.NewClient()
+	defer rabbitMQClient.Dispose()
+	return rabbitmq.ConsumeJSONMessages[sharedModel.TimeSeriesLateRecordCorrection](
+		rabbitMQClient,
+		sharedConstants.TimeSeriesLateRecordCorrectionQueueName,
+		influx.ApplyLateRecordCorrection,
+	)
 }
 
 func parseParameters() (bool, internal.TimeSeriesStoreEnvironment) {

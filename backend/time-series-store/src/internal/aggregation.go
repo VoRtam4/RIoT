@@ -36,7 +36,7 @@ func extractTags(values map[string]interface{}) map[string]string {
 }
 
 func buildAggregateKey(tags map[string]string) string {
-	return tags["sdInstanceUID"] + "|" + tags["kpiDefinitionID"]
+	return tags["sdInstanceUID"] + "|" + tags["kpiDefinitionUID"]
 }
 
 func cloneTags(src map[string]string) map[string]string {
@@ -157,8 +157,8 @@ func shouldSkipAggregatedPoint(plan sharedModel.QueryPlan, state *aggregateStrea
 		return false
 	}
 	cursorKey := plan.Cursor.SDInstanceUID
-	if plan.Cursor.KPIDefinitionID != nil {
-		cursorKey += "|" + fmt.Sprintf("%d", *plan.Cursor.KPIDefinitionID)
+	if plan.Cursor.KPIDefinitionUID != nil {
+		cursorKey += "|" + *plan.Cursor.KPIDefinitionUID
 	}
 	pointKey := buildAggregateKey(point.Tags)
 	if point.Time.Before(plan.Cursor.Time) {

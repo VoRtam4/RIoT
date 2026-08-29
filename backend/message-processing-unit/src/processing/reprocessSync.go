@@ -20,16 +20,16 @@ import (
 )
 
 func ProcessDelete(req sharedModel.KPIDeleteResultsRequestISCMessage) error {
-	if req.KPIDefinitionID != 0 {
-		key := makeKey(req.SDTypeUID, req.KPIDefinitionID)
+	if req.KPIDefinitionUID != "" {
+		key := makeKey(req.SDTypeUID, req.KPIDefinitionUID)
 		activeReprocessJobs.Delete(key)
-		log.Printf("[MPU][REPROCESS] Delete request received -> cancelling active reprocess | kpiID=%d sdType=%s key=%s", req.KPIDefinitionID, req.SDTypeUID, key)
+		log.Printf("[MPU][REPROCESS] Delete request received -> cancelling active reprocess | kpiUID=%s sdType=%s key=%s", req.KPIDefinitionUID, req.SDTypeUID, key)
 	}
 	return nil
 }
 
-func makeKey(sdType string, kpiID uint32) string {
-	return fmt.Sprintf("%s|%d", sdType, kpiID)
+func makeKey(sdType string, kpiUID string) string {
+	return fmt.Sprintf("%s|%s", sdType, kpiUID)
 }
 
 func isActive(jobKey string, jobID string) bool {

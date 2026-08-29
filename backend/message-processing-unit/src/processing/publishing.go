@@ -176,7 +176,7 @@ func mergeTagsAndFields(point sharedModel.TimeSeriesDataPoint) map[string]interf
 	}
 	for k, v := range point.Tags {
 		switch k {
-		case "sdInstanceUID", "sdType", "kpiDefinitionID":
+		case "sdInstanceUID", "sdType", "kpiDefinitionUID":
 			continue
 		default:
 			params[k] = v

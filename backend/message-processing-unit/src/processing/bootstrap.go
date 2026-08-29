@@ -130,8 +130,8 @@ func bootstrapKPICache() error {
 					continue
 				}
 				lastKPI.Store(sharedModel.KPIKey{
-					SDInstanceUID:   msg.SDInstanceUID,
-					KPIDefinitionID: msg.KPIDefinitionID,
+					SDInstanceUID:    msg.SDInstanceUID,
+					KPIDefinitionUID: msg.KPIDefinitionUID,
 				}, sharedModel.KPIState{
 					Value:          msg.Fulfilled,
 					EventTime:      msg.EventTime,
